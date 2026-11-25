@@ -462,6 +462,9 @@ export default function App() {
   const [cages, setCages] = useState(generateInitialCages);
   const [objects, setObjects] = useState(INITIAL_OBJECTS);
   const [companyInfo, setCompanyInfo] = useState(INITIAL_COMPANY_INFO);
+  const [trunkLabel, setTrunkLabel] = useState('Troncal Submarina 224m');
+  const [showTrunkLabel, setShowTrunkLabel] = useState(true);
+  const [selectedModuleId, setSelectedModuleId] = useState(null);
 
   // Estado de vista del plano (Pan & Zoom)
   const [zoom, setZoom] = useState(0.88);
@@ -491,8 +494,9 @@ export default function App() {
   const [fbUser, setFbUser] = useState(null);
   const [cloudStatus, setCloudStatus] = useState(db ? 'connecting' : 'offline');
   const [savedBlueprints, setSavedBlueprints] = useState([]);
+  const [cloudSearchQuery, setCloudSearchQuery] = useState('');
   const [currentBlueprintId, setCurrentBlueprintId] = useState('plano-principal-engorda');
-  const [blueprintNameInput, setBlueprintNameInput] = useState('Plano Maestro Centro Engorda (Módulos 200 y 100)');
+  const [blueprintNameInput, setBlueprintNameInput] = useState(INITIAL_COMPANY_INFO.centerName);
   const [isSavingCloud, setIsSavingCloud] = useState(false);
 
   // Visibilidad de paneles laterales, pantalla completa y vista previa
@@ -586,7 +590,7 @@ export default function App() {
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9-_]/g, '-');
-      const targetTitle = (customTitle || blueprintNameInput || 'Plano Centro de Engorda').trim();
+      const targetTitle = (customTitle || companyInfo.centerName || blueprintNameInput || 'Plano Centro de Engorda').trim();
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'planos_centro_engorda', targetId);
 
       const payload = {
@@ -599,6 +603,8 @@ export default function App() {
         modules,
         cages,
         objects,
+        trunkLabel,
+        showTrunkLabel,
         companyInfo,
       };
 
@@ -619,9 +625,11 @@ export default function App() {
     if (Array.isArray(bp.modules)) setModules(bp.modules);
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
+    if (typeof bp.trunkLabel === 'string') setTrunkLabel(bp.trunkLabel);
+    if (typeof bp.showTrunkLabel === 'boolean') setShowTrunkLabel(bp.showTrunkLabel);
     if (bp.companyInfo) setCompanyInfo((prev) => ({ ...prev, ...bp.companyInfo }));
     setCurrentBlueprintId(bp.id);
-    setBlueprintNameInput(bp.title || bp.id);
+    setBlueprintNameInput(bp.companyInfo?.centerName || bp.title || bp.id);
     setSelectedId(null);
     setSelectedKind(null);
     setShowCloudModal(false);
@@ -675,6 +683,33 @@ export default function App() {
     () => (selectedKind === 'cage' ? cages.find((c) => c.id === selectedId) : null),
     [cages, selectedId, selectedKind]
   );
+
+  const selectedModule = useMemo(
+    () => (selectedKind === 'module' ? modules.find((m) => m.id === selectedModuleId) : null),
+    [modules, selectedModuleId, selectedKind]
+  );
+
+  const filteredBlueprints = useMemo(() => {
+    const q = cloudSearchQuery.trim().toLowerCase();
+    if (!q) return savedBlueprints;
+    return savedBlueprints.filter(
+      (bp) =>
+        (bp.title || '').toLowerCase().includes(q) ||
+        (bp.companyInfo?.centerName || '').toLowerCase().includes(q) ||
+        (bp.companyName || '').toLowerCase().includes(q) ||
+        (bp.id || '').toLowerCase().includes(q)
+    );
+  }, [savedBlueprints, cloudSearchQuery]);
+
+  const slugifyCenterFileName = (fallbackPrefix) => {
+    const rawName = (companyInfo.centerName || companyInfo.companyName || fallbackPrefix || 'plano_centro')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return rawName || fallbackPrefix;
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1035,6 +1070,13 @@ export default function App() {
     );
   };
 
+  const updateSelectedModule = (field, value) => {
+    if (!selectedModule) return;
+    setModules((prev) =>
+      prev.map((m) => (m.id === selectedModule.id ? { ...m, [field]: value } : m))
+    );
+  };
+
   const deleteObject = (id) => {
     setObjects((prev) => prev.filter((o) => o.id !== id));
     if (selectedId === id) {
@@ -1063,9 +1105,11 @@ export default function App() {
 
   const handleExportJSON = () => {
     const payload = {
-      version: '2.4',
+      version: '2.5',
       exportedAt: new Date().toISOString(),
       companyInfo,
+      trunkLabel,
+      showTrunkLabel,
       modules,
       cages,
       objects,
@@ -1074,10 +1118,10 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `plano_engorda_${companyInfo.code.toLowerCase()}.json`;
+    a.download = `${slugifyCenterFileName('plano_centro')}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    notify('Plano guardado en formato JSON', 'success');
+    notify(`Archivo "${slugifyCenterFileName('plano_centro')}.json" guardado`, 'success');
   };
 
   const handleImportJSON = (e) => {
@@ -1091,7 +1135,12 @@ export default function App() {
           setModules(data.modules);
           setCages(data.cages);
           setObjects(data.objects);
-          if (data.companyInfo) setCompanyInfo((prev) => ({ ...prev, ...data.companyInfo }));
+          if (typeof data.trunkLabel === 'string') setTrunkLabel(data.trunkLabel);
+          if (typeof data.showTrunkLabel === 'boolean') setShowTrunkLabel(data.showTrunkLabel);
+          if (data.companyInfo) {
+            setCompanyInfo((prev) => ({ ...prev, ...data.companyInfo }));
+            if (data.companyInfo.centerName) setBlueprintNameInput(data.companyInfo.centerName);
+          }
           setSelectedId(null);
           notify('Plano cargado exitosamente desde JSON', 'success');
         } else {
@@ -1153,9 +1202,9 @@ export default function App() {
       const pngUrl = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = pngUrl;
-      a.download = `plano_centro_engorda_${companyInfo.code}.png`;
+      a.download = `${slugifyCenterFileName('plano_centro')}.png`;
       a.click();
-      notify('Imagen PNG de alta resolución descargada', 'success');
+      notify(`Imagen "${slugifyCenterFileName('plano_centro')}.png" descargada`, 'success');
     };
     img.src = url;
   };
@@ -1191,7 +1240,7 @@ export default function App() {
       <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        <title>Plano Eléctrico y Fotoperiodo - ${companyInfo.companyName}</title>
+        <title>${companyInfo.centerName || companyInfo.companyName}</title>
         <style>
           @page { size: A3 landscape; margin: 12mm; }
           body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
@@ -1428,7 +1477,7 @@ export default function App() {
           strokeWidth="1.5"
         />
 
-        {showLabels && (
+        {showLabels && obj.tag && (
           <g transform="translate(0, 26)">
             <rect
               x="-34"
@@ -1569,7 +1618,7 @@ export default function App() {
 
           <button
             onClick={() => setShowCloudModal(true)}
-            title="Abrir gestor de planos guardados en la nube (Firebase)"
+            title="Buscar y abrir planos anteriores guardados en Firebase"
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
               cloudStatus === 'connected'
                 ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25'
@@ -1578,8 +1627,8 @@ export default function App() {
                 : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
             }`}
           >
-            <Cloud className="w-3.5 h-3.5 text-amber-500" />
-            <span>Base de Datos</span>
+            <FolderOpen className="w-3.5 h-3.5 text-amber-500" />
+            <span>Buscar Proyectos ({savedBlueprints.length})</span>
             <span
               className={`w-2 h-2 rounded-full ${
                 cloudStatus === 'connected'
@@ -1592,9 +1641,9 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => handleSaveToCloud()}
+            onClick={() => handleSaveToCloud(slugifyCenterFileName('plano'), companyInfo.centerName)}
             disabled={isSavingCloud || cloudStatus !== 'connected'}
-            title="Guardar cambios directamente en Cloud Firestore"
+            title="Guardar cambios en la nube con el nombre del centro"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 transition shadow-xs"
           >
             <CloudUpload className={`w-3.5 h-3.5 ${isSavingCloud ? 'animate-bounce' : ''}`} />
@@ -2081,7 +2130,21 @@ export default function App() {
               </g>
 
               {/* Puente / Pasarela flotante de interconexión entre Módulo 200 y Módulo 100 */}
-              <g>
+              <g
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  setSelectedKind('trunk');
+                  setSelectedId('TRUNK');
+                  setShowRightSidebar(true);
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                  setSelectedKind('trunk');
+                  setSelectedId('TRUNK');
+                  setShowRightSidebar(true);
+                }}
+                className="cursor-pointer"
+              >
                 <line
                   x1="888"
                   y1="280"
@@ -2092,26 +2155,30 @@ export default function App() {
                   strokeDasharray="10 6"
                   opacity="0.65"
                 />
-                <rect
-                  x="930"
-                  y="258"
-                  width="140"
-                  height="20"
-                  rx="6"
-                  fill={darkMode ? '#0f172a' : '#ffffff'}
-                  stroke="#0284c7"
-                  strokeWidth="1.2"
-                />
-                <text
-                  x="1000"
-                  y="271"
-                  textAnchor="middle"
-                  fontSize="9.5"
-                  fontWeight="700"
-                  fill={darkMode ? '#38bdf8' : '#0369a1'}
-                >
-                  Troncal Submarina 224m
-                </text>
+                {showTrunkLabel && trunkLabel && (
+                  <>
+                    <rect
+                      x="925"
+                      y="258"
+                      width="150"
+                      height="20"
+                      rx="6"
+                      fill={darkMode ? '#0f172a' : '#ffffff'}
+                      stroke={selectedKind === 'trunk' ? '#f59e0b' : '#0284c7'}
+                      strokeWidth={selectedKind === 'trunk' ? '2' : '1.2'}
+                    />
+                    <text
+                      x="1000"
+                      y="271"
+                      textAnchor="middle"
+                      fontSize="9.5"
+                      fontWeight="700"
+                      fill={darkMode ? '#38bdf8' : '#0369a1'}
+                    >
+                      {trunkLabel}
+                    </text>
+                  </>
+                )}
               </g>
 
               {/* RENDERIZADO DE MÓDULOS Y PASILLOS PERIMETRALES */}
@@ -2120,6 +2187,7 @@ export default function App() {
                 const totalH = mod.rows * mod.cageSize + (mod.rows + 1) * mod.walkwayWidth;
                 const startX = mod.originX - mod.walkwayWidth;
                 const startY = mod.originY - mod.walkwayWidth;
+                const isModSelected = selectedKind === 'module' && selectedModuleId === mod.id;
 
                 return (
                   <g key={mod.id}>
@@ -2134,24 +2202,43 @@ export default function App() {
                       strokeWidth="2.5"
                     />
 
-                    <g transform={`translate(${startX}, ${startY - 56})`}>
-                      <rect
-                        x="0"
-                        y="0"
-                        width="320"
-                        height="42"
-                        rx="8"
-                        fill={darkMode ? '#0f172a' : '#0c4a6e'}
-                        stroke="#0284c7"
-                        strokeWidth="1.5"
-                      />
-                      <text x="14" y="18" fontSize="14" fontWeight="800" fill="#ffffff">
-                        {mod.name}
-                      </text>
-                      <text x="14" y="33" fontSize="10" fill="#bae6fd">
-                        {mod.subtitle}
-                      </text>
-                    </g>
+                    {!mod.hideHeader && (mod.name || mod.subtitle) && (
+                      <g
+                        transform={`translate(${startX}, ${startY - 56})`}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setSelectedKind('module');
+                          setSelectedModuleId(mod.id);
+                          setSelectedId(mod.id);
+                          setShowRightSidebar(true);
+                        }}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          setSelectedKind('module');
+                          setSelectedModuleId(mod.id);
+                          setSelectedId(mod.id);
+                          setShowRightSidebar(true);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <rect
+                          x="0"
+                          y="0"
+                          width="320"
+                          height="42"
+                          rx="8"
+                          fill={darkMode ? '#0f172a' : '#0c4a6e'}
+                          stroke={isModSelected ? '#f59e0b' : '#0284c7'}
+                          strokeWidth={isModSelected ? '2.5' : '1.5'}
+                        />
+                        <text x="14" y="18" fontSize="14" fontWeight="800" fill="#ffffff">
+                          {mod.name}
+                        </text>
+                        <text x="14" y="33" fontSize="10" fill="#bae6fd">
+                          {mod.subtitle}
+                        </text>
+                      </g>
+                    )}
                   </g>
                 );
               })}
@@ -2159,6 +2246,7 @@ export default function App() {
               {/* RENDERIZADO DE JAULAS (30m x 30m) */}
               {cages.map((cage) => {
                 const isSelected = selectedId === cage.id && selectedKind === 'cage';
+                const displayLabel = cage.customLabel !== undefined ? cage.customLabel : String(cage.number);
                 return (
                   <g
                     key={cage.id}
@@ -2210,27 +2298,18 @@ export default function App() {
                       />
                     )}
 
-                    <text
-                      x={cage.x + cage.size / 2}
-                      y={cage.y + cage.size / 2 - 4}
-                      textAnchor="middle"
-                      fontSize="18"
-                      fontWeight="800"
-                      fill={darkMode ? '#f0f9ff' : '#0c4a6e'}
-                    >
-                      {cage.number}
-                    </text>
-
-                    <text
-                      x={cage.x + cage.size / 2}
-                      y={cage.y + cage.size / 2 + 6}
-                      textAnchor="middle"
-                      fontSize="19"
-                      fontWeight="800"
-                      fill={darkMode ? '#f0f9ff' : '#0c4a6e'}
-                    >
-                      {cage.number}
-                    </text>
+                    {!cage.hideLabel && displayLabel !== '' && (
+                      <text
+                        x={cage.x + cage.size / 2}
+                        y={cage.y + cage.size / 2 + 6}
+                        textAnchor="middle"
+                        fontSize={displayLabel.length > 5 ? '13' : '19'}
+                        fontWeight="800"
+                        fill={darkMode ? '#f0f9ff' : '#0c4a6e'}
+                      >
+                        {displayLabel}
+                      </text>
+                    )}
 
                     {cage.photoperiodActive && (
                       <g transform={`translate(${cage.x + cage.size - 16}, ${cage.y + 16})`}>
@@ -2293,10 +2372,10 @@ export default function App() {
           <button
             onClick={() => setShowRightSidebar(true)}
             title="Abrir panel desplegable de propiedades"
-            className={`fixed md:absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1.5 px-2.5 py-3 rounded-l-xl border border-r-0 shadow-lg text-xs font-bold transition-all ${
+            className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-3 rounded-l-xl border border-r-0 shadow-xl text-xs font-bold transition-all ${
               darkMode
-                ? 'bg-slate-900/95 border-slate-700 text-sky-400 hover:bg-slate-800'
-                : 'bg-white/95 border-slate-300 text-sky-700 hover:bg-sky-50'
+                ? 'bg-slate-900 border-slate-700 text-sky-400 hover:bg-slate-800'
+                : 'bg-white border-slate-300 text-sky-700 hover:bg-sky-50'
             }`}
           >
             <PanelRightOpen className="w-4 h-4" />
@@ -2306,17 +2385,17 @@ export default function App() {
           </button>
         )}
 
-        {/* PANEL DERECHO DESPLEGABLE (CON BOTÓN X Y AUTO-OCULTAR) */}
+        {/* PANEL DERECHO DESPLEGABLE (SUPERPUESTO SÓLIDO POR ENCIMA DE TODO) */}
         {showRightSidebar && !isFullscreen && (
         <aside
-          className={`fixed md:absolute top-0 right-0 bottom-0 z-30 w-80 max-w-[90vw] flex flex-col border-l overflow-y-auto shadow-2xl transition-transform duration-200 ${
-            darkMode ? 'bg-slate-900/98 border-slate-700' : 'bg-white/98 border-slate-200'
+          className={`fixed top-0 right-0 bottom-0 z-50 w-80 sm:w-96 max-w-[92vw] flex flex-col border-l overflow-y-auto shadow-[0_0_45px_rgba(0,0,0,0.35)] transition-transform duration-200 ${
+            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
           }`}
         >
           {/* Barra superior fija del panel desplegable */}
           <div
-            className={`sticky top-0 z-10 flex items-center justify-between px-4 py-2.5 border-b backdrop-blur-md ${
-              darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-slate-50/95 border-slate-200'
+            className={`sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b ${
+              darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -2362,7 +2441,7 @@ export default function App() {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500">
                     Equipo / Luminaria Seleccionada
                   </span>
-                  <h2 className="text-base font-extrabold">{selectedObject.tag}</h2>
+                  <h2 className="text-base font-extrabold">{selectedObject.tag || '(Sin etiqueta)'}</h2>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -2384,10 +2463,22 @@ export default function App() {
 
               <div className="space-y-3 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Identificador (TAG)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-500">Identificador / Texto (TAG)</label>
+                    {selectedObject.tag && (
+                      <button
+                        type="button"
+                        onClick={() => updateSelectedObject('tag', '')}
+                        className="text-[11px] font-semibold text-rose-500 hover:underline"
+                      >
+                        Borrar texto
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={selectedObject.tag}
+                    placeholder="Sin texto en etiqueta"
                     onChange={(e) => updateSelectedObject('tag', e.target.value)}
                     className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
                       darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
@@ -2611,11 +2702,50 @@ export default function App() {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">
                   Unidad de Cultivo ({selectedCage.moduleId})
                 </span>
-                <h2 className="text-lg font-extrabold">Jaula N° {selectedCage.number}</h2>
-                <p className="text-xs text-slate-500">Dimensiones: {selectedCage.dimensions} · Prof: {selectedCage.depth}</p>
+                <h2 className="text-lg font-extrabold">
+                  {selectedCage.customLabel !== undefined
+                    ? selectedCage.customLabel || 'Jaula (Sin texto)'
+                    : `Jaula N° ${selectedCage.number}`}
+                </h2>
               </div>
 
               <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-600 dark:text-slate-300">
+                      Texto / Nombre de la Jaula
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateSelectedCage('customLabel', '');
+                        updateSelectedCage('hideLabel', true);
+                        notify('Texto de la jaula eliminado');
+                      }}
+                      className="text-[11px] font-semibold text-rose-500 hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Eliminar texto</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={
+                      selectedCage.customLabel !== undefined
+                        ? selectedCage.customLabel
+                        : String(selectedCage.number)
+                    }
+                    placeholder="Escribe nombre o número (ej. 201, A1, Semilla)"
+                    onChange={(e) => {
+                      updateSelectedCage('customLabel', e.target.value);
+                      updateSelectedCage('hideLabel', e.target.value.trim() === '');
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+
                 <div
                   className={`p-3 rounded-xl border flex items-center justify-between ${
                     selectedCage.photoperiodActive
@@ -2687,6 +2817,88 @@ export default function App() {
                     value={selectedCage.notes}
                     onChange={(e) => updateSelectedCage('notes', e.target.value)}
                     className={`w-full px-2.5 py-1.5 rounded-lg border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : selectedModule ? (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500">
+                    Encabezado de Módulo
+                  </span>
+                  <h2 className="text-base font-extrabold">{selectedModule.name || 'Módulo sin título'}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateSelectedModule('hideHeader', true);
+                    notify('Cartel de módulo ocultado');
+                  }}
+                  className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-bold flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar</span>
+                </button>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-500 mb-1">Título del Módulo</label>
+                  <input
+                    type="text"
+                    value={selectedModule.name}
+                    onChange={(e) => updateSelectedModule('name', e.target.value)}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-500 mb-1">Subtítulo / Descripción</label>
+                  <input
+                    type="text"
+                    value={selectedModule.subtitle}
+                    onChange={(e) => updateSelectedModule('subtitle', e.target.value)}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : selectedKind === 'trunk' ? (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500">
+                    Texto de Interconexión
+                  </span>
+                  <h2 className="text-base font-extrabold">Etiqueta Troncal</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTrunkLabel(false);
+                    setSelectedKind(null);
+                    notify('Texto de troncal eliminado');
+                  }}
+                  className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-bold flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar</span>
+                </button>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-500 mb-1">Texto de la Etiqueta</label>
+                  <input
+                    type="text"
+                    value={trunkLabel}
+                    onChange={(e) => setTrunkLabel(e.target.value)}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
                       darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                     }`}
                   />
@@ -2812,11 +3024,15 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Nombre Centro / Pontón</label>
+                  <label className="block font-semibold text-slate-500 mb-1">Nombre Centro / Proyecto</label>
                   <input
                     type="text"
                     value={companyInfo.centerName}
-                    onChange={(e) => setCompanyInfo({ ...companyInfo, centerName: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCompanyInfo({ ...companyInfo, centerName: val });
+                      setBlueprintNameInput(val);
+                    }}
                     className={`w-full px-3 py-2 rounded-lg border ${
                       darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                     }`}
@@ -3039,17 +3255,21 @@ export default function App() {
               >
                 <h4 className="font-bold text-sm mb-2 flex items-center gap-1.5">
                   <CloudUpload className="w-4 h-4 text-amber-500" />
-                  Guardar Plano Actual en la Nube
+                  Guardar Plano Actual con Nombre del Centro
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                      Nombre del Plano / Centro
+                      Nombre del Centro / Proyecto
                     </label>
                     <input
                       type="text"
-                      value={blueprintNameInput}
-                      onChange={(e) => setBlueprintNameInput(e.target.value)}
+                      value={companyInfo.centerName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCompanyInfo((prev) => ({ ...prev, centerName: val }));
+                        setBlueprintNameInput(val);
+                      }}
                       placeholder="Ej. Centro Engorda Canal Puyuhuapi"
                       className={`w-full px-3 py-2 rounded-lg border text-xs ${
                         darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
@@ -3073,7 +3293,7 @@ export default function App() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => handleSaveToCloud()}
+                    onClick={() => handleSaveToCloud(slugifyCenterFileName('plano'), companyInfo.centerName)}
                     disabled={isSavingCloud || cloudStatus !== 'connected'}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 transition"
                   >
@@ -3081,7 +3301,12 @@ export default function App() {
                     <span>{isSavingCloud ? 'Guardando...' : 'Guardar / Sobrescribir Actual'}</span>
                   </button>
                   <button
-                    onClick={() => handleSaveToCloud(`plano-${Date.now()}`, `${blueprintNameInput} (Copia)`)}
+                    onClick={() =>
+                      handleSaveToCloud(
+                        `${slugifyCenterFileName('plano')}-${Date.now()}`,
+                        `${companyInfo.centerName || blueprintNameInput} (Copia)`
+                      )
+                    }
                     disabled={isSavingCloud || cloudStatus !== 'connected'}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold border transition ${
                       darkMode
@@ -3096,25 +3321,35 @@ export default function App() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                   <h4 className="font-bold text-sm flex items-center gap-1.5">
                     <FolderOpen className="w-4 h-4 text-sky-500" />
-                    Planos Guardados en Cloud Firestore ({savedBlueprints.length})
+                    Buscar Proyectos Guardados ({filteredBlueprints.length} de {savedBlueprints.length})
                   </h4>
-                  <span className="text-[11px] text-slate-500">Sincronización en tiempo real</span>
+                  <input
+                    type="text"
+                    value={cloudSearchQuery}
+                    onChange={(e) => setCloudSearchQuery(e.target.value)}
+                    placeholder="Buscar por nombre de centro o proyecto..."
+                    className={`px-3 py-1.5 rounded-lg border text-xs w-full sm:w-64 ${
+                      darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'
+                    }`}
+                  />
                 </div>
 
-                {savedBlueprints.length === 0 ? (
+                {filteredBlueprints.length === 0 ? (
                   <div
                     className={`p-6 rounded-xl border border-dashed text-center ${
                       darkMode ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'
                     }`}
                   >
-                    Aún no hay planos guardados en la nube. Haz clic en <strong>"Guardar / Sobrescribir Actual"</strong> arriba para crear el primero.
+                    {savedBlueprints.length === 0
+                      ? 'Aún no hay planos guardados en la nube. Haz clic en "Guardar / Sobrescribir Actual" arriba para crear el primero.'
+                      : 'No se encontraron proyectos con ese nombre.'}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {savedBlueprints.map((bp) => (
+                    {filteredBlueprints.map((bp) => (
                       <div
                         key={bp.id}
                         className={`flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border ${
