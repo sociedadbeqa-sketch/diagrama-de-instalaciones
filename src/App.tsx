@@ -1348,10 +1348,10 @@ export default function App() {
     if (!svgEl) return null;
 
     const clone = svgEl.cloneNode(true);
-    const exportWidth = 1860;
-    const exportHeight = 760;
+    const exportWidth = 1820;
+    const exportHeight = 470;
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clone.setAttribute('viewBox', `0 0 ${exportWidth} ${exportHeight}`);
+    clone.setAttribute('viewBox', `40 65 ${exportWidth} ${exportHeight}`);
     clone.setAttribute('width', String(exportWidth));
     clone.setAttribute('height', String(exportHeight));
 
@@ -1361,8 +1361,8 @@ export default function App() {
     }
 
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', '0');
-    bgRect.setAttribute('y', '0');
+    bgRect.setAttribute('x', '40');
+    bgRect.setAttribute('y', '65');
     bgRect.setAttribute('width', String(exportWidth));
     bgRect.setAttribute('height', String(exportHeight));
     bgRect.setAttribute('fill', '#f0f9ff');
@@ -1381,7 +1381,7 @@ export default function App() {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = 2400;
-      canvas.height = 980;
+      canvas.height = 620;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1398,6 +1398,50 @@ export default function App() {
     img.src = url;
   };
 
+  // Agrupación resumida de equipos iguales (por especificación, circuito y potencia)
+  const summarizedEquipment = useMemo(() => {
+    const map = new Map();
+    objects.forEach((o) => {
+      const specKey = (o.spec || '').trim();
+      const key = `${specKey}__${o.phase}__${Number(o.power) || 0}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          spec: specKey,
+          phase: o.phase,
+          unitPower: Number(o.power) || 0,
+          totalPower: 0,
+          count: 0,
+          tags: [],
+          modules: new Set(),
+          statuses: [],
+        });
+      }
+      const entry = map.get(key);
+      entry.count += 1;
+      entry.totalPower += Number(o.power) || 0;
+      entry.tags.push(o.tag);
+      if (o.moduleId) entry.modules.add(o.moduleId);
+      entry.statuses.push(o.status);
+    });
+
+    return Array.from(map.values()).map((entry) => {
+      const hasFault = entry.statuses.includes('falla');
+      const hasMaint = entry.statuses.includes('mantencion');
+      const summaryStatus = hasFault
+        ? 'Con Falla / Alerta'
+        : hasMaint
+        ? 'En Mantención'
+        : 'Operativo';
+      return {
+        ...entry,
+        modulesLabel: Array.from(entry.modules).join(', '),
+        tagsLabel: entry.tags.join(', '),
+        summaryStatus,
+      };
+    });
+  }, [objects]);
+
   const handleExportPDF = () => {
     const svgString = generateSvgStringForExport();
     if (!svgString) return;
@@ -1411,16 +1455,18 @@ export default function App() {
       return;
     }
 
-    const rowsHtml = objects
+    const rowsHtml = summarizedEquipment
       .map(
-        (o) => `
+        (g) => `
         <tr>
-          <td style="font-weight:700;">${o.tag}</td>
-          <td>${o.moduleId}</td>
-          <td>${o.spec}</td>
-          <td>${PHASE_CONFIG[o.phase]?.label || o.phase}</td>
-          <td style="text-align:right;">${o.power} W</td>
-          <td>${STATUS_CONFIG[o.status]?.label || o.status}</td>
+          <td style="text-align:center; font-weight:800;">${g.count}</td>
+          <td style="font-weight:700; font-size:10px;">${g.tagsLabel}</td>
+          <td>${g.modulesLabel}</td>
+          <td>${g.spec}</td>
+          <td>${PHASE_CONFIG[g.phase]?.label || g.phase}</td>
+          <td style="text-align:right;">${g.unitPower} W</td>
+          <td style="text-align:right; font-weight:700;">${g.totalPower} W</td>
+          <td>${g.summaryStatus}</td>
         </tr>`
       )
       .join('');
@@ -1430,47 +1476,33 @@ export default function App() {
       <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        <title>Plano Técnico - ${companyInfo.centerName}</title>
+        <title>${companyInfo.centerName}</title>
         <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 24px; }
-          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 14px; }
-          .header-left { display: flex; align-items: center; gap: 14px; }
-          .logo { max-height: 54px; max-width: 180px; object-fit: contain; }
-          .title { font-size: 18px; font-weight: 800; margin: 0; }
-          .subtitle { font-size: 12px; color: #475569; margin: 2px 0 0 0; }
-          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 8px; background: #f8fafc; margin-bottom: 14px; }
-          .plan-box svg { width: 100%; height: auto; max-height: 390px; display: block; }
-          .title-block { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
-          .title-block td { border: 1.5px solid #0f172a; padding: 6px 10px; }
-          .tb-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
-          .tb-val { font-size: 12px; font-weight: 700; color: #0f172a; }
-          .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-          .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: #f1f5f9; }
-          .kpi-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; }
-          .kpi-val { font-size: 16px; font-weight: 800; color: #0f172a; }
-          table.inv { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
-          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+          @page { margin: 8mm; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
+          .logo-bar { margin-bottom: 8px; }
+          .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
+          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
+          .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
+          .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
+          .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
+          .tb-label { font-size: 8.5px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
+          .tb-val { font-size: 11.5px; font-weight: 700; color: #0f172a; }
+          .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+          .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; background: #f1f5f9; }
+          .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+          .kpi-val { font-size: 14px; font-weight: 800; color: #0f172a; }
+          table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 14px; }
+          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
           table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
-          .footer-sign { display: flex; justify-content: flex-end; margin-top: 24px; }
-          .sign-box { width: 260px; text-align: center; border-top: 1px solid #334155; padding-top: 6px; font-size: 11px; }
-          .sign-img { max-height: 52px; margin: 0 auto 4px auto; display: block; }
-          @media print { body { margin: 10mm; } }
+          .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
+          .company-footer { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
+          .sign-box { width: 250px; text-align: center; border-top: 1px solid #334155; padding-top: 5px; font-size: 10.5px; }
+          .sign-img { max-height: 46px; margin: 0 auto 4px auto; display: block; }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="header-left">
-            ${companyInfo.logoDataUrl ? `<img src="${companyInfo.logoDataUrl}" class="logo" />` : ''}
-            <div>
-              <h1 class="title">${companyInfo.companyName}</h1>
-              <p class="subtitle">${companyInfo.projectName} · ${companyInfo.centerName}</p>
-            </div>
-          </div>
-          <div style="text-align:right; font-size:11px; color:#475569;">
-            <div><strong>Código:</strong> ${companyInfo.code}</div>
-            <div><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CL')}</div>
-          </div>
-        </div>
+        ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
 
         <div class="plan-box">${svgString}</div>
 
@@ -1496,20 +1528,23 @@ export default function App() {
         <table class="inv">
           <thead>
             <tr>
-              <th>TAG</th>
+              <th style="text-align:center;">Cant.</th>
+              <th>TAGs Agrupados</th>
               <th>Módulo</th>
               <th>Especificación Técnica</th>
               <th>Circuito / Fase</th>
-              <th style="text-align:right;">Potencia</th>
+              <th style="text-align:right;">Pot. Unit.</th>
+              <th style="text-align:right;">Pot. Total</th>
               <th>Estado</th>
             </tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>
 
-        <div class="footer-sign">
+        <div class="footer-bottom">
+          <div class="company-footer">${companyInfo.companyName || 'SERVICIOS BEQA SPA'}</div>
           <div class="sign-box">
-            ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : '<div style="height:36px;"></div>'}
+            ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : '<div style="height:28px;"></div>'}
             <strong>${companyInfo.responsibleName}</strong><br/>
             <span>${companyInfo.responsibleRole}</span><br/>
             <span style="color:#64748b;">${companyInfo.responsibleLicense}</span>
@@ -1541,21 +1576,19 @@ export default function App() {
   }, [objects, filterPhase, filterStatus, filterModule, searchQuery]);
 
   const metrics = useMemo(() => {
-    const totalPowerW = objects.reduce((acc, o) => acc + (Number(o.power) || 0), 0);
+    const totalPower = objects.reduce((sum, o) => sum + (Number(o.power) || 0), 0);
     const activeCages = cages.filter((c) => c.photoperiodActive).length;
     const alertCount = objects.filter((o) => o.status !== 'operativo').length;
     return {
-      totalPowerKw: (totalPowerW / 1000).toFixed(2),
+      totalPower,
+      totalPowerKw: (totalPower / 1000).toFixed(2),
       activeCages,
       alertCount,
     };
   }, [objects, cages]);
 
-  // ============================================================================
-  // RENDERIZADO DE SÍMBOLOS TÉCNICOS SVG (CON PROYECTOR LED INDUSTRIAL REALISTA)
-  // ============================================================================
   const renderSymbolGraphic = (obj, isSelected) => {
-    const phaseColor = PHASE_CONFIG[obj.phase]?.color || '#3b82f6';
+    const phaseColor = PHASE_CONFIG[obj.phase]?.color || '#0284c7';
     const statusColor = STATUS_CONFIG[obj.status]?.color || '#10b981';
     const rot = Number(obj.rotation) || 0;
 
@@ -1563,81 +1596,118 @@ export default function App() {
       <g>
         {isSelected && (
           <circle
-            r="25"
+            r="24"
             fill="none"
-            stroke="#38bdf8"
-            strokeWidth="2.5"
+            stroke="#0284c7"
+            strokeWidth="2"
             strokeDasharray="4 3"
           />
         )}
 
-        {/* Diseño Especial Realista de Proyector LED Industrial */}
+        {/* Diseño Especial Realista de Proyector LED Industrial (Estilo Técnico CAD) */}
         {obj.type === 'luminaria' ? (
           <g>
-            {/* Haz volumétrico de luz en dirección del enfoque */}
             <g transform={`rotate(${rot})`}>
+              {/* Cono de proyección luminosa */}
               <polygon
-                points="0,0 56,-26 56,26"
+                points="10,-12 46,-26 46,26 10,12"
                 fill="url(#ledBeamGrad)"
                 opacity="0.72"
                 pointerEvents="none"
               />
-            </g>
+              {/* 3 Rayos punteados interiores del haz */}
+              <line
+                x1="13"
+                y1="-8"
+                x2="40"
+                y2="-18"
+                stroke="#2563eb"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+                strokeLinecap="round"
+              />
+              <line
+                x1="14"
+                y1="0"
+                x2="43"
+                y2="0"
+                stroke="#2563eb"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+                strokeLinecap="round"
+              />
+              <line
+                x1="13"
+                y1="8"
+                x2="40"
+                y2="18"
+                stroke="#2563eb"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+                strokeLinecap="round"
+              />
 
-            {/* Base circular técnica */}
-            <circle
-              r="18"
-              fill={darkMode ? '#0f172a' : '#ffffff'}
-              stroke={phaseColor}
-              strokeWidth="2.5"
-            />
+              {/* Perno / Pivote posterior de sujeción */}
+              <rect
+                x="-16"
+                y="-2.4"
+                width="4.5"
+                height="4.8"
+                rx="1.5"
+                fill="#1d4ed8"
+              />
 
-            {/* Cuerpo del Proyector LED (Horquilla U + Carcasa aleteada + Óptica frontal) */}
-            <g transform={`rotate(${rot})`}>
-              {/* Horquilla de montaje metálica en U */}
+              {/* Horquilla de montaje en U */}
               <path
-                d="M -11,-9 L -4,-9 L -4,9 L -11,9"
+                d="M -3,-14.5 L -11.5,-14.5 L -11.5,14.5 L -3,14.5"
                 fill="none"
-                stroke={darkMode ? '#94a3b8' : '#475569'}
-                strokeWidth="2.2"
+                stroke="#1d4ed8"
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              {/* Pernos laterales de articulación */}
-              <circle cx="-4" cy="-9" r="1.6" fill={phaseColor} />
-              <circle cx="-4" cy="9" r="1.6" fill={phaseColor} />
 
-              {/* Carcasa trasera con aletas disipadoras de calor */}
+              {/* Base posterior con aletas disipadoras */}
               <rect
-                x="-6"
-                y="-8.5"
-                width="9"
-                height="17"
-                rx="1.8"
-                fill={darkMode ? '#334155' : '#1e293b'}
-                stroke={darkMode ? '#cbd5e1' : '#0f172a'}
-                strokeWidth="1"
+                x="-8.5"
+                y="-11.5"
+                width="4.5"
+                height="23"
+                rx="1.2"
+                fill={darkMode ? '#1e293b' : '#ffffff'}
+                stroke="#1d4ed8"
+                strokeWidth="1.8"
               />
-              <line x1="-6" y1="-5" x2="-1" y2="-5" stroke="#64748b" strokeWidth="1" />
-              <line x1="-6" y1="-1.7" x2="-1" y2="-1.7" stroke="#64748b" strokeWidth="1" />
-              <line x1="-6" y1="1.7" x2="-1" y2="1.7" stroke="#64748b" strokeWidth="1" />
-              <line x1="-6" y1="5" x2="-1" y2="5" stroke="#64748b" strokeWidth="1" />
+              <line x1="-8.5" y1="-7.5" x2="-4" y2="-7.5" stroke="#1d4ed8" strokeWidth="1.4" />
+              <line x1="-8.5" y1="-3.8" x2="-4" y2="-3.8" stroke="#1d4ed8" strokeWidth="1.4" />
+              <line x1="-8.5" y1="0" x2="-4" y2="0" stroke="#1d4ed8" strokeWidth="1.4" />
+              <line x1="-8.5" y1="3.8" x2="-4" y2="3.8" stroke="#1d4ed8" strokeWidth="1.4" />
+              <line x1="-8.5" y1="7.5" x2="-4" y2="7.5" stroke="#1d4ed8" strokeWidth="1.4" />
 
-              {/* Bisel frontal y lente óptica LED iluminada */}
-              <polygon
-                points="3,-10 9,-12 9,12 3,10"
-                fill="#f59e0b"
-                stroke="#b45309"
-                strokeWidth="1"
-              />
+              {/* Carcasa frontal del panel LED */}
               <rect
-                x="7.5"
-                y="-10.5"
-                width="2.5"
-                height="21"
-                rx="0.8"
-                fill="#fef08a"
+                x="-4"
+                y="-12.5"
+                width="13.5"
+                height="25"
+                rx="3"
+                fill={darkMode ? '#0f172a' : '#ffffff'}
+                stroke="#1d4ed8"
+                strokeWidth="2.2"
               />
+
+              {/* Matriz 3x4 de diodos LED */}
+              {[-7.5, -2.5, 2.5, 7.5].map((cy, rIdx) =>
+                [-0.5, 2.8, 6.1].map((cx, cIdx) => (
+                  <circle
+                    key={`${rIdx}-${cIdx}`}
+                    cx={cx}
+                    cy={cy}
+                    r="1.05"
+                    fill="#1d4ed8"
+                  />
+                ))
+              )}
             </g>
           </g>
         ) : (
@@ -1748,11 +1818,22 @@ export default function App() {
     switch (iconName) {
       case 'sun':
         return (
-          <svg viewBox="0 0 28 28" className="w-5 h-5">
-            <path d="M4,8 L9,8 L9,20 L4,20" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" />
-            <rect x="8" y="8.5" width="8" height="11" rx="1.5" fill="#1e293b" />
-            <polygon points="16,7 22,5 22,23 16,21" fill="#f59e0b" />
-            <rect x="20.5" y="6.5" width="2.2" height="15" fill="#fef08a" />
+          <svg viewBox="0 0 32 32" className="w-5 h-5">
+            <g transform="translate(13, 18) rotate(-42)">
+              <polygon points="6,-8 22,-15 22,15 6,8" fill="#bfdbfe" opacity="0.85" />
+              <line x1="8" y1="-4" x2="19" y2="-9" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="2 2" />
+              <line x1="8" y1="0" x2="20" y2="0" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="2 2" />
+              <line x1="8" y1="4" x2="19" y2="9" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="2 2" />
+              <rect x="-11" y="-2" width="3.5" height="4" rx="1" fill="#1d4ed8" />
+              <path d="M -2,-10 L -8,-10 L -8,10 L -2,10" fill="none" stroke="#1d4ed8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="-3" y="-8.5" width="9" height="17" rx="2" fill="#ffffff" stroke="#1d4ed8" strokeWidth="1.8" />
+              <circle cx="0" cy="-4" r="1" fill="#1d4ed8" />
+              <circle cx="3" cy="-4" r="1" fill="#1d4ed8" />
+              <circle cx="0" cy="0" r="1" fill="#1d4ed8" />
+              <circle cx="3" cy="0" r="1" fill="#1d4ed8" />
+              <circle cx="0" cy="4" r="1" fill="#1d4ed8" />
+              <circle cx="3" cy="4" r="1" fill="#1d4ed8" />
+            </g>
           </svg>
         );
       case 'plug':
@@ -2431,8 +2512,8 @@ export default function App() {
                 <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
               </radialGradient>
               <linearGradient id="ledBeamGrad" x1="0%" y1="50%" x2="100%" y2="50%">
-                <stop offset="0%" stopColor="#fef08a" stopOpacity="0.85" />
-                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+                <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.65" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.06" />
               </linearGradient>
             </defs>
 
@@ -3506,7 +3587,7 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: INVENTARIO TÉCNICO
+          MODAL: INVENTARIO TÉCNICO RESUMIDO Y DETALLADO
       ==================================================================== */}
       {showInventoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
@@ -3516,41 +3597,53 @@ export default function App() {
             }`}
           >
             <div className="px-5 py-4 bg-violet-700 text-white flex items-center justify-between">
-              <h3 className="text-base font-extrabold">
-                Inventario de Equipos Instalados ({objects.length})
-              </h3>
+              <div>
+                <h3 className="text-base font-extrabold">
+                  Resumen de Equipos Instalados ({objects.length} unidades en {summarizedEquipment.length} tipos)
+                </h3>
+                <p className="text-xs text-violet-200">
+                  Los equipos idénticos se agrupan automáticamente en una misma fila
+                </p>
+              </div>
               <button onClick={() => setShowInventoryModal(false)} className="p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 overflow-auto">
+            <div className="p-4 overflow-auto space-y-5">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
-                    <th className="py-2 px-2">TAG</th>
+                    <th className="py-2 px-2 text-center">Cant.</th>
+                    <th className="py-2 px-2">TAGs Agrupados</th>
                     <th className="py-2 px-2">Módulo</th>
                     <th className="py-2 px-2">Especificación</th>
-                    <th className="py-2 px-2">Potencia</th>
+                    <th className="py-2 px-2 text-right">Pot. Total</th>
                     <th className="py-2 px-2">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {objects.map((o) => (
+                  {summarizedEquipment.map((g) => (
                     <tr
-                      key={o.id}
+                      key={g.key}
                       onClick={() => {
-                        setSelectedId(o.id);
-                        setSelectedKind('object');
-                        setShowInventoryModal(false);
-                        setShowRightSidebar(true);
+                        const firstObj = objects.find((o) => o.tag === g.tags[0]);
+                        if (firstObj) {
+                          setSelectedId(firstObj.id);
+                          setSelectedKind('object');
+                          setShowInventoryModal(false);
+                          setShowRightSidebar(true);
+                        }
                       }}
                       className="cursor-pointer hover:bg-sky-500/10"
                     >
-                      <td className="py-2 px-2 font-extrabold">{o.tag}</td>
-                      <td className="py-2 px-2">{o.moduleId}</td>
-                      <td className="py-2 px-2">{o.spec}</td>
-                      <td className="py-2 px-2 font-bold">{o.power} W</td>
-                      <td className="py-2 px-2">{STATUS_CONFIG[o.status]?.label}</td>
+                      <td className="py-2.5 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
+                        {g.count}
+                      </td>
+                      <td className="py-2.5 px-2 font-bold">{g.tagsLabel}</td>
+                      <td className="py-2.5 px-2">{g.modulesLabel}</td>
+                      <td className="py-2.5 px-2">{g.spec}</td>
+                      <td className="py-2.5 px-2 text-right font-extrabold">{g.totalPower} W</td>
+                      <td className="py-2.5 px-2">{g.summaryStatus}</td>
                     </tr>
                   ))}
                 </tbody>
