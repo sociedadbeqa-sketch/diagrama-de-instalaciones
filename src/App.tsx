@@ -6,8 +6,7 @@ import {
   Wrench, Zap, Camera, Radio, Cpu, Compass, Sliders, Edit3, Save, Copy,
   Magnet, Eye, EyeOff, Info, Layers, Grid, ArrowRightLeft, Building2, Printer,
   Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  MonitorPlay, X,
-  Cloud, FolderOpen, CloudUpload, RefreshCw
+  MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -99,6 +98,8 @@ const generateInitialCages = () => {
         cages.push({
           id: `JAULA-${num}`,
           number: num,
+          label: String(num),
+          showLabel: true,
           moduleId: mod.id,
           row: r,
           col: c,
@@ -404,7 +405,12 @@ const INITIAL_OBJECTS = [
 
 const INITIAL_COMPANY_INFO = {
   companyName: 'SERVICIOS BEQA SPA',
-  centerName: 'Centro de Engorda de Salmones · Módulos 200 y 100',
+  projectName: 'Instalación Sistema Fotoperiodo e Infraestructura Eléctrica',
+  projectDescription: 'Distribución de proyectores LED sumergibles, tableros IP66, tomas auxiliares 220V y telemetría en trenes de cultivo.',
+  clientName: 'Salmones Austral S.A.',
+  centerName: 'Centro de Engorda Navarro · Módulos 200 y 100',
+  coordinates: '-41.784520, -73.124890',
+  googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=-41.784520,-73.124890',
   code: 'SIEP-2026-01',
   responsibleName: 'Ing. Carlos Mendoza R.',
   responsibleRole: 'Jefe de Mantención Eléctrica & Fotoperiodo',
@@ -428,7 +434,7 @@ const STATUS_CONFIG = {
 };
 
 const SYMBOL_CATALOG = [
-  { type: 'luminaria', label: 'Luminaria Fotoperiodo', icon: 'sun', phase: 'fotoperiodo', power: 1000, rotation: 180 },
+  { type: 'luminaria', label: 'Proyector LED Fotoperiodo', icon: 'sun', phase: 'fotoperiodo', power: 1000, rotation: 180 },
   { type: 'enchufe_220v', label: 'Enchufe Industrial 220V', icon: 'plug', phase: 'fuerza_aux', power: 3520, rotation: 0, amperage: '16A', ipGrade: 'IP67' },
   { type: 'fotocelda', label: 'Fotocelda Crepuscular', icon: 'eye', phase: 'fotoperiodo', power: 15, rotation: 0, luxThreshold: '15 Lux', controlledCircuit: 'Contactor Fotoperiodo' },
   { type: 'tablero', label: 'Tablero Eléctrico IP66', icon: 'zap', phase: 'control', power: 1200, rotation: 0 },
@@ -437,6 +443,24 @@ const SYMBOL_CATALOG = [
   { type: 'camara', label: 'Cámara Submarina / PTZ', icon: 'camera', phase: 'monitoreo', power: 85, rotation: 0 },
   { type: 'alimentador', label: 'Selector Alimentación', icon: 'compass', phase: 'alimentacion', power: 350, rotation: 0 },
 ];
+
+const ICON_TO_TYPE_MAP = {
+  sun: 'luminaria',
+  plug: 'enchufe_220v',
+  eye: 'fotocelda',
+  zap: 'tablero',
+  radio: 'energizador',
+  cpu: 'sensor',
+  camera: 'camara',
+  compass: 'alimentador',
+};
+
+const buildGoogleMapsLink = (coordsText, customUrl = '') => {
+  if (customUrl && customUrl.trim().startsWith('http')) return customUrl.trim();
+  const clean = (coordsText || '').trim();
+  if (!clean) return 'https://www.google.com/maps';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clean)}`;
+};
 
 export default function App() {
   useEffect(() => {
@@ -461,14 +485,36 @@ export default function App() {
   const [modules, setModules] = useState(INITIAL_MODULES);
   const [cages, setCages] = useState(generateInitialCages);
   const [objects, setObjects] = useState(INITIAL_OBJECTS);
+  const [symbolCatalog, setSymbolCatalog] = useState(SYMBOL_CATALOG);
+  const [isEditingCatalog, setIsEditingCatalog] = useState(false);
+  const [catalogForm, setCatalogForm] = useState({
+    editingIndex: null,
+    label: '',
+    icon: 'sun',
+    phase: 'fotoperiodo',
+    power: 1000,
+    rotation: 180,
+  });
   const [companyInfo, setCompanyInfo] = useState(INITIAL_COMPANY_INFO);
   const [trunkLabel, setTrunkLabel] = useState('Troncal Submarina 224m');
   const [showTrunkLabel, setShowTrunkLabel] = useState(true);
   const [selectedModuleId, setSelectedModuleId] = useState(null);
 
+  // Modal Nuevo Proyecto
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [newProjectForm, setNewProjectForm] = useState({
+    projectName: '',
+    projectDescription: '',
+    clientName: '',
+    centerName: '',
+    coordinates: '',
+    googleMapsUrl: '',
+    clearExistingObjects: false,
+  });
+
   // Estado de vista del plano (Pan & Zoom)
-  const [zoom, setZoom] = useState(0.88);
-  const [pan, setPan] = useState({ x: 24, y: 18 });
+  const [zoom, setZoom] = useState(0.84);
+  const [pan, setPan] = useState({ x: 24, y: 14 });
   const [snapToWalkway, setSnapToWalkway] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
 
@@ -516,7 +562,7 @@ export default function App() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [hoveredObj, setHoveredObj] = useState(null);
   const [clipboardObj, setClipboardObj] = useState(null);
-  const pinchRef = useRef({ active: false, initialDist: 0, initialZoom: 0.88 });
+  const pinchRef = useRef({ active: false, initialDist: 0, initialZoom: 0.84 });
 
   const svgRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -579,39 +625,57 @@ export default function App() {
     return () => unsub();
   }, [fbUser]);
 
-  const handleSaveToCloud = async (customId = null, customTitle = null) => {
+  const handleSaveToCloud = async (customId = null, customTitle = null, overrideData = null) => {
     if (!db || !fbUser) {
       notify('Base de datos en la nube no disponible en este entorno', 'warn');
       return;
     }
     setIsSavingCloud(true);
     try {
+      const infoToUse = overrideData?.companyInfo || companyInfo;
+      const objectsToUse = overrideData?.objects || objects;
+      const cagesToUse = overrideData?.cages || cages;
+      const modulesToUse = overrideData?.modules || modules;
+      const catalogToUse = overrideData?.symbolCatalog || symbolCatalog;
+
       const targetId = (customId || currentBlueprintId || `plano-${Date.now()}`)
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9-_]/g, '-');
-      const targetTitle = (customTitle || companyInfo.centerName || blueprintNameInput || 'Plano Centro de Engorda').trim();
+      const targetTitle = (
+        customTitle ||
+        infoToUse.centerName ||
+        infoToUse.projectName ||
+        blueprintNameInput ||
+        'Plano Centro de Engorda'
+      ).trim();
+
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'planos_centro_engorda', targetId);
 
       const payload = {
         title: targetTitle,
+        projectName: infoToUse.projectName || targetTitle,
+        clientName: infoToUse.clientName || '',
+        centerName: infoToUse.centerName || targetTitle,
+        coordinates: infoToUse.coordinates || '',
         updatedAt: new Date().toISOString(),
-        updatedBy: companyInfo.responsibleName || 'Usuario Técnico',
-        companyName: companyInfo.companyName || 'SERVICIOS BEQA SPA',
-        totalObjects: objects.length,
-        totalCages: cages.length,
-        modules,
-        cages,
-        objects,
+        updatedBy: infoToUse.responsibleName || 'Usuario Técnico',
+        companyName: infoToUse.companyName || 'SERVICIOS BEQA SPA',
+        totalObjects: objectsToUse.length,
+        totalCages: cagesToUse.length,
+        modules: modulesToUse,
+        cages: cagesToUse,
+        objects: objectsToUse,
+        symbolCatalog: catalogToUse,
         trunkLabel,
         showTrunkLabel,
-        companyInfo,
+        companyInfo: infoToUse,
       };
 
       await setDoc(docRef, payload);
       setCurrentBlueprintId(targetId);
       setBlueprintNameInput(targetTitle);
-      notify(`Plano "${targetTitle}" guardado en la nube correctamente`, 'success');
+      notify(`Proyecto "${targetTitle}" guardado en la nube correctamente`, 'success');
     } catch (err) {
       console.error('Error guardando en Firestore:', err);
       notify('Error al guardar en la nube. Verifica permisos de Firestore.', 'warn');
@@ -625,6 +689,10 @@ export default function App() {
     if (Array.isArray(bp.modules)) setModules(bp.modules);
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
+    if (Array.isArray(bp.symbolCatalog) && bp.symbolCatalog.length > 0) {
+      setSymbolCatalog(bp.symbolCatalog);
+      setPlaceTemplate(bp.symbolCatalog[0]);
+    }
     if (typeof bp.trunkLabel === 'string') setTrunkLabel(bp.trunkLabel);
     if (typeof bp.showTrunkLabel === 'boolean') setShowTrunkLabel(bp.showTrunkLabel);
     if (bp.companyInfo) setCompanyInfo((prev) => ({ ...prev, ...bp.companyInfo }));
@@ -633,17 +701,17 @@ export default function App() {
     setSelectedId(null);
     setSelectedKind(null);
     setShowCloudModal(false);
-    notify(`Plano "${bp.title || bp.id}" cargado desde la nube`, 'success');
+    notify(`Proyecto "${bp.title || bp.id}" cargado desde la nube`, 'success');
   };
 
   const handleDeleteFromCloud = async (bpId, bpTitle) => {
     if (!db || !fbUser) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'planos_centro_engorda', bpId));
-      notify(`Plano "${bpTitle}" eliminado de la nube`, 'info');
+      notify(`Proyecto "${bpTitle}" eliminado de la nube`, 'info');
     } catch (err) {
       console.error('Error eliminando plano:', err);
-      notify('No se pudo eliminar el plano de la nube', 'warn');
+      notify('No se pudo eliminar el proyecto de la nube', 'warn');
     }
   };
 
@@ -695,6 +763,8 @@ export default function App() {
     return savedBlueprints.filter(
       (bp) =>
         (bp.title || '').toLowerCase().includes(q) ||
+        (bp.projectName || '').toLowerCase().includes(q) ||
+        (bp.clientName || '').toLowerCase().includes(q) ||
         (bp.companyInfo?.centerName || '').toLowerCase().includes(q) ||
         (bp.companyName || '').toLowerCase().includes(q) ||
         (bp.id || '').toLowerCase().includes(q)
@@ -702,13 +772,172 @@ export default function App() {
   }, [savedBlueprints, cloudSearchQuery]);
 
   const slugifyCenterFileName = (fallbackPrefix) => {
-    const rawName = (companyInfo.centerName || companyInfo.companyName || fallbackPrefix || 'plano_centro')
+    const rawName = (
+      companyInfo.centerName ||
+      companyInfo.projectName ||
+      companyInfo.companyName ||
+      fallbackPrefix ||
+      'plano_centro'
+    )
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
     return rawName || fallbackPrefix;
+  };
+
+  // ============================================================================
+  // EDICIÓN Y CREACIÓN EN LA PALETA DE SIMBOLOGÍA
+  // ============================================================================
+  const handleSaveCatalogSymbol = (e) => {
+    e.preventDefault();
+    const cleanLabel = catalogForm.label.trim();
+    if (!cleanLabel) {
+      notify('Ingresa un nombre para el símbolo', 'warn');
+      return;
+    }
+
+    const mappedType = ICON_TO_TYPE_MAP[catalogForm.icon] || 'tablero';
+    const newItem = {
+      type: mappedType,
+      label: cleanLabel,
+      icon: catalogForm.icon,
+      phase: catalogForm.phase,
+      power: Number(catalogForm.power) || 0,
+      rotation: Number(catalogForm.rotation) || 0,
+      amperage: mappedType === 'enchufe_220v' ? '16A' : undefined,
+      ipGrade: mappedType === 'enchufe_220v' ? 'IP67' : undefined,
+      luxThreshold: mappedType === 'fotocelda' ? '15 Lux' : undefined,
+    };
+
+    if (catalogForm.editingIndex !== null && symbolCatalog[catalogForm.editingIndex]) {
+      const updated = symbolCatalog.map((item, idx) =>
+        idx === catalogForm.editingIndex ? newItem : item
+      );
+      setSymbolCatalog(updated);
+      setPlaceTemplate(newItem);
+      notify(`Símbolo "${cleanLabel}" actualizado en la paleta`, 'success');
+    } else {
+      const updated = [...symbolCatalog, newItem];
+      setSymbolCatalog(updated);
+      setPlaceTemplate(newItem);
+      setActiveTool('place');
+      notify(`Nuevo símbolo "${cleanLabel}" agregado a la paleta`, 'success');
+    }
+
+    setCatalogForm({
+      editingIndex: null,
+      label: '',
+      icon: 'sun',
+      phase: 'fotoperiodo',
+      power: 1000,
+      rotation: 180,
+    });
+    setIsEditingCatalog(false);
+  };
+
+  const handleEditCatalogItem = (idx, e) => {
+    e.stopPropagation();
+    const item = symbolCatalog[idx];
+    if (!item) return;
+    setCatalogForm({
+      editingIndex: idx,
+      label: item.label,
+      icon: item.icon || 'zap',
+      phase: item.phase || 'control',
+      power: Number(item.power) || 0,
+      rotation: Number(item.rotation) || 0,
+    });
+    setIsEditingCatalog(true);
+  };
+
+  const handleDeleteCatalogItem = (idx, e) => {
+    e.stopPropagation();
+    if (symbolCatalog.length <= 1) {
+      notify('Debe quedar al menos un símbolo en la paleta', 'warn');
+      return;
+    }
+    const removed = symbolCatalog[idx];
+    const updated = symbolCatalog.filter((_, i) => i !== idx);
+    setSymbolCatalog(updated);
+    if (placeTemplate?.label === removed?.label) {
+      setPlaceTemplate(updated[0]);
+    }
+    notify(`Símbolo "${removed?.label}" eliminado de la paleta`, 'info');
+  };
+
+  // ============================================================================
+  // CREAR NUEVO PROYECTO
+  // ============================================================================
+  const handleCreateNewProject = async (e) => {
+    e.preventDefault();
+    const pName = newProjectForm.projectName.trim();
+    const cName = newProjectForm.centerName.trim();
+    const client = newProjectForm.clientName.trim();
+
+    if (!pName || !cName) {
+      notify('Ingresa al menos el nombre del proyecto y el nombre del centro', 'warn');
+      return;
+    }
+
+    const coords = newProjectForm.coordinates.trim();
+    const mapsLink = buildGoogleMapsLink(coords, newProjectForm.googleMapsUrl);
+    const newCode = `PRJ-${new Date().getFullYear()}-${String(Math.floor(100 + Math.random() * 899))}`;
+
+    const updatedInfo = {
+      ...companyInfo,
+      projectName: pName,
+      projectDescription: newProjectForm.projectDescription.trim(),
+      clientName: client || 'Cliente No Especificado',
+      centerName: cName,
+      coordinates: coords,
+      googleMapsUrl: mapsLink,
+      code: newCode,
+    };
+
+    const nextObjects = newProjectForm.clearExistingObjects ? [] : objects;
+    const nextCages = newProjectForm.clearExistingObjects ? generateInitialCages() : cages;
+    const nextModules = newProjectForm.clearExistingObjects ? INITIAL_MODULES : modules;
+
+    setCompanyInfo(updatedInfo);
+    if (newProjectForm.clearExistingObjects) {
+      setObjects([]);
+      setCages(nextCages);
+      setModules(nextModules);
+    }
+
+    const slugId = `${cName}-${pName}`
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `proyecto-${Date.now()}`;
+
+    setCurrentBlueprintId(slugId);
+    setBlueprintNameInput(cName);
+    setShowNewProjectModal(false);
+    setNewProjectForm({
+      projectName: '',
+      projectDescription: '',
+      clientName: '',
+      centerName: '',
+      coordinates: '',
+      googleMapsUrl: '',
+      clearExistingObjects: false,
+    });
+
+    notify(`Nuevo proyecto "${pName}" creado para ${cName}`, 'success');
+
+    if (db && fbUser) {
+      await handleSaveToCloud(slugId, cName, {
+        companyInfo: updatedInfo,
+        objects: nextObjects,
+        cages: nextCages,
+        modules: nextModules,
+        symbolCatalog,
+      });
+    }
   };
 
   useEffect(() => {
@@ -833,60 +1062,64 @@ export default function App() {
     notify(`Elemento duplicado como "${clonedObj.tag}"`, 'success');
   };
 
+  const placeSymbolAtCoords = (rawX, rawY) => {
+    const snapped = applySnap(rawX, rawY);
+    const modId = detectModuleId(snapped.x);
+    const modShort = modId === 'MOD-200' ? '200' : '100';
+    const prefixMap = {
+      luminaria: 'PROY',
+      enchufe_220v: 'ENCH',
+      fotocelda: 'FC',
+      tablero: 'TAB',
+      energizador: 'ERG',
+      sensor: 'SEN',
+      camara: 'CAM',
+      alimentador: 'ALI',
+    };
+    const prefix = prefixMap[placeTemplate.type] || placeTemplate.type.slice(0, 3).toUpperCase();
+    const count = objects.filter((o) => o.type === placeTemplate.type).length + 1;
+    const defaultSpec =
+      placeTemplate.type === 'enchufe_220v'
+        ? `Toma Industrial CEE 220V ${placeTemplate.amperage || '16A'} 2P+T ${placeTemplate.ipGrade || 'IP67'}`
+        : placeTemplate.type === 'fotocelda'
+        ? `Fotocelda Crepuscular ${placeTemplate.luxThreshold || '15 Lux'} (${placeTemplate.controlledCircuit || `Módulo ${modShort}`})`
+        : `${placeTemplate.label} (${placeTemplate.power}W)`;
+
+    const newObj = {
+      id: `OBJ-${Date.now()}`,
+      tag: `${prefix}-${modShort}-${String(count).padStart(2, '0')}`,
+      type: placeTemplate.type,
+      icon: placeTemplate.icon,
+      phase: placeTemplate.phase,
+      power: placeTemplate.power,
+      rotation: placeTemplate.rotation ?? 180,
+      amperage: placeTemplate.amperage || '16A',
+      ipGrade: placeTemplate.ipGrade || 'IP67',
+      luxThreshold: placeTemplate.luxThreshold || '15 Lux',
+      controlledCircuit: placeTemplate.controlledCircuit || `Contactor Módulo ${modShort}`,
+      spec: defaultSpec,
+      status: 'operativo',
+      x: snapped.x,
+      y: snapped.y,
+      moduleId: modId,
+      locationLabel: `Pasillo ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}`,
+      description: `${defaultSpec} incorporado en pasillo del ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}.`,
+      lastInspection: new Date().toISOString().slice(0, 10),
+    };
+    setObjects((prev) => [...prev, newObj]);
+    setSelectedId(newObj.id);
+    setSelectedKind('object');
+    setShowRightSidebar(true);
+    setActiveTool('select');
+    notify(`Equipo "${newObj.tag}" añadido al plano`, 'success');
+  };
+
   const handleCanvasMouseDown = (e) => {
     if (e.button !== 0) return;
     const coords = clientToSvgCoords(e.clientX, e.clientY);
 
     if (activeTool === 'place') {
-      const snapped = applySnap(coords.x, coords.y);
-      const modId = detectModuleId(snapped.x);
-      const modShort = modId === 'MOD-200' ? '200' : '100';
-      const prefixMap = {
-        luminaria: 'PROY',
-        enchufe_220v: 'ENCH',
-        fotocelda: 'FC',
-        tablero: 'TAB',
-        energizador: 'ERG',
-        sensor: 'SEN',
-        camara: 'CAM',
-        alimentador: 'ALI',
-      };
-      const prefix = prefixMap[placeTemplate.type] || placeTemplate.type.slice(0, 3).toUpperCase();
-      const count = objects.filter((o) => o.type === placeTemplate.type).length + 1;
-      const defaultSpec =
-        placeTemplate.type === 'enchufe_220v'
-          ? `Toma Industrial CEE 220V ${placeTemplate.amperage || '16A'} 2P+T ${placeTemplate.ipGrade || 'IP67'}`
-          : placeTemplate.type === 'fotocelda'
-          ? `Fotocelda Crepuscular ${placeTemplate.luxThreshold || '15 Lux'} (${placeTemplate.controlledCircuit || `Módulo ${modShort}`})`
-          : `${placeTemplate.label} (${placeTemplate.power}W)`;
-
-      const newObj = {
-        id: `OBJ-${Date.now()}`,
-        tag: `${prefix}-${modShort}-${String(count).padStart(2, '0')}`,
-        type: placeTemplate.type,
-        icon: placeTemplate.icon,
-        phase: placeTemplate.phase,
-        power: placeTemplate.power,
-        rotation: placeTemplate.rotation ?? 180,
-        amperage: placeTemplate.amperage || '16A',
-        ipGrade: placeTemplate.ipGrade || 'IP67',
-        luxThreshold: placeTemplate.luxThreshold || '15 Lux',
-        controlledCircuit: placeTemplate.controlledCircuit || `Contactor Módulo ${modShort}`,
-        spec: defaultSpec,
-        status: 'operativo',
-        x: snapped.x,
-        y: snapped.y,
-        moduleId: modId,
-        locationLabel: `Pasillo ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}`,
-        description: `${defaultSpec} incorporado en pasillo del ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}.`,
-        lastInspection: new Date().toISOString().slice(0, 10),
-      };
-      setObjects((prev) => [...prev, newObj]);
-      setSelectedId(newObj.id);
-      setSelectedKind('object');
-      setShowRightSidebar(true);
-      setActiveTool('select');
-      notify(`Equipo "${newObj.tag}" añadido al plano`, 'success');
+      placeSymbolAtCoords(coords.x, coords.y);
       return;
     }
 
@@ -933,7 +1166,6 @@ export default function App() {
     setZoom((z) => Math.min(2.5, Math.max(0.4, Number((z * factor).toFixed(2)))));
   };
 
-  // Soporte táctil completo para celulares y tablets (arrastrar equipos, mover plano y pellizcar zoom)
   const handleCanvasTouchStart = (e) => {
     if (e.touches.length === 2) {
       const t1 = e.touches[0];
@@ -950,55 +1182,7 @@ export default function App() {
       const coords = clientToSvgCoords(touch.clientX, touch.clientY);
 
       if (activeTool === 'place') {
-        const snapped = applySnap(coords.x, coords.y);
-        const modId = detectModuleId(snapped.x);
-        const modShort = modId === 'MOD-200' ? '200' : '100';
-        const prefixMap = {
-          luminaria: 'PROY',
-          enchufe_220v: 'ENCH',
-          fotocelda: 'FC',
-          tablero: 'TAB',
-          energizador: 'ERG',
-          sensor: 'SEN',
-          camara: 'CAM',
-          alimentador: 'ALI',
-        };
-        const prefix = prefixMap[placeTemplate.type] || placeTemplate.type.slice(0, 3).toUpperCase();
-        const count = objects.filter((o) => o.type === placeTemplate.type).length + 1;
-        const defaultSpec =
-          placeTemplate.type === 'enchufe_220v'
-            ? `Toma Industrial CEE 220V ${placeTemplate.amperage || '16A'} 2P+T ${placeTemplate.ipGrade || 'IP67'}`
-            : placeTemplate.type === 'fotocelda'
-            ? `Fotocelda Crepuscular ${placeTemplate.luxThreshold || '15 Lux'} (${placeTemplate.controlledCircuit || `Módulo ${modShort}`})`
-            : `${placeTemplate.label} (${placeTemplate.power}W)`;
-
-        const newObj = {
-          id: `OBJ-${Date.now()}`,
-          tag: `${prefix}-${modShort}-${String(count).padStart(2, '0')}`,
-          type: placeTemplate.type,
-          icon: placeTemplate.icon,
-          phase: placeTemplate.phase,
-          power: placeTemplate.power,
-          rotation: placeTemplate.rotation ?? 180,
-          amperage: placeTemplate.amperage || '16A',
-          ipGrade: placeTemplate.ipGrade || 'IP67',
-          luxThreshold: placeTemplate.luxThreshold || '15 Lux',
-          controlledCircuit: placeTemplate.controlledCircuit || `Contactor Módulo ${modShort}`,
-          spec: defaultSpec,
-          status: 'operativo',
-          x: snapped.x,
-          y: snapped.y,
-          moduleId: modId,
-          locationLabel: `Pasillo ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}`,
-          description: `${defaultSpec} incorporado en pasillo del ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}.`,
-          lastInspection: new Date().toISOString().slice(0, 10),
-        };
-        setObjects((prev) => [...prev, newObj]);
-        setSelectedId(newObj.id);
-        setSelectedKind('object');
-        setShowRightSidebar(true);
-        setActiveTool('select');
-        notify(`Equipo "${newObj.tag}" añadido al plano`, 'success');
+        placeSymbolAtCoords(coords.x, coords.y);
         return;
       }
 
@@ -1105,7 +1289,7 @@ export default function App() {
 
   const handleExportJSON = () => {
     const payload = {
-      version: '2.5',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       companyInfo,
       trunkLabel,
@@ -1113,6 +1297,7 @@ export default function App() {
       modules,
       cages,
       objects,
+      symbolCatalog,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1135,6 +1320,10 @@ export default function App() {
           setModules(data.modules);
           setCages(data.cages);
           setObjects(data.objects);
+          if (Array.isArray(data.symbolCatalog) && data.symbolCatalog.length > 0) {
+            setSymbolCatalog(data.symbolCatalog);
+            setPlaceTemplate(data.symbolCatalog[0]);
+          }
           if (typeof data.trunkLabel === 'string') setTrunkLabel(data.trunkLabel);
           if (typeof data.showTrunkLabel === 'boolean') setShowTrunkLabel(data.showTrunkLabel);
           if (data.companyInfo) {
@@ -1160,7 +1349,7 @@ export default function App() {
 
     const clone = svgEl.cloneNode(true);
     const exportWidth = 1860;
-    const exportHeight = 680;
+    const exportHeight = 760;
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('viewBox', `0 0 ${exportWidth} ${exportHeight}`);
     clone.setAttribute('width', String(exportWidth));
@@ -1192,7 +1381,7 @@ export default function App() {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = 2400;
-      canvas.height = 880;
+      canvas.height = 980;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1215,6 +1404,7 @@ export default function App() {
 
     const totalWatts = objects.reduce((acc, o) => acc + (Number(o.power) || 0), 0);
     const activePhotoperiodCages = cages.filter((c) => c.photoperiodActive).length;
+    const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
     const printWin = window.open('', '_blank', 'width=1200,height=850');
     if (!printWin) {
       notify('Permite ventanas emergentes para generar el PDF', 'warn');
@@ -1235,156 +1425,145 @@ export default function App() {
       )
       .join('');
 
-    printWin.document.write(`
+    const htmlDoc = `
       <!DOCTYPE html>
       <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        <title>${companyInfo.centerName || companyInfo.companyName}</title>
+        <title>Plano Técnico - ${companyInfo.centerName}</title>
         <style>
-          @page { size: A3 landscape; margin: 12mm; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
-          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 14px; }
-          .brand { display: flex; align-items: center; gap: 14px; }
-          .brand img { max-height: 54px; max-width: 160px; object-fit: contain; }
-          .title-block h1 { margin: 0; font-size: 18px; color: #0c4a6e; }
-          .title-block p { margin: 2px 0 0; font-size: 12px; color: #475569; }
-          .meta-box { text-align: right; font-size: 11px; color: #334155; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; }
-          .plan-frame { border: 1.5px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #f0f9ff; margin-bottom: 14px; }
-          .plan-frame svg { width: 100%; height: auto; display: block; }
-          .bottom-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start; }
-          table { width: 100%; border-collapse: collapse; font-size: 10px; }
-          th, td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
-          th { background: #e0f2fe; color: #0c4a6e; font-weight: 700; }
-          .sign-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 12px; background: #f8fafc; text-align: center; }
-          .sign-img { height: 64px; display: flex; align-items: center; justify-content: center; border-bottom: 1px dashed #64748b; margin-bottom: 8px; }
-          .sign-img img { max-height: 58px; max-width: 200px; object-fit: contain; }
-          .kpis { display: flex; gap: 10px; margin-bottom: 10px; font-size: 11px; }
-          .kpi { background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border-left: 3px solid #0284c7; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 24px; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 14px; }
+          .header-left { display: flex; align-items: center; gap: 14px; }
+          .logo { max-height: 54px; max-width: 180px; object-fit: contain; }
+          .title { font-size: 18px; font-weight: 800; margin: 0; }
+          .subtitle { font-size: 12px; color: #475569; margin: 2px 0 0 0; }
+          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 8px; background: #f8fafc; margin-bottom: 14px; }
+          .plan-box svg { width: 100%; height: auto; max-height: 390px; display: block; }
+          .title-block { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
+          .title-block td { border: 1.5px solid #0f172a; padding: 6px 10px; }
+          .tb-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
+          .tb-val { font-size: 12px; font-weight: 700; color: #0f172a; }
+          .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+          .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: #f1f5f9; }
+          .kpi-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+          .kpi-val { font-size: 16px; font-weight: 800; color: #0f172a; }
+          table.inv { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
+          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+          table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
+          .footer-sign { display: flex; justify-content: flex-end; margin-top: 24px; }
+          .sign-box { width: 260px; text-align: center; border-top: 1px solid #334155; padding-top: 6px; font-size: 11px; }
+          .sign-img { max-height: 52px; margin: 0 auto 4px auto; display: block; }
+          @media print { body { margin: 10mm; } }
         </style>
       </head>
       <body>
         <div class="header">
-          <div class="brand">
-            ${companyInfo.logoDataUrl ? `<img src="${companyInfo.logoDataUrl}" alt="Logo" />` : ''}
-            <div class="title-block">
-              <h1>${companyInfo.companyName}</h1>
-              <p>${companyInfo.centerName} · Plano Técnico de Fotoperiodo e Infraestructura Eléctrica</p>
+          <div class="header-left">
+            ${companyInfo.logoDataUrl ? `<img src="${companyInfo.logoDataUrl}" class="logo" />` : ''}
+            <div>
+              <h1 class="title">${companyInfo.companyName}</h1>
+              <p class="subtitle">${companyInfo.projectName} · ${companyInfo.centerName}</p>
             </div>
           </div>
-          <div class="meta-box">
-            <div><strong>Código Plano:</strong> ${companyInfo.code}</div>
-            <div><strong>Fecha Emisión:</strong> ${new Date().toLocaleDateString('es-CL')}</div>
-            <div><strong>Módulos:</strong> 200 (12 Jaulas) & 100 (10 Jaulas)</div>
+          <div style="text-align:right; font-size:11px; color:#475569;">
+            <div><strong>Código:</strong> ${companyInfo.code}</div>
+            <div><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CL')}</div>
           </div>
         </div>
+
+        <div class="plan-box">${svgString}</div>
+
+        <table class="title-block">
+          <tr>
+            <td style="width:36%;"><span class="tb-label">Proyecto</span><span class="tb-val">${companyInfo.projectName || '-'}</span></td>
+            <td style="width:32%;"><span class="tb-label">Cliente / Mandante</span><span class="tb-val">${companyInfo.clientName || '-'}</span></td>
+            <td style="width:32%;"><span class="tb-label">Centro / Pontón</span><span class="tb-val">${companyInfo.centerName || '-'}</span></td>
+          </tr>
+          <tr>
+            <td colspan="2"><span class="tb-label">Descripción del Alcance</span><span>${companyInfo.projectDescription || '-'}</span></td>
+            <td><span class="tb-label">Coordenadas Geográficas</span><a href="${mapsLink}" target="_blank" style="color:#0284c7;font-weight:700;">${companyInfo.coordinates || 'Sin coordenadas'}</a></td>
+          </tr>
+        </table>
 
         <div class="kpis">
-          <div class="kpi"><strong>Total Jaulas:</strong> ${cages.length} unidades</div>
-          <div class="kpi"><strong>Jaulas con Fotoperiodo Activo:</strong> ${activePhotoperiodCages} / ${cages.length}</div>
-          <div class="kpi"><strong>Equipos Instalados:</strong> ${objects.length} unidades</div>
-          <div class="kpi"><strong>Potencia Instalada Total:</strong> ${(totalWatts / 1000).toFixed(2)} kW</div>
+          <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${cages.length} Unidades</div></div>
+          <div class="kpi"><div class="kpi-label">Con Fotoperiodo</div><div class="kpi-val">${activePhotoperiodCages} Jaulas</div></div>
+          <div class="kpi"><div class="kpi-label">Equipos Instalados</div><div class="kpi-val">${objects.length} Equipos</div></div>
+          <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(totalWatts / 1000).toFixed(2)} kW</div></div>
         </div>
 
-        <div class="plan-frame">
-          ${svgString}
-        </div>
+        <table class="inv">
+          <thead>
+            <tr>
+              <th>TAG</th>
+              <th>Módulo</th>
+              <th>Especificación Técnica</th>
+              <th>Circuito / Fase</th>
+              <th style="text-align:right;">Potencia</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
 
-        <div class="bottom-grid">
-          <div>
-            <table>
-              <thead>
-                <tr>
-                  <th>TAG</th>
-                  <th>Módulo</th>
-                  <th>Especificación Técnica</th>
-                  <th>Sistema</th>
-                  <th style="text-align:right;">Potencia</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>${rowsHtml}</tbody>
-            </table>
-          </div>
+        <div class="footer-sign">
           <div class="sign-box">
-            <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 6px;">Aprobación y Firma Técnica</div>
-            <div class="sign-img">
-              ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" alt="Firma" />` : '<span style="color:#94a3b8;font-style:italic;font-size:11px;">Firma Digital Responsable</span>'}
-            </div>
-            <div style="font-weight: 700; font-size: 13px;">${companyInfo.responsibleName}</div>
-            <div style="font-size: 11px; color: #475569;">${companyInfo.responsibleRole}</div>
-            <div style="font-size: 10px; color: #0284c7; font-weight: 600; margin-top: 2px;">${companyInfo.responsibleLicense}</div>
+            ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : '<div style="height:36px;"></div>'}
+            <strong>${companyInfo.responsibleName}</strong><br/>
+            <span>${companyInfo.responsibleRole}</span><br/>
+            <span style="color:#64748b;">${companyInfo.responsibleLicense}</span>
           </div>
         </div>
-        <script>
-          window.onload = function() { setTimeout(function() { window.print(); }, 350); };
-        </script>
+        <script>window.onload = function() { window.print(); };</script>
       </body>
       </html>
-    `);
+    `;
+    printWin.document.open();
+    printWin.document.write(htmlDoc);
     printWin.document.close();
   };
 
-  const filteredObjectIds = useMemo(() => {
-    const set = new Set();
-    objects.forEach((obj) => {
-      const matchPhase = filterPhase === 'all' || obj.phase === filterPhase;
-      const matchStatus = filterStatus === 'all' || obj.status === filterStatus;
-      const matchModule = filterModule === 'all' || obj.moduleId === filterModule;
-      const q = searchQuery.trim().toLowerCase();
-      const matchQuery =
-        !q ||
-        obj.tag.toLowerCase().includes(q) ||
-        obj.spec.toLowerCase().includes(q) ||
-        obj.locationLabel.toLowerCase().includes(q);
-      if (matchPhase && matchStatus && matchModule && matchQuery) {
-        set.add(obj.id);
+  const filteredObjects = useMemo(() => {
+    return objects.filter((obj) => {
+      if (filterPhase !== 'all' && obj.phase !== filterPhase) return false;
+      if (filterStatus !== 'all' && obj.status !== filterStatus) return false;
+      if (filterModule !== 'all' && obj.moduleId !== filterModule) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTag = obj.tag.toLowerCase().includes(q);
+        const matchSpec = obj.spec.toLowerCase().includes(q);
+        const matchLoc = (obj.locationLabel || '').toLowerCase().includes(q);
+        if (!matchTag && !matchSpec && !matchLoc) return false;
       }
+      return true;
     });
-    return set;
   }, [objects, filterPhase, filterStatus, filterModule, searchQuery]);
 
-  const stats = useMemo(() => {
-    const totalPower = objects.reduce((s, o) => s + (Number(o.power) || 0), 0);
-    const activeLights = objects.filter((o) => o.type === 'luminaria' && o.status === 'operativo').length;
-    const alertsCount = objects.filter((o) => o.status !== 'operativo').length;
-    const photoCages = cages.filter((c) => c.photoperiodActive).length;
-    return { totalPower, activeLights, alertsCount, photoCages };
+  const metrics = useMemo(() => {
+    const totalPowerW = objects.reduce((acc, o) => acc + (Number(o.power) || 0), 0);
+    const activeCages = cages.filter((c) => c.photoperiodActive).length;
+    const alertCount = objects.filter((o) => o.status !== 'operativo').length;
+    return {
+      totalPowerKw: (totalPowerW / 1000).toFixed(2),
+      activeCages,
+      alertCount,
+    };
   }, [objects, cages]);
 
-  const renderObjectSymbol = (obj) => {
-    const isSelected = selectedId === obj.id && selectedKind === 'object';
-    const isDimmed = !filteredObjectIds.has(obj.id);
-    const phaseColor = PHASE_CONFIG[obj.phase]?.color || '#38bdf8';
+  // ============================================================================
+  // RENDERIZADO DE SÍMBOLOS TÉCNICOS SVG (CON PROYECTOR LED INDUSTRIAL REALISTA)
+  // ============================================================================
+  const renderSymbolGraphic = (obj, isSelected) => {
+    const phaseColor = PHASE_CONFIG[obj.phase]?.color || '#3b82f6';
     const statusColor = STATUS_CONFIG[obj.status]?.color || '#10b981';
     const rot = Number(obj.rotation) || 0;
 
     return (
-      <g
-        key={obj.id}
-        transform={`translate(${obj.x}, ${obj.y})`}
-        opacity={isDimmed ? 0.2 : 1}
-        className="cursor-grab active:cursor-grabbing transition-opacity duration-150"
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          setSelectedId(obj.id);
-          setSelectedKind('object');
-          setShowRightSidebar(true);
-          setDraggingObjId(obj.id);
-        }}
-        onTouchStart={(e) => {
-          e.stopPropagation();
-          setSelectedId(obj.id);
-          setSelectedKind('object');
-          setShowRightSidebar(true);
-          setDraggingObjId(obj.id);
-        }}
-        onMouseEnter={() => setHoveredObj(obj)}
-        onMouseLeave={() => setHoveredObj(null)}
-      >
+      <g>
         {isSelected && (
           <circle
-            r="23"
+            r="25"
             fill="none"
             stroke="#38bdf8"
             strokeWidth="2.5"
@@ -1392,110 +1571,170 @@ export default function App() {
           />
         )}
 
+        {/* Diseño Especial Realista de Proyector LED Industrial */}
+        {obj.type === 'luminaria' ? (
+          <g>
+            {/* Haz volumétrico de luz en dirección del enfoque */}
+            <g transform={`rotate(${rot})`}>
+              <polygon
+                points="0,0 56,-26 56,26"
+                fill="url(#ledBeamGrad)"
+                opacity="0.72"
+                pointerEvents="none"
+              />
+            </g>
+
+            {/* Base circular técnica */}
+            <circle
+              r="18"
+              fill={darkMode ? '#0f172a' : '#ffffff'}
+              stroke={phaseColor}
+              strokeWidth="2.5"
+            />
+
+            {/* Cuerpo del Proyector LED (Horquilla U + Carcasa aleteada + Óptica frontal) */}
+            <g transform={`rotate(${rot})`}>
+              {/* Horquilla de montaje metálica en U */}
+              <path
+                d="M -11,-9 L -4,-9 L -4,9 L -11,9"
+                fill="none"
+                stroke={darkMode ? '#94a3b8' : '#475569'}
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Pernos laterales de articulación */}
+              <circle cx="-4" cy="-9" r="1.6" fill={phaseColor} />
+              <circle cx="-4" cy="9" r="1.6" fill={phaseColor} />
+
+              {/* Carcasa trasera con aletas disipadoras de calor */}
+              <rect
+                x="-6"
+                y="-8.5"
+                width="9"
+                height="17"
+                rx="1.8"
+                fill={darkMode ? '#334155' : '#1e293b'}
+                stroke={darkMode ? '#cbd5e1' : '#0f172a'}
+                strokeWidth="1"
+              />
+              <line x1="-6" y1="-5" x2="-1" y2="-5" stroke="#64748b" strokeWidth="1" />
+              <line x1="-6" y1="-1.7" x2="-1" y2="-1.7" stroke="#64748b" strokeWidth="1" />
+              <line x1="-6" y1="1.7" x2="-1" y2="1.7" stroke="#64748b" strokeWidth="1" />
+              <line x1="-6" y1="5" x2="-1" y2="5" stroke="#64748b" strokeWidth="1" />
+
+              {/* Bisel frontal y lente óptica LED iluminada */}
+              <polygon
+                points="3,-10 9,-12 9,12 3,10"
+                fill="#f59e0b"
+                stroke="#b45309"
+                strokeWidth="1"
+              />
+              <rect
+                x="7.5"
+                y="-10.5"
+                width="2.5"
+                height="21"
+                rx="0.8"
+                fill="#fef08a"
+              />
+            </g>
+          </g>
+        ) : (
+          <>
+            <circle
+              r="17"
+              fill={darkMode ? '#0f172a' : '#ffffff'}
+              stroke={phaseColor}
+              strokeWidth="2.6"
+            />
+            {obj.type === 'enchufe_220v' && (
+              <g>
+                <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#2563eb" />
+                <circle cx="-3.5" cy="-1.5" r="1.6" fill="#ffffff" />
+                <circle cx="3.5" cy="-1.5" r="1.6" fill="#ffffff" />
+                <rect x="-1.2" y="2.5" width="2.4" height="3.2" rx="0.6" fill="#fde047" />
+              </g>
+            )}
+            {obj.type === 'fotocelda' && (
+              <g>
+                <path
+                  d="M -10,0 Q 0,-9 10,0 Q 0,9 -10,0 Z"
+                  fill="#fef3c7"
+                  stroke="#d97706"
+                  strokeWidth="1.8"
+                />
+                <circle r="3.8" fill="#0f172a" />
+                <circle cx="-1.2" cy="-1.2" r="1.1" fill="#ffffff" />
+              </g>
+            )}
+            {obj.type === 'tablero' && (
+              <g>
+                <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#ef4444" />
+                <polygon points="1,-5 -3,1 0,1 -1,5 4,-1 1,-1" fill="#ffffff" />
+              </g>
+            )}
+            {obj.type === 'energizador' && (
+              <g>
+                <circle r="6" fill="#ef4444" />
+                <path
+                  d="M -10,-6 A 12,12 0 0,1 -10,6 M 10,-6 A 12,12 0 0,0 10,6"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="1.8"
+                />
+              </g>
+            )}
+            {obj.type === 'sensor' && (
+              <g>
+                <circle r="6.5" fill="#06b6d4" />
+                <circle r="2.5" fill="#ffffff" />
+              </g>
+            )}
+            {obj.type === 'camara' && (
+              <g>
+                <rect x="-8" y="-5" width="11" height="10" rx="2" fill="#06b6d4" />
+                <polygon points="3,-3 9,-6 9,6 3,3" fill="#0891b2" />
+              </g>
+            )}
+            {obj.type === 'alimentador' && (
+              <g>
+                <polygon points="0,-9 8,6 -8,6" fill="#10b981" />
+                <circle r="2.2" fill="#ffffff" />
+              </g>
+            )}
+          </>
+        )}
+
+        {/* Indicador de Estado Operativo */}
         <circle
-          r="15"
-          fill={darkMode ? '#0f172a' : '#ffffff'}
-          stroke={phaseColor}
-          strokeWidth={isSelected ? '3' : '2.2'}
-        />
-
-        {obj.type === 'luminaria' && (
-          <g transform={`rotate(${rot})`}>
-            <polygon points="-14,-8 -28,-16 -28,16 -14,8" fill="#fef08a" opacity="0.45" />
-            <line x1="-15" y1="0" x2="-26" y2="0" stroke="#f59e0b" strokeWidth="1.6" />
-            <line x1="-14" y1="-5" x2="-24" y2="-11" stroke="#f59e0b" strokeWidth="1.4" />
-            <line x1="-14" y1="5" x2="-24" y2="11" stroke="#f59e0b" strokeWidth="1.4" />
-            <rect x="-8" y="-6" width="14" height="12" rx="2" fill="#f59e0b" stroke="#78350f" strokeWidth="1.2" />
-            <rect x="-11" y="-5" width="3" height="10" rx="1" fill="#fef08a" />
-            <circle cx="8" cy="0" r="2.2" fill={darkMode ? '#e2e8f0' : '#334155'} />
-          </g>
-        )}
-
-        {obj.type === 'enchufe_220v' && (
-          <g transform={`rotate(${rot})`}>
-            <rect x="-8" y="-7" width="16" height="14" rx="3" fill="#2563eb" stroke="#1e3a8a" strokeWidth="1.3" />
-            <circle cx="-3.5" cy="-1.5" r="1.6" fill="#ffffff" />
-            <circle cx="3.5" cy="-1.5" r="1.6" fill="#ffffff" />
-            <rect x="-1.5" y="2" width="3" height="3.2" rx="0.6" fill="#fde047" />
-          </g>
-        )}
-
-        {obj.type === 'fotocelda' && (
-          <g transform={`rotate(${rot})`}>
-            <circle cx="0" cy="0" r="8.5" fill="#fef3c7" stroke="#d97706" strokeWidth="1.5" />
-            <path d="M -6,0 Q 0,-5.5 6,0 Q 0,5.5 -6,0 Z" fill="#ffffff" stroke="#b45309" strokeWidth="1.3" />
-            <circle cx="0" cy="0" r="2.4" fill="#d97706" />
-            <line x1="0" y1="-8.5" x2="0" y2="-12" stroke="#f59e0b" strokeWidth="1.4" />
-            <line x1="-5.5" y1="-6.5" x2="-8" y2="-9" stroke="#f59e0b" strokeWidth="1.3" />
-            <line x1="5.5" y1="-6.5" x2="8" y2="-9" stroke="#f59e0b" strokeWidth="1.3" />
-          </g>
-        )}
-
-        {obj.type === 'tablero' && (
-          <g transform={`rotate(${rot})`}>
-            <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#ef4444" stroke="#7f1d1d" strokeWidth="1.2" />
-            <polygon points="-1,-5 3,-1 0,-1 2,5 -3,1 0,1" fill="#ffffff" />
-          </g>
-        )}
-
-        {obj.type === 'energizador' && (
-          <g transform={`rotate(${rot})`}>
-            <rect x="-7" y="-7" width="14" height="14" rx="2" fill="#dc2626" />
-            <path d="M-4,0 L-1,-4 L2,4 L5,0" stroke="#fff" strokeWidth="1.8" fill="none" />
-          </g>
-        )}
-
-        {obj.type === 'sensor' && (
-          <g transform={`rotate(${rot})`}>
-            <circle r="7" fill="#06b6d4" />
-            <text x="0" y="3" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#fff">
-              O₂
-            </text>
-          </g>
-        )}
-
-        {obj.type === 'camara' && (
-          <g transform={`rotate(${rot})`}>
-            <rect x="-7" y="-5" width="11" height="10" rx="2" fill="#0891b2" />
-            <polygon points="4,-3 9,-6 9,6 4,3" fill="#06b6d4" />
-          </g>
-        )}
-
-        {obj.type === 'alimentador' && (
-          <g transform={`rotate(${rot})`}>
-            <polygon points="0,-8 8,6 -8,6" fill="#10b981" />
-            <circle cy="2" r="2.2" fill="#fff" />
-          </g>
-        )}
-
-        <circle
-          cx="11"
-          cy="-11"
-          r="4.2"
+          cx="13"
+          cy="-13"
+          r="5"
           fill={statusColor}
           stroke={darkMode ? '#0f172a' : '#ffffff'}
-          strokeWidth="1.5"
+          strokeWidth="1.8"
         />
 
-        {showLabels && obj.tag && (
+        {/* Etiqueta TAG del equipo */}
+        {showLabels && (
           <g transform="translate(0, 26)">
             <rect
               x="-34"
-              y="-9"
+              y="-8"
               width="68"
               height="15"
               rx="4"
               fill={darkMode ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.95)'}
-              stroke={isSelected ? '#0284c7' : darkMode ? '#334155' : '#cbd5e1'}
+              stroke={phaseColor}
               strokeWidth="1"
             />
             <text
-              x="0"
-              y="1.5"
               textAnchor="middle"
+              y="2.5"
               fontSize="8.5"
-              fontWeight="700"
-              fill={darkMode ? '#f1f5f9' : '#0f172a'}
+              fontWeight="800"
+              fill={darkMode ? '#f8fafc' : '#0f172a'}
             >
               {obj.tag}
             </text>
@@ -1505,164 +1744,192 @@ export default function App() {
     );
   };
 
+  const renderPalettePreviewIcon = (iconName) => {
+    switch (iconName) {
+      case 'sun':
+        return (
+          <svg viewBox="0 0 28 28" className="w-5 h-5">
+            <path d="M4,8 L9,8 L9,20 L4,20" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" />
+            <rect x="8" y="8.5" width="8" height="11" rx="1.5" fill="#1e293b" />
+            <polygon points="16,7 22,5 22,23 16,21" fill="#f59e0b" />
+            <rect x="20.5" y="6.5" width="2.2" height="15" fill="#fef08a" />
+          </svg>
+        );
+      case 'plug':
+        return <Zap className="w-4 h-4 text-blue-500" />;
+      case 'eye':
+        return <Eye className="w-4 h-4 text-amber-500" />;
+      case 'zap':
+        return <Zap className="w-4 h-4 text-rose-500" />;
+      case 'radio':
+        return <Radio className="w-4 h-4 text-rose-500" />;
+      case 'cpu':
+        return <Cpu className="w-4 h-4 text-cyan-500" />;
+      case 'camera':
+        return <Camera className="w-4 h-4 text-cyan-500" />;
+      default:
+        return <Compass className="w-4 h-4 text-emerald-500" />;
+    }
+  };
+
+  const mapsHref = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
+
   return (
     <div
       ref={appContainerRef}
-      className={`flex flex-col h-screen w-screen overflow-hidden select-none ${
+      className={`h-screen w-screen overflow-hidden flex flex-col select-none ${
         darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
       }`}
     >
-      {/* BARRA SUPERIOR */}
+      {/* ====================================================================
+          BARRA SUPERIOR DE HERRAMIENTAS Y ACCIONES
+      ==================================================================== */}
       <header
-        className={`flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b z-20 ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
+        className={`z-30 border-b px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-xs ${
+          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}
       >
-        <div className="flex items-center gap-2.5">
-          {!isFullscreen && (
-            <button
-              onClick={() => setShowLeftSidebar((v) => !v)}
-              title={showLeftSidebar ? 'Ocultar panel de herramientas' : 'Mostrar panel de herramientas'}
-              className={`p-2 rounded-lg border transition ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {showLeftSidebar ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-            </button>
+        {/* Identidad Empresa + Botón Nuevo Proyecto */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          {companyInfo.logoDataUrl ? (
+            <img
+              src={companyInfo.logoDataUrl}
+              alt="Logo"
+              className="h-9 max-w-[110px] object-contain rounded-lg border border-slate-200/40 bg-white p-1"
+            />
+          ) : (
+            <div className="h-9 px-2.5 rounded-xl bg-sky-600 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
+              <Building2 className="w-4 h-4" />
+              <span>BEQA</span>
+            </div>
           )}
 
-          <button
-            onClick={() => setShowCompanyModal(true)}
-            title="Haz clic para subir logo y configurar empresa"
-            className={`flex items-center justify-center h-10 px-2.5 rounded-lg border transition ${
-              darkMode
-                ? 'bg-slate-800 border-slate-700 hover:border-sky-500'
-                : 'bg-slate-50 border-slate-200 hover:border-sky-400'
-            }`}
-          >
-            {companyInfo.logoDataUrl ? (
-              <img
-                src={companyInfo.logoDataUrl}
-                alt="Logo Empresa"
-                className="h-8 max-w-[120px] object-contain"
-              />
-            ) : (
-              <div className="flex items-center gap-1.5 text-sky-500 font-bold text-xs">
-                <Building2 className="w-4 h-4" />
-                <span>Tu Logo</span>
-              </div>
-            )}
-          </button>
-
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm md:text-base font-extrabold tracking-tight leading-tight">
+              <h1 className="text-xs sm:text-sm font-extrabold truncate">
                 {companyInfo.companyName}
               </h1>
               <button
                 onClick={() => setShowCompanyModal(true)}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400 font-semibold hover:bg-sky-500/25 transition"
+                className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25 transition-colors"
               >
                 Configurar Empresa / Firma
               </button>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {companyInfo.centerName} · Resp: <strong>{companyInfo.responsibleName}</strong>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              {companyInfo.centerName} · {companyInfo.projectName}
             </p>
           </div>
         </div>
 
+        {/* Acciones Principales */}
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* BOTÓN NUEVO PROYECTO */}
           <button
-            onClick={() => setSnapToWalkway(!snapToWalkway)}
-            title="Activar/Desactivar imán magnético a los pasillos entre jaulas"
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              snapToWalkway
-                ? 'bg-sky-600 text-white border-sky-600'
-                : darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-300'
-                : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}
+            onClick={() => {
+              setNewProjectForm({
+                projectName: '',
+                projectDescription: '',
+                clientName: companyInfo.clientName || '',
+                centerName: '',
+                coordinates: '',
+                googleMapsUrl: '',
+                clearExistingObjects: false,
+              });
+              setShowNewProjectModal(true);
+            }}
+            className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-colors"
           >
-            <Magnet className="w-3.5 h-3.5" />
-            <span>Imán Pasillos</span>
+            <FolderPlus className="w-3.5 h-3.5" />
+            <span>Nuevo Proyecto</span>
           </button>
 
+          {/* BOTÓN BUSCAR PROYECTOS EN BASE DE DATOS */}
           <button
-            onClick={() => setShowLabels(!showLabels)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
+            onClick={() => {
+              setCloudSearchQuery('');
+              setShowCloudModal(true);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-colors ${
               darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                ? 'bg-slate-800 border-slate-700 text-sky-300 hover:bg-slate-700'
+                : 'bg-sky-50 border-sky-200 text-sky-800 hover:bg-sky-100'
             }`}
           >
-            {showLabels ? <Eye className="w-3.5 h-3.5 text-sky-500" /> : <EyeOff className="w-3.5 h-3.5" />}
-            <span>Etiquetas</span>
-          </button>
-
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              darkMode
-                ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700'
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            <span>{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
-          </button>
-
-          <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
-
-          <button
-            onClick={() => setShowCloudModal(true)}
-            title="Buscar y abrir planos anteriores guardados en Firebase"
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              cloudStatus === 'connected'
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25'
-                : darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <FolderOpen className="w-3.5 h-3.5 text-amber-500" />
+            <FolderOpen className="w-3.5 h-3.5 text-sky-500" />
             <span>Buscar Proyectos ({savedBlueprints.length})</span>
+          </button>
+
+          {/* BOTÓN GUARDAR EN NUBE */}
+          <button
+            onClick={() => handleSaveToCloud()}
+            disabled={isSavingCloud}
+            className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-60"
+          >
+            <CloudUpload className="w-3.5 h-3.5" />
+            <span>{isSavingCloud ? 'Guardando...' : 'Guardar en Nube'}</span>
             <span
               className={`w-2 h-2 rounded-full ${
                 cloudStatus === 'connected'
-                  ? 'bg-emerald-500'
+                  ? 'bg-emerald-700'
                   : cloudStatus === 'connecting'
-                  ? 'bg-amber-400 animate-pulse'
-                  : 'bg-rose-500'
+                  ? 'bg-slate-700 animate-pulse'
+                  : 'bg-rose-700'
               }`}
             />
           </button>
 
           <button
-            onClick={() => handleSaveToCloud(slugifyCenterFileName('plano'), companyInfo.centerName)}
-            disabled={isSavingCloud || cloudStatus !== 'connected'}
-            title="Guardar cambios en la nube con el nombre del centro"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 transition shadow-xs"
+            onClick={() => setSnapToWalkway((v) => !v)}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
+              snapToWalkway
+                ? 'bg-blue-600 text-white border-blue-600'
+                : darkMode
+                ? 'bg-slate-800 border-slate-700 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700'
+            }`}
           >
-            <CloudUpload className={`w-3.5 h-3.5 ${isSavingCloud ? 'animate-bounce' : ''}`} />
-            <span>{isSavingCloud ? 'Guardando...' : 'Guardar en Nube'}</span>
+            <Magnet className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Imán Pasillos</span>
           </button>
 
-          <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
+          <button
+            onClick={() => setShowLabels((v) => !v)}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
+              showLabels
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : darkMode
+                ? 'bg-slate-800 border-slate-700 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Etiquetas</span>
+          </button>
+
+          <button
+            onClick={() => setDarkMode((v) => !v)}
+            className={`p-1.5 rounded-xl border ${
+              darkMode
+                ? 'bg-slate-800 border-slate-700 text-amber-400'
+                : 'bg-white border-slate-200 text-slate-700'
+            }`}
+            title="Modo Oscuro / Claro"
+          >
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
 
           <button
             onClick={() => setShowInventoryModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white flex items-center gap-1"
           >
-            <FileText className="w-3.5 h-3.5" />
+            <Layers className="w-3.5 h-3.5" />
             <span>Inventario ({objects.length})</span>
           </button>
 
           <button
             onClick={handleExportPNG}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1"
           >
             <ImageIcon className="w-3.5 h-3.5" />
             <span>PNG</span>
@@ -1670,348 +1937,441 @@ export default function App() {
 
           <button
             onClick={() => setShowPreviewModal(true)}
-            title="Ver plano limpio en pantalla completa sin menús"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-700 text-white transition shadow-xs"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-700 hover:bg-slate-800 text-white flex items-center gap-1"
           >
             <MonitorPlay className="w-3.5 h-3.5" />
-            <span>Vista Previa</span>
+            <span className="hidden md:inline">Vista Previa</span>
           </button>
 
           <button
             onClick={handleExportPDF}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white transition shadow-xs"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Exportar PDF</span>
+            <span>PDF</span>
           </button>
-
-          <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
 
           <button
             onClick={handleExportJSON}
-            title="Guardar archivo de proyecto (.json)"
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border ${
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${
               darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                ? 'bg-slate-800 border-slate-700 text-slate-200'
+                : 'bg-white border-slate-200 text-slate-700'
             }`}
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Guardar JSON</span>
+            <span className="hidden md:inline">JSON</span>
           </button>
 
           <button
             onClick={() => jsonInputRef.current?.click()}
-            title="Cargar proyecto guardado (.json)"
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border ${
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${
               darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                ? 'bg-slate-800 border-slate-700 text-slate-200'
+                : 'bg-white border-slate-200 text-slate-700'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Cargar</span>
+            <span className="hidden md:inline">Cargar</span>
           </button>
-          <input ref={jsonInputRef} type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
-
-          <button
-            onClick={() => {
-              setObjects(INITIAL_OBJECTS);
-              setCages(generateInitialCages());
-              notify('Plano restablecido a valores iniciales');
-            }}
-            title="Restablecer plano inicial"
-            className={`p-1.5 rounded-lg border ${
-              darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-
-          <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
+          <input
+            ref={jsonInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportJSON}
+            className="hidden"
+          />
 
           <button
             onClick={toggleFullscreen}
-            title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Expandir plano en pantalla completa'}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
-              isFullscreen
-                ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
-                : darkMode
-                ? 'bg-slate-800 border-slate-700 text-sky-400 hover:bg-slate-700'
-                : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+            className={`p-1.5 rounded-xl border ${
+              darkMode
+                ? 'bg-slate-800 border-slate-700 text-slate-200'
+                : 'bg-white border-slate-200 text-slate-700'
             }`}
+            title="Pantalla Completa"
           >
-            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
-            <span>{isFullscreen ? 'Salir Pantalla Completa' : 'Pantalla Completa'}</span>
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Expand className="w-4 h-4" />}
           </button>
-
-          {!isFullscreen && (
-            <button
-              onClick={() => setShowRightSidebar((v) => !v)}
-              title={showRightSidebar ? 'Ocultar panel de propiedades' : 'Mostrar panel de propiedades'}
-              className={`p-2 rounded-lg border transition ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {showRightSidebar ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-            </button>
-          )}
         </div>
       </header>
 
-      {/* CONTENEDOR PRINCIPAL DE 3 COLUMNAS */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {showLeftSidebar && !isFullscreen && (
-        <aside
-          className={`fixed md:static inset-y-0 left-0 z-30 w-72 flex-shrink-0 flex flex-col border-r overflow-y-auto shadow-2xl md:shadow-none ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-          }`}
-        >
-          <div className={`p-3.5 border-b ${darkMode ? 'border-slate-800 bg-slate-800/30' : 'border-slate-200 bg-slate-50/70'}`}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-sky-500" />
-                Identidad y Firma PDF
-              </h2>
-              <div className="flex items-center gap-2">
+      {/* ====================================================================
+          CUERPO PRINCIPAL: PANEL IZQUIERDO + LIENZO CENTRAL + PANEL DERECHO SUPERPUESTO
+      ==================================================================== */}
+      <div className="relative flex-1 flex overflow-hidden">
+        {/* PANEL IZQUIERDO: IDENTIDAD, PALETA EDITABLE DE SIMBOLOGÍA Y FILTROS */}
+        {showLeftSidebar && (
+          <aside
+            className={`w-72 shrink-0 border-r overflow-y-auto p-3.5 space-y-4 z-20 ${
+              darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+            }`}
+          >
+            {/* Identidad y Firma PDF */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Identidad y Firma PDF
+                </span>
                 <button
                   onClick={() => setShowCompanyModal(true)}
-                  className="text-[11px] font-semibold text-sky-600 hover:text-sky-500 dark:text-sky-400"
+                  className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline"
                 >
                   Editar
                 </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => setShowLeftSidebar(false)}
-                  title="Cerrar panel izquierdo"
-                  className="md:hidden p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70"
+                  onClick={() => logoInputRef.current?.click()}
+                  className={`p-2.5 rounded-xl border border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                    darkMode
+                      ? 'border-slate-700 hover:border-sky-500 bg-slate-800/60'
+                      : 'border-slate-300 hover:border-sky-500 bg-slate-50'
+                  }`}
                 >
-                  <X className="w-4 h-4" />
+                  <Upload className="w-4 h-4 text-sky-500" />
+                  <span>Insertar Logo</span>
+                </button>
+                <button
+                  onClick={() => signatureInputRef.current?.click()}
+                  className={`p-2.5 rounded-xl border border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                    darkMode
+                      ? 'border-slate-700 hover:border-emerald-500 bg-slate-800/60'
+                      : 'border-slate-300 hover:border-emerald-500 bg-slate-50'
+                  }`}
+                >
+                  <Edit3 className="w-4 h-4 text-emerald-500" />
+                  <span>Insertar Firma</span>
                 </button>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => logoInputRef.current?.click()}
-                className={`flex flex-col items-center justify-center p-2 rounded-lg border border-dashed text-[11px] font-medium transition ${
-                  darkMode
-                    ? 'border-slate-700 hover:border-sky-500 bg-slate-800/60 text-slate-300'
-                    : 'border-slate-300 hover:border-sky-500 bg-white text-slate-700'
-                }`}
-              >
-                {companyInfo.logoDataUrl ? (
-                  <img src={companyInfo.logoDataUrl} alt="Logo" className="h-7 object-contain mb-1" />
-                ) : (
-                  <Upload className="w-4 h-4 text-sky-500 mb-1" />
-                )}
-                <span>{companyInfo.logoDataUrl ? 'Cambiar Logo' : 'Insertar Logo'}</span>
-              </button>
-
-              <button
-                onClick={() => signatureInputRef.current?.click()}
-                className={`flex flex-col items-center justify-center p-2 rounded-lg border border-dashed text-[11px] font-medium transition ${
-                  darkMode
-                    ? 'border-slate-700 hover:border-emerald-500 bg-slate-800/60 text-slate-300'
-                    : 'border-slate-300 hover:border-emerald-500 bg-white text-slate-700'
-                }`}
-              >
-                {companyInfo.signatureDataUrl ? (
-                  <img src={companyInfo.signatureDataUrl} alt="Firma" className="h-7 object-contain mb-1" />
-                ) : (
-                  <Edit3 className="w-4 h-4 text-emerald-500 mb-1" />
-                )}
-                <span>{companyInfo.signatureDataUrl ? 'Cambiar Firma' : 'Insertar Firma'}</span>
-              </button>
-            </div>
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload(e, 'logoDataUrl')}
-              className="hidden"
-            />
-            <input
-              ref={signatureInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload(e, 'signatureDataUrl')}
-              className="hidden"
-            />
-          </div>
-
-          <div className="p-3.5 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5 text-sky-500" />
-              Paleta de Simbología
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">
-              Selecciona un elemento y haz clic o toca un pasillo del plano para insertarlo.
-            </p>
-            <div className="space-y-1.5">
-              {SYMBOL_CATALOG.map((item) => {
-                const isPlacingThis = activeTool === 'place' && placeTemplate.type === item.type;
-                const phaseCol = PHASE_CONFIG[item.phase]?.color || '#38bdf8';
-                return (
-                  <button
-                    key={item.type}
-                    onClick={() => {
-                      if (isPlacingThis) {
-                        setActiveTool('select');
-                      } else {
-                        setPlaceTemplate(item);
-                        setActiveTool('place');
-                        notify(`Modo inserción: Haz clic en el plano para colocar "${item.label}"`);
-                      }
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium border transition ${
-                      isPlacingThis
-                        ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
-                        : darkMode
-                        ? 'bg-slate-800/70 border-slate-700/80 hover:bg-slate-800 text-slate-200'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-800'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: isPlacingThis ? '#ffffff' : phaseCol }}
-                      />
-                      {item.label}
-                    </span>
-                    <span className={`text-[10px] ${isPlacingThis ? 'text-sky-100' : 'text-slate-400'}`}>
-                      {item.power}W
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="p-3.5 space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-sky-500" />
-              Filtros de Capas
-            </h2>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Buscar TAG / Equipo</label>
               <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Ej. PROY-201, TAB, O2..."
-                className={`w-full px-2.5 py-1.5 rounded-lg text-xs border ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
-                    : 'bg-slate-50 border-slate-200 text-slate-900'
-                }`}
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, 'logoDataUrl')}
+                className="hidden"
+              />
+              <input
+                ref={signatureInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, 'signatureDataUrl')}
+                className="hidden"
               />
             </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Módulo / Tren</label>
-              <select
-                value={filterModule}
-                onChange={(e) => setFilterModule(e.target.value)}
-                className={`w-full px-2.5 py-1.5 rounded-lg text-xs border ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200'
-                }`}
-              >
-                <option value="all">Todos los Módulos (200 y 100)</option>
-                <option value="MOD-200">Módulo 200 (12 Jaulas)</option>
-                <option value="MOD-100">Módulo 100 (10 Jaulas)</option>
-              </select>
+            {/* PALETA DE SIMBOLOGÍA EDITABLE Y EXTENSIBLE */}
+            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Paleta de Simbología
+                </span>
+                <button
+                  onClick={() => {
+                    setCatalogForm({
+                      editingIndex: null,
+                      label: '',
+                      icon: 'sun',
+                      phase: 'fotoperiodo',
+                      power: 1000,
+                      rotation: 180,
+                    });
+                    setIsEditingCatalog((v) => !v);
+                  }}
+                  className="px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{isEditingCatalog ? 'Cerrar' : 'Agregar'}</span>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-snug">
+                Selecciona un símbolo y haz clic en el plano para insertarlo, o edita/agrega nuevos.
+              </p>
+
+              {/* Formulario para Agregar o Editar Elemento en la Paleta */}
+              {isEditingCatalog && (
+                <form
+                  onSubmit={handleSaveCatalogSymbol}
+                  className={`p-3 rounded-xl border space-y-2.5 ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700'
+                      : 'bg-sky-50/70 border-sky-200'
+                  }`}
+                >
+                  <div className="text-[11px] font-extrabold text-sky-600 dark:text-sky-400 uppercase">
+                    {catalogForm.editingIndex !== null
+                      ? 'Editar Elemento de Paleta'
+                      : 'Nuevo Elemento de Simbología'}
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      Nombre del Equipo / Símbolo
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Proyector LED 1500W"
+                      value={catalogForm.label}
+                      onChange={(e) =>
+                        setCatalogForm((prev) => ({ ...prev, label: e.target.value }))
+                      }
+                      className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Ícono Gráfico
+                      </label>
+                      <select
+                        value={catalogForm.icon}
+                        onChange={(e) =>
+                          setCatalogForm((prev) => ({ ...prev, icon: e.target.value }))
+                        }
+                        className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <option value="sun">Proyector LED</option>
+                        <option value="plug">Enchufe 220V</option>
+                        <option value="eye">Fotocelda</option>
+                        <option value="zap">Tablero IP66</option>
+                        <option value="radio">Energizador</option>
+                        <option value="cpu">Sensor / Sonda</option>
+                        <option value="camera">Cámara PTZ</option>
+                        <option value="compass">Alimentador</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Potencia (W)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={catalogForm.power}
+                        onChange={(e) =>
+                          setCatalogForm((prev) => ({ ...prev, power: Number(e.target.value) }))
+                        }
+                        className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      Sistema / Circuito
+                    </label>
+                    <select
+                      value={catalogForm.phase}
+                      onChange={(e) =>
+                        setCatalogForm((prev) => ({ ...prev, phase: e.target.value }))
+                      }
+                      className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    >
+                      {Object.entries(PHASE_CONFIG).map(([key, val]) => (
+                        <option key={key} value={key}>
+                          {val.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="submit"
+                      className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
+                    >
+                      {catalogForm.editingIndex !== null ? 'Guardar Cambios' : 'Añadir a Paleta'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCatalog(false)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-bold"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Lista de Elementos de la Paleta */}
+              <div className="space-y-1.5">
+                {symbolCatalog.map((item, idx) => {
+                  const isActivePlace =
+                    activeTool === 'place' && placeTemplate?.label === item.label;
+                  return (
+                    <div
+                      key={`${item.label}-${idx}`}
+                      onClick={() => {
+                        setPlaceTemplate(item);
+                        setActiveTool('place');
+                        notify(`Modo inserción: Haz clic en el plano para ubicar "${item.label}"`, 'info');
+                      }}
+                      className={`group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all ${
+                        isActivePlace
+                          ? 'border-sky-500 bg-sky-500/15 ring-1 ring-sky-500'
+                          : darkMode
+                          ? 'border-slate-800 bg-slate-800/50 hover:border-slate-700'
+                          : 'border-slate-200 bg-white hover:border-sky-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
+                          {renderPalettePreviewIcon(item.icon)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold truncate">{item.label}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {PHASE_CONFIG[item.phase]?.label || item.phase} · {item.power}W
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleEditCatalogItem(idx, e)}
+                          title="Editar símbolo"
+                          className="p-1 rounded-md text-slate-400 hover:text-sky-500 hover:bg-sky-500/10"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteCatalogItem(idx, e)}
+                          title="Eliminar símbolo"
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-500/10"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Sistema / Circuito</label>
+            {/* Filtros de Capas y Búsqueda */}
+            <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                Filtros de Capas
+              </span>
+
+              <input
+                type="text"
+                placeholder="Buscar TAG o equipo..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full px-3 py-1.5 rounded-xl text-xs border ${
+                  darkMode
+                    ? 'bg-slate-800 border-slate-700 text-white'
+                    : 'bg-slate-50 border-slate-200 text-slate-900'
+                }`}
+              />
+
               <select
                 value={filterPhase}
                 onChange={(e) => setFilterPhase(e.target.value)}
-                className={`w-full px-2.5 py-1.5 rounded-lg text-xs border ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200'
+                className={`w-full px-2.5 py-1.5 rounded-xl text-xs border ${
+                  darkMode
+                    ? 'bg-slate-800 border-slate-700 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
                 }`}
               >
-                <option value="all">Todos los Sistemas</option>
-                {Object.entries(PHASE_CONFIG).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val.label}
+                <option value="all">Todos los Circuitos / Fases</option>
+                {Object.entries(PHASE_CONFIG).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
                   </option>
                 ))}
               </select>
-            </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Estado Operativo</label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className={`w-full px-2.5 py-1.5 rounded-lg text-xs border ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200'
+                className={`w-full px-2.5 py-1.5 rounded-xl text-xs border ${
+                  darkMode
+                    ? 'bg-slate-800 border-slate-700 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
                 }`}
               >
-                <option value="all">Todos los Estados</option>
-                {Object.entries(STATUS_CONFIG).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val.label}
-                  </option>
-                ))}
+                <option value="all">Todos los Estados Operativos</option>
+                <option value="operativo">Operativo</option>
+                <option value="mantencion">En Mantención</option>
+                <option value="falla">Falla / Alerta</option>
               </select>
             </div>
-          </div>
-        </aside>
+          </aside>
         )}
 
-        {/* LIENZO CENTRAL INTERACTIVO (CANVAS SVG) */}
-        <main
-          className={`flex-1 relative overflow-hidden ${
-            darkMode ? 'bg-[#071526]' : 'bg-[#e0f2fe]'
-          }`}
-        >
-          {/* Barra flotante superior izquierda del canvas */}
-          <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2">
-            <div
-              className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border text-xs backdrop-blur-md ${
+        {/* LIENZO CENTRAL INTERACTIVO (SVG + VIÑETA TÉCNICA INFERIOR) */}
+        <main className="relative flex-1 overflow-hidden flex flex-col">
+          {/* Botones flotantes superiores del lienzo */}
+          <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowLeftSidebar((v) => !v)}
+              className={`p-2 rounded-xl border shadow-sm ${
                 darkMode
-                  ? 'bg-slate-900/85 border-slate-700 text-slate-200'
-                  : 'bg-white/90 border-slate-200/80 text-slate-800 shadow-xs'
+                  ? 'bg-slate-900/95 border-slate-700 text-slate-200'
+                  : 'bg-white/95 border-slate-200 text-slate-700'
+              }`}
+              title="Mostrar/Ocultar Paleta Izquierda"
+            >
+              {showLeftSidebar ? (
+                <PanelLeftClose className="w-4 h-4" />
+              ) : (
+                <PanelLeftOpen className="w-4 h-4" />
+              )}
+            </button>
+
+            <div
+              className={`px-3 py-1.5 rounded-xl border shadow-sm flex flex-wrap items-center gap-3 text-xs font-bold ${
+                darkMode
+                  ? 'bg-slate-900/95 border-slate-700 text-slate-200'
+                  : 'bg-white/95 border-slate-200 text-slate-800'
               }`}
             >
-              <span className="flex items-center gap-1.5">
-                <Grid className="w-3.5 h-3.5 text-sky-500" />
-                <strong>{cages.length}</strong> Jaulas
+              <span className="flex items-center gap-1 text-sky-500">
+                <Grid className="w-3.5 h-3.5" /> {cages.length} Jaulas
               </span>
-              <span className="text-slate-400">|</span>
-              <span className="flex items-center gap-1.5">
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-                <strong>{stats.photoCages}</strong> con Fotoperiodo
+              <span className="flex items-center gap-1 text-amber-500">
+                <Sun className="w-3.5 h-3.5" /> {metrics.activeCages} con Fotoperiodo
               </span>
-              <span className="text-slate-400">|</span>
-              <span className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-emerald-500" />
-                <strong>{(stats.totalPower / 1000).toFixed(2)}</strong> kW
+              <span className="flex items-center gap-1 text-emerald-500">
+                <Zap className="w-3.5 h-3.5" /> {metrics.totalPowerKw} kW
               </span>
-              {stats.alertsCount > 0 && (
-                <>
-                  <span className="text-slate-400">|</span>
-                  <span className="flex items-center gap-1 text-rose-500 font-bold">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    {stats.alertsCount} Alerta(s)
-                  </span>
-                </>
+              {metrics.alertCount > 0 && (
+                <span className="flex items-center gap-1 text-rose-500">
+                  <AlertTriangle className="w-3.5 h-3.5" /> {metrics.alertCount} Alerta(s)
+                </span>
               )}
             </div>
 
             {activeTool === 'place' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-bold shadow-md animate-pulse">
-                <span>Haz clic o toca en el plano para ubicar: {placeTemplate.label}</span>
+              <div className="px-3 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
+                <span>Haz clic en el plano para insertar: {placeTemplate?.label}</span>
                 <button
                   onClick={() => setActiveTool('select')}
-                  className="underline text-sky-100 hover:text-white ml-1"
+                  className="px-1.5 py-0.5 bg-white/20 rounded-md hover:bg-white/30"
                 >
                   Cancelar
                 </button>
@@ -2019,493 +2379,480 @@ export default function App() {
             )}
           </div>
 
-          {/* Controles flotantes de Zoom */}
-          <div
-            className={`absolute bottom-3 left-3 z-10 flex items-center gap-1 p-1 rounded-xl border backdrop-blur-md ${
-              darkMode
-                ? 'bg-slate-900/90 border-slate-700'
-                : 'bg-white/90 border-slate-200 shadow-xs'
-            }`}
-          >
+          {/* Botón flotante para abrir el inspector derecho */}
+          {!showRightSidebar && (
             <button
-              onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.12).toFixed(2))))}
-              className="p-1.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800"
-              title="Alejar"
+              onClick={() => setShowRightSidebar(true)}
+              className={`absolute top-3 right-3 z-20 px-3 py-2 rounded-xl border shadow-md text-xs font-extrabold flex items-center gap-1.5 ${
+                darkMode
+                  ? 'bg-slate-900 border-slate-700 text-sky-400'
+                  : 'bg-white border-slate-200 text-sky-700'
+              }`}
             >
-              <ZoomOut className="w-4 h-4" />
+              <PanelRightOpen className="w-4 h-4" />
+              <span>Inspector</span>
             </button>
-            <span className="px-2 text-xs font-bold min-w-[48px] text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.12).toFixed(2))))}
-              className="p-1.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800"
-              title="Acercar"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                setZoom(0.88);
-                setPan({ x: 24, y: 18 });
-              }}
-              className="p-1.5 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800"
-              title="Encuadrar ambos módulos"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
+          )}
 
-          {/* Leyenda de simbología flotante inferior */}
-          <div
-            className={`hidden sm:flex absolute bottom-3 right-3 z-10 flex-wrap items-center gap-3 px-3 py-1.5 rounded-xl border text-[11px] backdrop-blur-md ${
-              darkMode
-                ? 'bg-slate-900/90 border-slate-700 text-slate-300'
-                : 'bg-white/90 border-slate-200 text-slate-700 shadow-xs'
-            }`}
-          >
-            <span className="font-bold text-slate-500">Simbología:</span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Fotoperiodo LED / Fotocelda
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" /> Enchufe 220V Aux.
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Fuerza / Tableros
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" /> Sensores / Cámaras
-            </span>
-          </div>
-
-          {/* SVG PRINCIPAL */}
+          {/* SVG DEL PLANO */}
           <svg
             ref={svgRef}
-            className={`w-full h-full touch-none ${
-              activeTool === 'place' ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-default'
-            }`}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
+            onWheel={handleWheel}
             onTouchStart={handleCanvasTouchStart}
             onTouchMove={handleCanvasTouchMove}
             onTouchEnd={handleCanvasTouchEnd}
-            onWheel={handleWheel}
+            className={`w-full flex-1 touch-none ${
+              activeTool === 'place'
+                ? 'cursor-crosshair'
+                : isPanning
+                ? 'cursor-grabbing'
+                : 'cursor-grab'
+            }`}
+            style={{
+              backgroundColor: darkMode ? '#020617' : '#e0f2fe',
+            }}
           >
             <defs>
-              <pattern id="seaGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <pattern id="seaGrid" width="32" height="32" patternUnits="userSpaceOnUse">
                 <path
-                  d="M 40 0 L 0 0 0 40"
+                  d="M 32 0 L 0 0 0 32"
                   fill="none"
-                  stroke={darkMode ? 'rgba(56,189,248,0.08)' : 'rgba(2,132,199,0.12)'}
+                  stroke={darkMode ? '#0f172a' : '#bae6fd'}
                   strokeWidth="1"
                 />
               </pattern>
-
-              <pattern id="walkwayGrating" width="8" height="8" patternUnits="userSpaceOnUse">
-                <rect width="8" height="8" fill={darkMode ? '#334155' : '#94a3b8'} />
-                <path d="M 0 4 L 8 4 M 4 0 L 4 8" stroke={darkMode ? '#1e293b' : '#cbd5e1'} strokeWidth="0.8" />
-              </pattern>
-
-              <radialGradient id="photoperiodGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#fde047" stopOpacity="0.45" />
-                <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.16" />
+              <radialGradient id="cageLightGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#fde047" stopOpacity="0.65" />
+                <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.22" />
                 <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
               </radialGradient>
+              <linearGradient id="ledBeamGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+                <stop offset="0%" stopColor="#fef08a" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+              </linearGradient>
             </defs>
 
+            <rect width="100%" height="100%" fill="url(#seaGrid)" />
+
             <g id="plan-viewport" transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              <rect x="-400" y="-300" width="3000" height="1600" fill="url(#seaGrid)" />
+              {/* Estructuras de Módulos y Pasillos */}
+              {modules.map((mod) => {
+                const totalW = mod.cols * (mod.cageSize + mod.walkwayWidth) + mod.walkwayWidth;
+                const totalH = mod.rows * (mod.cageSize + mod.walkwayWidth) + mod.walkwayWidth;
+                const boxX = mod.originX - mod.walkwayWidth;
+                const boxY = mod.originY - mod.walkwayWidth;
 
-              {/* Rosa de los vientos */}
-              <g transform="translate(65, 75)">
-                <circle r="24" fill={darkMode ? '#0f172a' : '#ffffff'} stroke="#0284c7" strokeWidth="1.5" />
-                <polygon points="0,-18 5,0 0,-4 -5,0" fill="#ef4444" />
-                <polygon points="0,18 5,0 0,4 -5,0" fill="#64748b" />
-                <text x="0" y="-27" textAnchor="middle" fontSize="10" fontWeight="800" fill="#0284c7">
-                  N
-                </text>
-              </g>
+                return (
+                  <g key={mod.id}>
+                    {/* Encabezado Editable del Módulo */}
+                    <g
+                      transform={`translate(${boxX}, ${boxY - 54})`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedModuleId(mod.id);
+                        setSelectedId(mod.id);
+                        setSelectedKind('module');
+                        setShowRightSidebar(true);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <rect
+                        width="320"
+                        height="44"
+                        rx="10"
+                        fill={darkMode ? '#0f172a' : '#ffffff'}
+                        stroke={selectedModuleId === mod.id && selectedKind === 'module' ? '#0284c7' : '#94a3b8'}
+                        strokeWidth="1.8"
+                      />
+                      <text
+                        x="14"
+                        y="19"
+                        fontSize="14"
+                        fontWeight="800"
+                        fill={darkMode ? '#f8fafc' : '#0f172a'}
+                      >
+                        {mod.name}
+                      </text>
+                      <text
+                        x="14"
+                        y="34"
+                        fontSize="10.5"
+                        fontWeight="600"
+                        fill={darkMode ? '#94a3b8' : '#475569'}
+                      >
+                        {mod.subtitle}
+                      </text>
+                    </g>
 
-              {/* Puente / Pasarela flotante de interconexión entre Módulo 200 y Módulo 100 */}
-              <g
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  setSelectedKind('trunk');
-                  setSelectedId('TRUNK');
-                  setShowRightSidebar(true);
-                }}
-                onTouchStart={(e) => {
-                  e.stopPropagation();
-                  setSelectedKind('trunk');
-                  setSelectedId('TRUNK');
-                  setShowRightSidebar(true);
-                }}
-                className="cursor-pointer"
-              >
+                    {/* Plataforma / Pasillos Perimetrales */}
+                    <rect
+                      x={boxX}
+                      y={boxY}
+                      width={totalW}
+                      height={totalH}
+                      rx="12"
+                      fill={darkMode ? '#334155' : '#64748b'}
+                      stroke={darkMode ? '#475569' : '#334155'}
+                      strokeWidth="2.5"
+                    />
+                  </g>
+                );
+              })}
+
+              {/* Línea Troncal Submarina entre Módulos */}
+              <g>
                 <line
                   x1="888"
                   y1="280"
-                  x2="1112"
+                  x2="1104"
                   y2="280"
                   stroke="#0284c7"
-                  strokeWidth="6"
+                  strokeWidth="4"
                   strokeDasharray="10 6"
-                  opacity="0.65"
                 />
-                {showTrunkLabel && trunkLabel && (
-                  <>
+                {showTrunkLabel && (
+                  <g
+                    transform="translate(996, 266)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedId('TRUNK');
+                      setSelectedKind('trunk');
+                      setShowRightSidebar(true);
+                    }}
+                    className="cursor-pointer"
+                  >
                     <rect
-                      x="925"
-                      y="258"
-                      width="150"
-                      height="20"
-                      rx="6"
+                      x="-74"
+                      y="-13"
+                      width="148"
+                      height="22"
+                      rx="8"
                       fill={darkMode ? '#0f172a' : '#ffffff'}
-                      stroke={selectedKind === 'trunk' ? '#f59e0b' : '#0284c7'}
-                      strokeWidth={selectedKind === 'trunk' ? '2' : '1.2'}
+                      stroke="#0284c7"
+                      strokeWidth="1.5"
                     />
                     <text
-                      x="1000"
-                      y="271"
                       textAnchor="middle"
-                      fontSize="9.5"
-                      fontWeight="700"
+                      y="2"
+                      fontSize="10.5"
+                      fontWeight="800"
                       fill={darkMode ? '#38bdf8' : '#0369a1'}
                     >
                       {trunkLabel}
                     </text>
-                  </>
+                  </g>
                 )}
               </g>
 
-              {/* RENDERIZADO DE MÓDULOS Y PASILLOS PERIMETRALES */}
-              {modules.map((mod) => {
-                const totalW = mod.cols * mod.cageSize + (mod.cols + 1) * mod.walkwayWidth;
-                const totalH = mod.rows * mod.cageSize + (mod.rows + 1) * mod.walkwayWidth;
-                const startX = mod.originX - mod.walkwayWidth;
-                const startY = mod.originY - mod.walkwayWidth;
-                const isModSelected = selectedKind === 'module' && selectedModuleId === mod.id;
-
-                return (
-                  <g key={mod.id}>
-                    <rect
-                      x={startX}
-                      y={startY}
-                      width={totalW}
-                      height={totalH}
-                      rx="6"
-                      fill="url(#walkwayGrating)"
-                      stroke={darkMode ? '#64748b' : '#475569'}
-                      strokeWidth="2.5"
-                    />
-
-                    {!mod.hideHeader && (mod.name || mod.subtitle) && (
-                      <g
-                        transform={`translate(${startX}, ${startY - 56})`}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          setSelectedKind('module');
-                          setSelectedModuleId(mod.id);
-                          setSelectedId(mod.id);
-                          setShowRightSidebar(true);
-                        }}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
-                          setSelectedKind('module');
-                          setSelectedModuleId(mod.id);
-                          setSelectedId(mod.id);
-                          setShowRightSidebar(true);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <rect
-                          x="0"
-                          y="0"
-                          width="320"
-                          height="42"
-                          rx="8"
-                          fill={darkMode ? '#0f172a' : '#0c4a6e'}
-                          stroke={isModSelected ? '#f59e0b' : '#0284c7'}
-                          strokeWidth={isModSelected ? '2.5' : '1.5'}
-                        />
-                        <text x="14" y="18" fontSize="14" fontWeight="800" fill="#ffffff">
-                          {mod.name}
-                        </text>
-                        <text x="14" y="33" fontSize="10" fill="#bae6fd">
-                          {mod.subtitle}
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
-
-              {/* RENDERIZADO DE JAULAS (30m x 30m) */}
+              {/* Jaulas de Cultivo */}
               {cages.map((cage) => {
-                const isSelected = selectedId === cage.id && selectedKind === 'cage';
-                const displayLabel = cage.customLabel !== undefined ? cage.customLabel : String(cage.number);
+                const isSel = selectedKind === 'cage' && selectedId === cage.id;
+                const displayText = cage.label !== undefined ? cage.label : String(cage.number);
+
                 return (
                   <g
                     key={cage.id}
-                    onMouseDown={(e) => {
-                      if (activeTool === 'place') return;
+                    transform={`translate(${cage.x}, ${cage.y})`}
+                    onClick={(e) => {
                       e.stopPropagation();
                       setSelectedId(cage.id);
                       setSelectedKind('cage');
                       setShowRightSidebar(true);
                     }}
-                    onTouchStart={(e) => {
-                      if (activeTool === 'place') return;
-                      e.stopPropagation();
-                      setSelectedId(cage.id);
-                      setSelectedKind('cage');
-                      setShowRightSidebar(true);
-                    }}
-                    className="cursor-pointer group"
+                    className="cursor-pointer"
                   >
                     <rect
-                      x={cage.x}
-                      y={cage.y}
                       width={cage.size}
                       height={cage.size}
-                      rx="4"
-                      fill={darkMode ? '#082f49' : '#bae6fd'}
-                      stroke={isSelected ? '#f59e0b' : darkMode ? '#0284c7' : '#0369a1'}
-                      strokeWidth={isSelected ? '3.5' : '2'}
+                      rx="6"
+                      fill={darkMode ? '#0c4a6e' : '#bae6fd'}
+                      stroke={isSel ? '#f59e0b' : darkMode ? '#38bdf8' : '#0284c7'}
+                      strokeWidth={isSel ? '3' : '1.8'}
                     />
 
-                    <rect
-                      x={cage.x + 6}
-                      y={cage.y + 6}
-                      width={cage.size - 12}
-                      height={cage.size - 12}
-                      rx="3"
-                      fill="none"
-                      stroke={darkMode ? 'rgba(125,211,252,0.25)' : 'rgba(3,105,161,0.25)'}
-                      strokeWidth="1"
-                      strokeDasharray="3 3"
-                    />
-
+                    {/* Halo de Fotoperiodo Activo */}
                     {cage.photoperiodActive && (
-                      <circle
-                        cx={cage.x + cage.size / 2}
-                        cy={cage.y + cage.size / 2}
-                        r={cage.size * 0.44}
-                        fill="url(#photoperiodGlow)"
-                      />
+                      <>
+                        <circle
+                          cx={cage.size / 2}
+                          cy={cage.size / 2}
+                          r={cage.size * 0.44}
+                          fill="url(#cageLightGlow)"
+                        />
+                        <circle
+                          cx={cage.size - 14}
+                          cy="14"
+                          r="5"
+                          fill="#f59e0b"
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                        />
+                      </>
                     )}
 
-                    {!cage.hideLabel && displayLabel !== '' && (
+                    {/* Etiqueta única editable / eliminable de la jaula */}
+                    {cage.showLabel !== false && displayText !== '' && (
                       <text
-                        x={cage.x + cage.size / 2}
-                        y={cage.y + cage.size / 2 + 6}
+                        x={cage.size / 2}
+                        y={cage.size / 2 + 5}
                         textAnchor="middle"
-                        fontSize={displayLabel.length > 5 ? '13' : '19'}
+                        fontSize="15"
                         fontWeight="800"
-                        fill={darkMode ? '#f0f9ff' : '#0c4a6e'}
+                        fill={darkMode ? '#f0f9ff' : '#0f172a'}
                       >
-                        {displayLabel}
+                        {displayText}
                       </text>
-                    )}
-
-                    {cage.photoperiodActive && (
-                      <g transform={`translate(${cage.x + cage.size - 16}, ${cage.y + 16})`}>
-                        <circle r="8" fill="#f59e0b" />
-                        <circle r="3.5" fill="#fef08a" />
-                      </g>
                     )}
                   </g>
                 );
               })}
 
-              {/* LÍNEAS DE CANALIZACIÓN ELÉCTRICA */}
-              <g opacity="0.7" pointerEvents="none">
-                <polyline
-                  points="112,280 816,280"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="2.5"
-                  strokeDasharray="6 4"
-                />
-                <polyline
-                  points="1112,280 1688,280"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="2.5"
-                  strokeDasharray="6 4"
-                />
-              </g>
-
-              {/* RENDERIZADO DE EQUIPOS Y LUMINARIAS */}
-              {objects.map((obj) => renderObjectSymbol(obj))}
+              {/* Equipos Eléctricos y Luminarias */}
+              {filteredObjects.map((obj) => {
+                const isSel = selectedKind === 'object' && selectedId === obj.id;
+                return (
+                  <g
+                    key={obj.id}
+                    transform={`translate(${obj.x}, ${obj.y})`}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      setSelectedId(obj.id);
+                      setSelectedKind('object');
+                      setDraggingObjId(obj.id);
+                      setShowRightSidebar(true);
+                    }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      setSelectedId(obj.id);
+                      setSelectedKind('object');
+                      setDraggingObjId(obj.id);
+                      setShowRightSidebar(true);
+                    }}
+                    onMouseEnter={() => setHoveredObj(obj)}
+                    onMouseLeave={() => setHoveredObj(null)}
+                    className="cursor-move"
+                  >
+                    {renderSymbolGraphic(obj, isSel)}
+                  </g>
+                );
+              })}
             </g>
           </svg>
 
-          {/* Tooltip rápido al pasar el mouse */}
-          {hoveredObj && !draggingObjId && (
+          {/* Controles inferiores de Zoom + Leyenda rápida */}
+          <div className="absolute bottom-24 left-3 z-20 flex items-center gap-1.5">
             <div
-              className={`pointer-events-none absolute top-14 right-4 z-10 p-3 rounded-xl border max-w-xs text-xs shadow-lg ${
+              className={`px-2 py-1 rounded-xl border shadow-sm flex items-center gap-1 text-xs font-bold ${
                 darkMode
-                  ? 'bg-slate-900/95 border-slate-700 text-slate-100'
+                  ? 'bg-slate-900/95 border-slate-700 text-slate-200'
                   : 'bg-white/95 border-slate-200 text-slate-800'
               }`}
             >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="font-extrabold text-sky-500">{hoveredObj.tag}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/15 font-semibold">
-                  {hoveredObj.moduleId}
-                </span>
-              </div>
-              <p className="font-semibold">{hoveredObj.spec}</p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Ubicación: {hoveredObj.locationLabel} · {hoveredObj.power}W
-              </p>
-            </div>
-          )}
-        </main>
-
-        {/* PESTAÑA FLOTANTE PARA ABRIR EL PANEL DERECHO CUANDO ESTÁ CERRADO */}
-        {!showRightSidebar && !isFullscreen && (
-          <button
-            onClick={() => setShowRightSidebar(true)}
-            title="Abrir panel desplegable de propiedades"
-            className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-3 rounded-l-xl border border-r-0 shadow-xl text-xs font-bold transition-all ${
-              darkMode
-                ? 'bg-slate-900 border-slate-700 text-sky-400 hover:bg-slate-800'
-                : 'bg-white border-slate-300 text-sky-700 hover:bg-sky-50'
-            }`}
-          >
-            <PanelRightOpen className="w-4 h-4" />
-            <span className="[writing-mode:vertical-rl] rotate-180 tracking-wider uppercase text-[10px]">
-              Inspector
-            </span>
-          </button>
-        )}
-
-        {/* PANEL DERECHO DESPLEGABLE (SUPERPUESTO SÓLIDO POR ENCIMA DE TODO) */}
-        {showRightSidebar && !isFullscreen && (
-        <aside
-          className={`fixed top-0 right-0 bottom-0 z-50 w-80 sm:w-96 max-w-[92vw] flex flex-col border-l overflow-y-auto shadow-[0_0_45px_rgba(0,0,0,0.35)] transition-transform duration-200 ${
-            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
-          }`}
-        >
-          {/* Barra superior fija del panel desplegable */}
-          <div
-            className={`sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b ${
-              darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Sliders className="w-3.5 h-3.5 text-sky-500" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Panel Desplegable
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
               <button
-                type="button"
-                onClick={() => setAutoHideRightPanel((v) => !v)}
-                title="Si está activo, el panel se oculta automáticamente al tocar el plano"
-                className={`px-2 py-1 rounded-md text-[10px] font-semibold border transition ${
-                  autoHideRightPanel
-                    ? 'bg-sky-600 text-white border-sky-600'
-                    : darkMode
-                    ? 'bg-slate-800 text-slate-400 border-slate-700'
-                    : 'bg-white text-slate-600 border-slate-300'
-                }`}
+                onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
+                className="p-1 hover:text-sky-500"
+                title="Alejar"
               >
-                {autoHideRightPanel ? 'Auto-ocultar: ON' : 'Auto-ocultar: OFF'}
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="px-1.5">{Math.round(zoom * 100)}%</span>
+              <button
+                onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(2))))}
+                className="p-1 hover:text-sky-500"
+                title="Acercar"
+              >
+                <ZoomIn className="w-4 h-4" />
               </button>
               <button
-                type="button"
-                onClick={() => setShowRightSidebar(false)}
-                title="Cerrar panel derecho"
-                className={`p-1.5 rounded-lg transition ${
-                  darkMode
-                    ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    : 'text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-                }`}
+                onClick={() => {
+                  setZoom(0.84);
+                  setPan({ x: 24, y: 14 });
+                }}
+                className="p-1 hover:text-sky-500 border-l border-slate-200 dark:border-slate-700 pl-1.5"
+                title="Centrar Plano"
               >
-                <X className="w-4 h-4" />
+                <Maximize2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {selectedObject ? (
-            <div className="p-4 space-y-4">
-              <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500">
-                    Equipo / Luminaria Seleccionada
-                  </span>
-                  <h2 className="text-base font-extrabold">{selectedObject.tag || '(Sin etiqueta)'}</h2>
+          {/* ================================================================
+              CUADRO INFERIOR DE INFORMACIÓN DEL PROYECTO (VIÑETA TÉCNICA)
+          ================================================================ */}
+          <div
+            className={`z-20 border-t-2 px-4 py-2.5 shadow-md ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                : 'bg-white border-slate-900 text-slate-900'
+            }`}
+          >
+            <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 items-center text-xs">
+              <div className="lg:col-span-2 border-l-4 border-sky-600 pl-2.5 min-w-0">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Proyecto
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => duplicateObject(selectedObject, 36, 36)}
-                    title="Duplicar elemento (Ctrl+D)"
-                    className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteObject(selectedObject.id)}
-                    title="Eliminar equipo del plano (Supr)"
-                    className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="font-extrabold truncate">
+                  {companyInfo.projectName || 'Sin nombre de proyecto'}
+                </div>
+                {companyInfo.projectDescription && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {companyInfo.projectDescription}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-l border-slate-200 dark:border-slate-700 pl-2.5 min-w-0">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Cliente
+                </div>
+                <div className="font-bold truncate">
+                  {companyInfo.clientName || 'No especificado'}
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="font-semibold text-slate-500">Identificador / Texto (TAG)</label>
-                    {selectedObject.tag && (
-                      <button
-                        type="button"
-                        onClick={() => updateSelectedObject('tag', '')}
-                        className="text-[11px] font-semibold text-rose-500 hover:underline"
-                      >
-                        Borrar texto
-                      </button>
-                    )}
+              <div className="border-l border-slate-200 dark:border-slate-700 pl-2.5 min-w-0">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Centro / Ubicación
+                </div>
+                <div className="font-bold truncate">
+                  {companyInfo.centerName || 'No especificado'}
+                </div>
+              </div>
+
+              <div className="border-l border-slate-200 dark:border-slate-700 pl-2.5 min-w-0">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Coordenadas / Mapa
+                </div>
+                {companyInfo.coordinates ? (
+                  <a
+                    href={mapsHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 truncate"
+                    title="Abrir ubicación en Google Maps"
+                  >
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{companyInfo.coordinates}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400">Sin coordenadas</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* ====================================================================
+            PANEL DERECHO DESPLEGABLE SUPERPUESTO Y TOTALMENTE OPACO (z-50)
+        ==================================================================== */}
+        {showRightSidebar && (
+          <aside
+            className={`fixed top-14 right-0 bottom-0 w-80 sm:w-96 z-50 border-l-2 shadow-2xl overflow-y-auto p-4 space-y-4 ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                : 'bg-white border-slate-300 text-slate-900'
+            }`}
+          >
+            {/* Cabecera del Inspector */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-sky-500" />
+                <span className="text-xs font-extrabold uppercase tracking-wider">
+                  Panel Inspector
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAutoHideRightPanel((v) => !v)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${
+                    autoHideRightPanel
+                      ? 'bg-sky-600 text-white'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  Auto-ocultar: {autoHideRightPanel ? 'ON' : 'OFF'}
+                </button>
+                <button
+                  onClick={() => setShowRightSidebar(false)}
+                  className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"
+                  title="Cerrar panel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* EDITOR DE EQUIPO SELECCIONADO */}
+            {selectedObject ? (
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                      Equipo / Luminaria Seleccionada
+                    </span>
+                    <h2 className="text-lg font-extrabold">{selectedObject.tag}</h2>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => duplicateObject(selectedObject)}
+                      className="p-2 rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25"
+                      title="Duplicar equipo"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteObject(selectedObject.id)}
+                      className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                      title="Eliminar equipo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Identificador (TAG)</label>
                   <input
                     type="text"
                     value={selectedObject.tag}
-                    placeholder="Sin texto en etiqueta"
                     onChange={(e) => updateSelectedObject('tag', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Especificación Técnica</label>
+                  <label className="block text-xs font-bold mb-1">Especificación Técnica</label>
                   <input
                     type="text"
                     value={selectedObject.spec}
                     onChange={(e) => updateSelectedObject('spec', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block font-semibold text-slate-500 mb-1">Sistema</label>
+                    <label className="block text-xs font-bold mb-1">Sistema / Circuito</label>
                     <select
                       value={selectedObject.phase}
                       onChange={(e) => updateSelectedObject('phase', e.target.value)}
-                      className={`w-full px-2 py-1.5 rounded-lg border ${
-                        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                      className={`w-full px-2.5 py-2 rounded-xl text-xs border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
                       }`}
                     >
                       {Object.entries(PHASE_CONFIG).map(([k, v]) => (
@@ -2517,114 +2864,44 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-500 mb-1">Potencia (W)</label>
+                    <label className="block text-xs font-bold mb-1">Potencia (W)</label>
                     <input
                       type="number"
                       value={selectedObject.power}
                       onChange={(e) => updateSelectedObject('power', Number(e.target.value))}
-                      className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="font-semibold text-slate-500">Orientación / Ángulo del Haz</label>
-                    <span className="font-bold text-sky-500">{selectedObject.rotation ?? 0}°</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="315"
-                      step="45"
-                      value={selectedObject.rotation ?? 0}
-                      onChange={(e) => updateSelectedObject('rotation', Number(e.target.value))}
-                      className="flex-1 accent-sky-500 cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => updateSelectedObject('rotation', ((selectedObject.rotation ?? 0) + 90) % 360)}
-                      title="Rotar 90° en sentido horario"
-                      className={`px-2 py-1 rounded-lg border text-[11px] font-bold ${
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                         darkMode
-                          ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200'
-                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
                       }`}
-                    >
-                      +90°
-                    </button>
+                    />
                   </div>
                 </div>
 
-                {selectedObject.type === 'enchufe_220v' && (
-                  <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <div>
-                      <label className="block font-semibold text-blue-600 dark:text-blue-400 mb-1">Corriente Nominal</label>
-                      <select
-                        value={selectedObject.amperage || '16A'}
-                        onChange={(e) => updateSelectedObject('amperage', e.target.value)}
-                        className={`w-full px-2 py-1.5 rounded-lg border ${
-                          darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                        }`}
-                      >
-                        <option value="16A">16A (3.52 kW)</option>
-                        <option value="32A">32A (7.04 kW)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-blue-600 dark:text-blue-400 mb-1">Grado Estanqueidad</label>
-                      <select
-                        value={selectedObject.ipGrade || 'IP67'}
-                        onChange={(e) => updateSelectedObject('ipGrade', e.target.value)}
-                        className={`w-full px-2 py-1.5 rounded-lg border ${
-                          darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                        }`}
-                      >
-                        <option value="IP67">IP67 Sumergible</option>
-                        <option value="IP66">IP66 Intemperie</option>
-                      </select>
-                    </div>
+                <div>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span>Orientación / Ángulo del Haz</span>
+                    <span className="text-sky-500">{selectedObject.rotation || 0}°</span>
                   </div>
-                )}
-
-                {selectedObject.type === 'fotocelda' && (
-                  <div className="space-y-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <div>
-                      <label className="block font-semibold text-amber-600 dark:text-amber-400 mb-1">Umbral Activación (Lux)</label>
-                      <input
-                        type="text"
-                        value={selectedObject.luxThreshold || '15 Lux'}
-                        onChange={(e) => updateSelectedObject('luxThreshold', e.target.value)}
-                        className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                          darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-amber-600 dark:text-amber-400 mb-1">Circuito / Contactor Comandado</label>
-                      <input
-                        type="text"
-                        value={selectedObject.controlledCircuit || ''}
-                        onChange={(e) => updateSelectedObject('controlledCircuit', e.target.value)}
-                        className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                          darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                )}
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="15"
+                    value={selectedObject.rotation || 0}
+                    onChange={(e) => updateSelectedObject('rotation', Number(e.target.value))}
+                    className="w-full accent-sky-600"
+                  />
+                </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Estado Operativo</label>
+                  <label className="block text-xs font-bold mb-1.5">Estado Operativo</label>
                   <div className="grid grid-cols-3 gap-1.5">
                     {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
                       <button
                         key={key}
                         onClick={() => updateSelectedObject('status', key)}
-                        className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold transition ${
+                        className={`py-2 px-2 rounded-xl text-[11px] font-extrabold border transition-all ${
                           selectedObject.status === key
                             ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-300'
                             : darkMode
@@ -2639,546 +2916,641 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Ubicación en Pasillo</label>
+                  <label className="block text-xs font-bold mb-1">Ubicación en Pasillo</label>
                   <input
                     type="text"
-                    value={selectedObject.locationLabel}
+                    value={selectedObject.locationLabel || ''}
                     onChange={(e) => updateSelectedObject('locationLabel', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-semibold text-slate-500 mb-1">Coord. X</label>
-                    <input
-                      type="number"
-                      value={selectedObject.x}
-                      onChange={(e) => updateSelectedObject('x', Number(e.target.value))}
-                      className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-500 mb-1">Coord. Y</label>
-                    <input
-                      type="number"
-                      value={selectedObject.y}
-                      onChange={(e) => updateSelectedObject('y', Number(e.target.value))}
-                      className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                      }`}
-                    />
-                  </div>
+              </div>
+            ) : selectedCage ? (
+              /* EDITOR DE JAULA SELECCIONADA (TEXTO EDITABLE / ELIMINABLE) */
+              <div className="space-y-3.5">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                    Jaula Seleccionada
+                  </span>
+                  <h2 className="text-lg font-extrabold">Jaula {selectedCage.label || selectedCage.number}</h2>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Observaciones Técnicas</label>
-                  <textarea
-                    rows={3}
-                    value={selectedObject.description}
-                    onChange={(e) => updateSelectedObject('description', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  />
-                </div>
-
-                <button
-                  onClick={() => duplicateObject(selectedObject, 36, 36)}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-semibold transition shadow-xs"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Duplicar Elemento (Ctrl+D)</span>
-                </button>
-              </div>
-            </div>
-          ) : selectedCage ? (
-            <div className="p-4 space-y-4">
-              <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">
-                  Unidad de Cultivo ({selectedCage.moduleId})
-                </span>
-                <h2 className="text-lg font-extrabold">
-                  {selectedCage.customLabel !== undefined
-                    ? selectedCage.customLabel || 'Jaula (Sin texto)'
-                    : `Jaula N° ${selectedCage.number}`}
-                </h2>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-600 dark:text-slate-300">
-                      Texto / Nombre de la Jaula
-                    </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold">Nombre / Número de Jaula</label>
                     <button
                       type="button"
                       onClick={() => {
-                        updateSelectedCage('customLabel', '');
-                        updateSelectedCage('hideLabel', true);
-                        notify('Texto de la jaula eliminado');
+                        updateSelectedCage('label', '');
+                        updateSelectedCage('showLabel', false);
+                        notify('Texto de la jaula eliminado', 'info');
                       }}
-                      className="text-[11px] font-semibold text-rose-500 hover:underline flex items-center gap-1"
+                      className="text-[11px] font-bold text-rose-500 hover:underline flex items-center gap-1"
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>Eliminar texto</span>
+                      <span>Eliminar Texto</span>
                     </button>
                   </div>
                   <input
                     type="text"
-                    value={
-                      selectedCage.customLabel !== undefined
-                        ? selectedCage.customLabel
-                        : String(selectedCage.number)
-                    }
-                    placeholder="Escribe nombre o número (ej. 201, A1, Semilla)"
+                    value={selectedCage.label !== undefined ? selectedCage.label : String(selectedCage.number)}
                     onChange={(e) => {
-                      updateSelectedCage('customLabel', e.target.value);
-                      updateSelectedCage('hideLabel', e.target.value.trim() === '');
+                      updateSelectedCage('label', e.target.value);
+                      updateSelectedCage('showLabel', true);
                     }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
 
-                <div
-                  className={`p-3 rounded-xl border flex items-center justify-between ${
-                    selectedCage.photoperiodActive
-                      ? 'bg-amber-500/10 border-amber-500/30'
-                      : darkMode
-                      ? 'bg-slate-800 border-slate-700'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div>
-                    <div className="font-bold flex items-center gap-1.5">
-                      <Sun className="w-4 h-4 text-amber-500" />
-                      <span>Fotoperiodo Artificial</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {selectedCage.photoperiodActive ? 'Encendido (24h continuo)' : 'Apagado / Fotoperiodo Natural'}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-bold">Fotoperiodo Activo en Jaula</span>
                   <input
                     type="checkbox"
-                    checked={selectedCage.photoperiodActive}
+                    checked={Boolean(selectedCage.photoperiodActive)}
                     onChange={(e) => updateSelectedCage('photoperiodActive', e.target.checked)}
-                    className="w-4 h-4 accent-amber-500 cursor-pointer"
+                    className="w-4 h-4 accent-amber-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Especie en Cultivo</label>
+                  <label className="block text-xs font-bold mb-1">Especie en Cultivo</label>
                   <input
                     type="text"
-                    value={selectedCage.species}
+                    value={selectedCage.species || ''}
                     onChange={(e) => updateSelectedCage('species', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-semibold text-slate-500 mb-1">Biomasa (Ton)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={selectedCage.biomassTons}
-                      onChange={(e) => updateSelectedCage('biomassTons', Number(e.target.value))}
-                      className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-500 mb-1">Intensidad (Lux)</label>
-                    <input
-                      type="number"
-                      value={selectedCage.targetLux}
-                      onChange={(e) => updateSelectedCage('targetLux', Number(e.target.value))}
-                      className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Notas Operativas Jaula</label>
-                  <textarea
-                    rows={3}
-                    value={selectedCage.notes}
-                    onChange={(e) => updateSelectedCage('notes', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
-            </div>
-          ) : selectedModule ? (
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            ) : selectedModule ? (
+              /* EDITOR DE TÍTULO DE MÓDULO */
+              <div className="space-y-3.5">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500">
+                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
                     Encabezado de Módulo
                   </span>
-                  <h2 className="text-base font-extrabold">{selectedModule.name || 'Módulo sin título'}</h2>
+                  <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateSelectedModule('hideHeader', true);
-                    notify('Cartel de módulo ocultado');
-                  }}
-                  className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-bold flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Eliminar</span>
-                </button>
-              </div>
-              <div className="space-y-3 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Título del Módulo</label>
+                  <label className="block text-xs font-bold mb-1">Título del Módulo</label>
                   <input
                     type="text"
                     value={selectedModule.name}
                     onChange={(e) => updateSelectedModule('name', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Subtítulo / Descripción</label>
+                  <label className="block text-xs font-bold mb-1">Subtítulo / Descripción</label>
                   <input
                     type="text"
                     value={selectedModule.subtitle}
                     onChange={(e) => updateSelectedModule('subtitle', e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
-            </div>
-          ) : selectedKind === 'trunk' ? (
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            ) : selectedKind === 'trunk' ? (
+              /* EDITOR DE ETIQUETA TRONCAL */
+              <div className="space-y-3.5">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500">
-                    Texto de Interconexión
+                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                    Etiqueta Troncal
                   </span>
-                  <h2 className="text-base font-extrabold">Etiqueta Troncal</h2>
+                  <h2 className="text-lg font-extrabold">Línea Interconexión</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowTrunkLabel(false);
-                    setSelectedKind(null);
-                    notify('Texto de troncal eliminado');
-                  }}
-                  className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-bold flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Eliminar</span>
-                </button>
-              </div>
-              <div className="space-y-3 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Texto de la Etiqueta</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold">Texto Troncal</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTrunkLabel(false)}
+                      className="text-[11px] font-bold text-rose-500 hover:underline"
+                    >
+                      Ocultar / Eliminar
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={trunkLabel}
-                    onChange={(e) => setTrunkLabel(e.target.value)}
-                    className={`w-full px-2.5 py-1.5 rounded-lg border font-bold ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    onChange={(e) => {
+                      setTrunkLabel(e.target.value);
+                      setShowTrunkLabel(true);
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="p-5 text-center space-y-3 my-auto">
-              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center mx-auto">
-                <Sliders className="w-6 h-6" />
+            ) : (
+              <div className="text-xs text-slate-500 py-8 text-center space-y-2">
+                <Info className="w-7 h-7 mx-auto text-sky-500 opacity-80" />
+                <p>
+                  Haz clic sobre cualquier <strong>equipo, jaula, módulo o troncal</strong> en el plano para editar sus propiedades o eliminar textos.
+                </p>
               </div>
-              <h3 className="text-sm font-bold">Inspector de Propiedades</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Haz clic o toca cualquier <strong>Jaula (201–212 / 101–110)</strong> o cualquier{' '}
-                <strong>Luminaria, Tablero o Sensor</strong> en el plano para editar sus parámetros o arrastrarlo por los pasillos.
-              </p>
-            </div>
-          )}
-        </aside>
+            )}
+          </aside>
         )}
       </div>
 
-      {/* MODAL VISTA PREVIA LIMPIA EN PANTALLA COMPLETA */}
-      {showPreviewModal && (
-        <div
-          className={`fixed inset-0 z-50 flex flex-col ${
-            darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
-          }`}
-        >
+      {/* ====================================================================
+          MODAL: NUEVO PROYECTO (CON COORDENADAS Y GOOGLE MAPS)
+      ==================================================================== */}
+      {showNewProjectModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b ${
-              darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
+            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="flex items-center gap-3">
-              {companyInfo.logoDataUrl && (
-                <img
-                  src={companyInfo.logoDataUrl}
-                  alt="Logo"
-                  className="h-9 max-w-[140px] object-contain"
-                />
-              )}
-              <div>
-                <h2 className="text-base font-extrabold leading-tight">
-                  {companyInfo.companyName} · Vista Previa del Plano
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {companyInfo.centerName} · Código: <strong>{companyInfo.code}</strong> · Resp:{' '}
-                  <strong>{companyInfo.responsibleName}</strong>
-                </p>
+            <div className="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderPlus className="w-5 h-5" />
+                <div>
+                  <h3 className="text-base font-extrabold">Nuevo Proyecto de Instalación</h3>
+                  <p className="text-xs text-emerald-100">
+                    Configura la viñeta técnica, ubicación geográfica y datos del centro
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
               <button
-                onClick={handleExportPNG}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
+                onClick={() => setShowNewProjectModal(false)}
+                className="p-1 rounded-lg hover:bg-white/20"
               >
-                <ImageIcon className="w-3.5 h-3.5" />
-                <span>Descargar PNG</span>
-              </button>
-              <button
-                onClick={handleExportPDF}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white transition"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Exportar PDF</span>
-              </button>
-              <button
-                onClick={() => setShowPreviewModal(false)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition"
-              >
-                <X className="w-4 h-4" />
-                <span>Cerrar Vista Previa (Esc)</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-            <div
-              className={`w-full max-w-[1800px] rounded-2xl border-2 overflow-hidden shadow-2xl ${
-                darkMode ? 'border-slate-700 bg-[#071526]' : 'border-slate-300 bg-[#f0f9ff]'
-              }`}
-              dangerouslySetInnerHTML={{ __html: generateSvgStringForExport() || '' }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE EMPRESA, LOGOTIPO Y FIRMA PARA EXPORTACIÓN PDF */}
-      {showCompanyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div
-            className={`w-full max-w-lg rounded-2xl border p-5 shadow-2xl ${
-              darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
-            }`}
-          >
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 mb-4">
-              <h3 className="text-base font-extrabold flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-sky-500" />
-                Configuración de Empresa y Firma PDF
-              </h3>
-              <button
-                onClick={() => setShowCompanyModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-              >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <form onSubmit={handleCreateNewProject} className="p-5 space-y-3.5 text-xs">
               <div>
-                <label className="block font-semibold text-slate-500 mb-1">Nombre de la Empresa</label>
+                <label className="block font-bold mb-1">Nombre del Proyecto *</label>
                 <input
                   type="text"
-                  value={companyInfo.companyName}
-                  onChange={(e) => setCompanyInfo({ ...companyInfo, companyName: e.target.value })}
-                  className={`w-full px-3 py-2 rounded-lg border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  required
+                  placeholder="Ej. Instalación Fotoperiodo Tren Norte y Sur"
+                  value={newProjectForm.projectName}
+                  onChange={(e) =>
+                    setNewProjectForm((prev) => ({ ...prev, projectName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border text-sm font-semibold ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-300 text-slate-900'
                   }`}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold mb-1">Descripción del Proyecto</label>
+                <textarea
+                  rows={2}
+                  placeholder="Breve resumen técnico del alcance, potencia o equipamiento..."
+                  value={newProjectForm.projectDescription}
+                  onChange={(e) =>
+                    setNewProjectForm((prev) => ({ ...prev, projectDescription: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Nombre Centro / Proyecto</label>
+                  <label className="block font-bold mb-1">Nombre del Cliente *</label>
                   <input
                     type="text"
-                    value={companyInfo.centerName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCompanyInfo({ ...companyInfo, centerName: val });
-                      setBlueprintNameInput(val);
-                    }}
-                    className={`w-full px-3 py-2 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    required
+                    placeholder="Ej. Salmones Austral S.A."
+                    value={newProjectForm.clientName}
+                    onChange={(e) =>
+                      setNewProjectForm((prev) => ({ ...prev, clientName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
+
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Código de Plano</label>
+                  <label className="block font-bold mb-1">Nombre del Centro *</label>
                   <input
                     type="text"
-                    value={companyInfo.code}
-                    onChange={(e) => setCompanyInfo({ ...companyInfo, code: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    required
+                    placeholder="Ej. Centro Engorda Canal Dalcahue"
+                    value={newProjectForm.centerName}
+                    onChange={(e) =>
+                      setNewProjectForm((prev) => ({ ...prev, centerName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Responsable Técnico</label>
+                  <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
                   <input
                     type="text"
-                    value={companyInfo.responsibleName}
-                    onChange={(e) => setCompanyInfo({ ...companyInfo, responsibleName: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    placeholder="Ej. -42.381240, -73.654120"
+                    value={newProjectForm.coordinates}
+                    onChange={(e) =>
+                      setNewProjectForm((prev) => ({ ...prev, coordinates: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border text-xs font-mono ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
+
                 <div>
-                  <label className="block font-semibold text-slate-500 mb-1">Cargo / Registro SEC</label>
+                  <label className="block font-bold mb-1">Enlace Google Maps (Opcional)</label>
                   <input
-                    type="text"
-                    value={companyInfo.responsibleLicense}
-                    onChange={(e) => setCompanyInfo({ ...companyInfo, responsibleLicense: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    type="url"
+                    placeholder="https://maps.google.com/..."
+                    value={newProjectForm.googleMapsUrl}
+                    onChange={(e) =>
+                      setNewProjectForm((prev) => ({ ...prev, googleMapsUrl: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center">
-                  <div className="font-bold mb-1.5">Logotipo Empresa</div>
-                  {companyInfo.logoDataUrl ? (
-                    <img src={companyInfo.logoDataUrl} alt="Logo" className="h-12 mx-auto object-contain mb-2" />
-                  ) : (
-                    <div className="h-12 flex items-center justify-center text-slate-400">Sin logo</div>
-                  )}
-                  <button
-                    onClick={() => logoInputRef.current?.click()}
-                    className="px-2.5 py-1 rounded bg-sky-600 text-white font-semibold"
+              {newProjectForm.coordinates.trim() && (
+                <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400">
+                    Vista previa enlace Google Maps generada automáticamente
+                  </span>
+                  <a
+                    href={buildGoogleMapsLink(
+                      newProjectForm.coordinates,
+                      newProjectForm.googleMapsUrl
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-extrabold text-sky-600 underline flex items-center gap-1"
                   >
-                    Subir Imagen
-                  </button>
+                    <span>Probar Mapa</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
+              )}
 
-                <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center">
-                  <div className="font-bold mb-1.5">Firma Responsable</div>
-                  {companyInfo.signatureDataUrl ? (
-                    <img src={companyInfo.signatureDataUrl} alt="Firma" className="h-12 mx-auto object-contain mb-2" />
-                  ) : (
-                    <div className="h-12 flex items-center justify-center text-slate-400">Sin firma</div>
-                  )}
-                  <button
-                    onClick={() => signatureInputRef.current?.click()}
-                    className="px-2.5 py-1 rounded bg-emerald-600 text-white font-semibold"
-                  >
-                    Subir Firma
-                  </button>
+              <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newProjectForm.clearExistingObjects}
+                  onChange={(e) =>
+                    setNewProjectForm((prev) => ({
+                      ...prev,
+                      clearExistingObjects: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 accent-emerald-600"
+                />
+                <span className="text-xs font-semibold">
+                  Iniciar con el plano limpio (sin equipos previos instalados)
+                </span>
+              </label>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewProjectModal(false)}
+                  className="px-4 py-2 rounded-xl font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Crear Nuevo</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================
+          MODAL: BUSCAR Y GESTIONAR PROYECTOS GUARDADOS EN CLOUD FIRESTORE
+      ==================================================================== */}
+      {showCloudModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
+              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            <div className="px-5 py-4 bg-slate-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Cloud className="w-5 h-5 text-sky-400" />
+                <div>
+                  <h3 className="text-base font-extrabold">
+                    Buscar Proyectos Guardados en Base de Datos
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Carga cualquier centro o proyecto guardado anteriormente en Firebase
+                  </p>
                 </div>
               </div>
+              <button
+                onClick={() => setShowCloudModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setShowCompanyModal(false)}
-                className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold"
-              >
-                Guardar Cambios
-              </button>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              {/* Buscador en vivo */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Buscar por nombre de centro, proyecto, cliente o empresa..."
+                  value={cloudSearchQuery}
+                  onChange={(e) => setCloudSearchQuery(e.target.value)}
+                  className={`flex-1 px-3.5 py-2 rounded-xl border text-xs font-semibold ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                />
+                <button
+                  onClick={() => handleSaveToCloud()}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar Actual</span>
+                </button>
+              </div>
+
+              {/* Resultados */}
+              {filteredBlueprints.length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-xs text-slate-500">
+                  No se encontraron proyectos con ese criterio en la nube.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {filteredBlueprints.map((bp) => (
+                    <div
+                      key={bp.id}
+                      className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        bp.id === currentBlueprintId
+                          ? 'border-sky-500 bg-sky-500/10'
+                          : darkMode
+                          ? 'border-slate-800 bg-slate-800/60'
+                          : 'border-slate-200 bg-slate-50'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm truncate">
+                            {bp.centerName || bp.title || bp.id}
+                          </span>
+                          {bp.id === currentBlueprintId && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-sky-600 text-white">
+                              Abierto
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {bp.projectName || 'Proyecto'} {bp.clientName ? `· Cliente: ${bp.clientName}` : ''}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {bp.totalObjects || 0} equipos · Actualizado:{' '}
+                          {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString('es-CL') : '-'}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleLoadFromCloud(bp)}
+                          className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold"
+                        >
+                          Abrir Proyecto
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFromCloud(bp.id, bp.title || bp.id)}
+                          className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/15"
+                          title="Eliminar de la nube"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE INVENTARIO TABULAR */}
-      {showInventoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      {/* ====================================================================
+          MODAL: CONFIGURAR EMPRESA Y FIRMA TÉCNICA
+      ==================================================================== */}
+      {showCompanyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-4xl rounded-2xl border p-5 shadow-2xl max-h-[85vh] flex flex-col ${
-              darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 mb-3">
-              <div>
-                <h3 className="text-base font-extrabold">Inventario de Equipos y Luminarias</h3>
-                <p className="text-xs text-slate-500">
-                  Módulo 200 (12 Jaulas) y Módulo 100 (10 Jaulas) · Potencia Total: {(stats.totalPower / 1000).toFixed(2)} kW
-                </p>
-              </div>
-              <button
-                onClick={() => setShowInventoryModal(false)}
-                className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-xs font-bold"
-              >
-                Cerrar ✕
+            <div className="px-5 py-4 bg-slate-950 text-white flex items-center justify-between">
+              <h3 className="text-base font-extrabold">Datos de Empresa y Viñeta Técnica</h3>
+              <button onClick={() => setShowCompanyModal(false)} className="p-1">
+                <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="p-5 space-y-3 text-xs max-h-[80vh] overflow-y-auto">
+              <div>
+                <label className="block font-bold mb-1">Empresa Ejecutora</label>
+                <input
+                  type="text"
+                  value={companyInfo.companyName}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                  }`}
+                />
+              </div>
+              <div>
+                <label className="block font-bold mb-1">Nombre del Proyecto</label>
+                <input
+                  type="text"
+                  value={companyInfo.projectName}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                  }`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Cliente</label>
+                  <input
+                    type="text"
+                    value={companyInfo.clientName || ''}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Nombre del Centro</label>
+                  <input
+                    type="text"
+                    value={companyInfo.centerName}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, centerName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                    }`}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Coordenadas</label>
+                  <input
+                    type="text"
+                    value={companyInfo.coordinates || ''}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({
+                        ...p,
+                        coordinates: e.target.value,
+                        googleMapsUrl: buildGoogleMapsLink(e.target.value),
+                      }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border font-mono ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Responsable Técnico</label>
+                  <input
+                    type="text"
+                    value={companyInfo.responsibleName}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                    }`}
+                  />
+                </div>
+              </div>
+              <div className="pt-3 flex justify-end">
+                <button
+                  onClick={() => setShowCompanyModal(false)}
+                  className="px-5 py-2 rounded-xl bg-sky-600 text-white font-extrabold"
+                >
+                  Listo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <div className="overflow-auto flex-1">
+      {/* ====================================================================
+          MODAL: INVENTARIO TÉCNICO
+      ==================================================================== */}
+      {showInventoryModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
+              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            <div className="px-5 py-4 bg-violet-700 text-white flex items-center justify-between">
+              <h3 className="text-base font-extrabold">
+                Inventario de Equipos Instalados ({objects.length})
+              </h3>
+              <button onClick={() => setShowInventoryModal(false)} className="p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className={darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'}>
-                    <th className="p-2.5">TAG</th>
-                    <th className="p-2.5">Módulo</th>
-                    <th className="p-2.5">Especificación</th>
-                    <th className="p-2.5">Sistema</th>
-                    <th className="p-2.5">Potencia</th>
-                    <th className="p-2.5">Estado</th>
+                  <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
+                    <th className="py-2 px-2">TAG</th>
+                    <th className="py-2 px-2">Módulo</th>
+                    <th className="py-2 px-2">Especificación</th>
+                    <th className="py-2 px-2">Potencia</th>
+                    <th className="py-2 px-2">Estado</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {objects.map((o) => (
                     <tr
                       key={o.id}
                       onClick={() => {
                         setSelectedId(o.id);
                         setSelectedKind('object');
-                        setShowRightSidebar(true);
                         setShowInventoryModal(false);
+                        setShowRightSidebar(true);
                       }}
                       className="cursor-pointer hover:bg-sky-500/10"
                     >
-                      <td className="p-2.5 font-bold text-sky-500">{o.tag}</td>
-                      <td className="p-2.5">{o.moduleId}</td>
-                      <td className="p-2.5">{o.spec}</td>
-                      <td className="p-2.5">{PHASE_CONFIG[o.phase]?.label}</td>
-                      <td className="p-2.5 font-semibold">{o.power} W</td>
-                      <td className="p-2.5">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${STATUS_CONFIG[o.status]?.dot}`} />
-                          {STATUS_CONFIG[o.status]?.label}
-                        </span>
-                      </td>
+                      <td className="py-2 px-2 font-extrabold">{o.tag}</td>
+                      <td className="py-2 px-2">{o.moduleId}</td>
+                      <td className="py-2 px-2">{o.spec}</td>
+                      <td className="py-2 px-2 font-bold">{o.power} W</td>
+                      <td className="py-2 px-2">{STATUS_CONFIG[o.status]?.label}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -3188,224 +3560,49 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL BASE DE DATOS EN LA NUBE (FIREBASE CLOUD FIRESTORE) */}
-      {showCloudModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div
-            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[88vh] ${
-              darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
-            }`}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                  <Cloud className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold">Base de Datos y Acceso desde Celular</h3>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                    Estado:
-                    {cloudStatus === 'connected' && (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                        ● Conectado a Cloud Firestore (BEQA)
-                      </span>
-                    )}
-                    {cloudStatus === 'connecting' && (
-                      <span className="text-amber-600 font-semibold">● Conectando...</span>
-                    )}
-                    {cloudStatus === 'error' && (
-                      <span className="text-rose-600 font-semibold">
-                        ● Error de permisos o dominio en Firestore
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
+      {/* ====================================================================
+          MODAL: VISTA PREVIA FULLSCREEN
+      ==================================================================== */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 flex flex-col p-4">
+          <div className="flex items-center justify-between text-white pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold">
+                Vista Previa de Plano · {companyInfo.centerName}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {companyInfo.projectName} · Cliente: {companyInfo.clientName}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowCloudModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                onClick={handleExportPDF}
+                className="px-3.5 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-extrabold flex items-center gap-1"
               >
-                <X className="w-4 h-4" />
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir / PDF</span>
+              </button>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
-
-            <div className="p-5 overflow-y-auto space-y-5 text-xs">
-              <div
-                className={`p-3.5 rounded-xl border ${
-                  darkMode
-                    ? 'bg-sky-950/30 border-sky-800 text-sky-200'
-                    : 'bg-sky-50 border-sky-200 text-sky-950'
-                }`}
-              >
-                <h4 className="font-bold text-xs mb-1">📱 ¿Por qué no abre desde el celular en StackBlitz?</h4>
-                <p className="leading-relaxed text-[11px]">
-                  Los enlaces de vista previa interna de StackBlitz (<code>*.local-credentialless.webcontainer-api.io</code>) solo funcionan dentro del navegador de tu computador. Para abrirlo en tu celular y sincronizar tus planos en vivo:
-                </p>
-                <ol className="list-decimal list-inside mt-1.5 space-y-1 text-[11px]">
-                  <li>En StackBlitz, haz clic en <strong>"Deploy"</strong> (arriba a la derecha) o súbelo gratis a <strong>Vercel / Netlify</strong> para obtener una URL pública (<code>https://tu-app.vercel.app</code>).</li>
-                  <li>En Firebase Console → <strong>Authentication → Configuración → Dominios autorizados</strong>, agrega ese dominio público.</li>
-                  <li>¡Listo! Desde el celular podrás tocar los equipos, arrastrarlos con el dedo y hacer zoom con dos dedos.</li>
-                </ol>
-              </div>
-
-              <div
-                className={`p-4 rounded-xl border ${
-                  darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-amber-50/60 border-amber-200'
-                }`}
-              >
-                <h4 className="font-bold text-sm mb-2 flex items-center gap-1.5">
-                  <CloudUpload className="w-4 h-4 text-amber-500" />
-                  Guardar Plano Actual con Nombre del Centro
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                      Nombre del Centro / Proyecto
-                    </label>
-                    <input
-                      type="text"
-                      value={companyInfo.centerName}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCompanyInfo((prev) => ({ ...prev, centerName: val }));
-                        setBlueprintNameInput(val);
-                      }}
-                      placeholder="Ej. Centro Engorda Canal Puyuhuapi"
-                      className={`w-full px-3 py-2 rounded-lg border text-xs ${
-                        darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                      ID Único del Documento
-                    </label>
-                    <input
-                      type="text"
-                      value={currentBlueprintId}
-                      onChange={(e) => setCurrentBlueprintId(e.target.value)}
-                      placeholder="plano-centro-01"
-                      className={`w-full px-3 py-2 rounded-lg border text-xs font-mono ${
-                        darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
-                      }`}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => handleSaveToCloud(slugifyCenterFileName('plano'), companyInfo.centerName)}
-                    disabled={isSavingCloud || cloudStatus !== 'connected'}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 transition"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{isSavingCloud ? 'Guardando...' : 'Guardar / Sobrescribir Actual'}</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleSaveToCloud(
-                        `${slugifyCenterFileName('plano')}-${Date.now()}`,
-                        `${companyInfo.centerName || blueprintNameInput} (Copia)`
-                      )
-                    }
-                    disabled={isSavingCloud || cloudStatus !== 'connected'}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold border transition ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700'
-                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Guardar como Nuevo Plano</span>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                  <h4 className="font-bold text-sm flex items-center gap-1.5">
-                    <FolderOpen className="w-4 h-4 text-sky-500" />
-                    Buscar Proyectos Guardados ({filteredBlueprints.length} de {savedBlueprints.length})
-                  </h4>
-                  <input
-                    type="text"
-                    value={cloudSearchQuery}
-                    onChange={(e) => setCloudSearchQuery(e.target.value)}
-                    placeholder="Buscar por nombre de centro o proyecto..."
-                    className={`px-3 py-1.5 rounded-lg border text-xs w-full sm:w-64 ${
-                      darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300'
-                    }`}
-                  />
-                </div>
-
-                {filteredBlueprints.length === 0 ? (
-                  <div
-                    className={`p-6 rounded-xl border border-dashed text-center ${
-                      darkMode ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'
-                    }`}
-                  >
-                    {savedBlueprints.length === 0
-                      ? 'Aún no hay planos guardados en la nube. Haz clic en "Guardar / Sobrescribir Actual" arriba para crear el primero.'
-                      : 'No se encontraron proyectos con ese nombre.'}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredBlueprints.map((bp) => (
-                      <div
-                        key={bp.id}
-                        className={`flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border ${
-                          bp.id === currentBlueprintId
-                            ? darkMode
-                              ? 'bg-sky-950/40 border-sky-600'
-                              : 'bg-sky-50 border-sky-400'
-                            : darkMode
-                            ? 'bg-slate-800/50 border-slate-700'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <div>
-                          <div className="font-bold text-sm flex items-center gap-2">
-                            <span>{bp.title || bp.id}</span>
-                            {bp.id === currentBlueprintId && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 font-semibold">
-                                Activo
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {bp.companyName || 'SERVICIOS BEQA SPA'} · {bp.totalObjects || 0} equipos ·{' '}
-                            {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString('es-CL') : ''}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleLoadFromCloud(bp)}
-                            className="px-3 py-1.5 rounded-lg font-bold bg-sky-600 hover:bg-sky-700 text-white transition"
-                          >
-                            Cargar Plano
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFromCloud(bp.id, bp.title || bp.id)}
-                            title="Eliminar plano de la nube"
-                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/15 transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+          </div>
+          <div className="flex-1 bg-white rounded-2xl overflow-hidden flex items-center justify-center p-4">
+            <div
+              className="w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full"
+              dangerouslySetInnerHTML={{ __html: generateSvgStringForExport() || '' }}
+            />
           </div>
         </div>
       )}
 
-      {/* NOTIFICACIÓN TOAST */}
+      {/* NOTIFICACIÓN FLOTANTE (TOAST) */}
       {toast && (
-        <div className="fixed bottom-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-xl border border-slate-700">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-16 right-4 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xl border border-slate-700 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toast.message}</span>
         </div>
       )}
