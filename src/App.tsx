@@ -3075,9 +3075,36 @@ export default function App() {
       const svgString = serializer.serializeToString(clonedSvg);
       const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
 
+      // Diccionario local de fases (sin depender de PHASE_CONFIG externo)
+      const localPhaseLabels = {
+        fotoperiodo: 'Fotoperiodo LED',
+        fuerza_aux: 'Fuerza 220V Auxiliar',
+        control: 'Fuerza y Control',
+        monitoreo: 'Sensores / Cámaras',
+        alimentacion: 'Alimentación',
+      };
+
+      const safeObjects = Array.isArray(objects) ? objects : [];
+      const safeConduits = Array.isArray(conduits) ? conduits : [];
+      const safeCages = Array.isArray(cages) ? cages : [];
+      const safeSummary = Array.isArray(summarizedEquipment) ? summarizedEquipment : [];
+
+      // Cálculo autocontenido de potencia total y metros canalizados
+      const computedTotalWatts = safeObjects.reduce(
+        (acc, o) => acc + (Number(o.power) || Number(o.watts) || 0),
+        0
+      );
+      const computedGrandTotalMeters =
+        typeof totalCableMetersByPhase !== 'undefined' && totalCableMetersByPhase?.grandTotal !== undefined
+          ? totalCableMetersByPhase.grandTotal
+          : safeConduits.reduce(
+              (acc, c) => acc + (typeof computeConduitMeters === 'function' ? Number(computeConduitMeters(c)) || 0 : 0),
+              0
+            );
+
       // Checklist automático de sistemas instalados en el plano
       const installedSystems = [];
-      const hasPhotoperiodLamps = objects.some(
+      const hasPhotoperiodLamps = safeObjects.some(
         (o) =>
           o.phase === 'fotoperiodo' ||
           o.icon === 'led_lamp' ||
@@ -3088,21 +3115,21 @@ export default function App() {
         installedSystems.push('Fotoperiodo LED');
       }
       if (
-        objects.some((o) => o.phase === 'fuerza_aux') ||
-        conduits.some((c) => ['L1', 'L2', 'L3', 'TRIFASICO'].includes(c.phase))
+        safeObjects.some((o) => o.phase === 'fuerza_aux') ||
+        safeConduits.some((c) => ['L1', 'L2', 'L3', 'TRIFASICO'].includes(c.phase))
       ) {
         installedSystems.push('Fuerza / Iluminación');
       }
       if (
-        objects.some((o) => o.phase === 'control') ||
-        conduits.some((c) => c.phase === 'CONTROL')
+        safeObjects.some((o) => o.phase === 'control') ||
+        safeConduits.some((c) => c.phase === 'CONTROL')
       ) {
         installedSystems.push('Control / Tableros');
       }
-      if (objects.some((o) => o.phase === 'monitoreo')) {
+      if (safeObjects.some((o) => o.phase === 'monitoreo')) {
         installedSystems.push('Monitoreo / Cámaras');
       }
-      if (objects.some((o) => o.phase === 'alimentacion')) {
+      if (safeObjects.some((o) => o.phase === 'alimentacion')) {
         installedSystems.push('Alimentación');
       }
 
@@ -3118,21 +3145,14 @@ export default function App() {
               .join(' ')
           : '<span style="font-size:10.5px;color:#64748b;font-weight:600;">Sin sistemas registrados</span>';
 
-      const rowsHtml = summarizedEquipment
+      const rowsHtml = safeSummary
         .map((g) => {
           const rawTags = Array.isArray(g.tags)
             ? g.tags.filter((t) => t && String(t).trim() !== '' && String(t).trim() !== '-').join(', ')
             : String(g.tagsLabel || '').trim();
           const hasValidTags = rawTags !== '' && rawTags !== '-' && rawTags.toLowerCase() !== 'sin tag';
           const displayTags = hasValidTags ? rawTags : 'SIN INFORMACION';
-          const localPhaseLabels = {
-            fotoperiodo: 'Fotoperiodo LED',
-            fuerza_aux: 'Fuerza 220V Auxiliar',
-            control: 'Fuerza y Control',
-            monitoreo: 'Sensores / Cámaras',
-            alimentacion: 'Alimentación',
-          };
-          const phaseLabel =
+          const phaseText =
             (typeof PHASES !== 'undefined' && PHASES[g.phase]?.label) ||
             localPhaseLabels[g.phase] ||
             g.phase ||
@@ -3144,7 +3164,7 @@ export default function App() {
             <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
             <td>${g.modulesLabel || '-'}</td>
             <td>${g.spec || '-'}</td>
-            <td>${phaseLabel}</td>
+            <td>${phaseText}</td>
             <td style="text-align:right;">${g.unitPower || 0} W</td>
             <td style="text-align:right; font-weight:700;">${g.totalPower || 0} W</td>
             <td>${g.summaryStatus || '-'}</td>
@@ -3152,10 +3172,13 @@ export default function App() {
         })
         .join('');
 
-      const conduitRowsHtml = conduits
+      const conduitRowsHtml = safeConduits
         .map((c) => {
-          const phaseInfo = CONDUIT_PHASE_CONFIG[c.phase] || { label: c.phase };
-          const meters = computeConduitMeters(c);
+          const phaseInfo =
+            (typeof CONDUIT_PHASE_CONFIG !== 'undefined' && CONDUIT_PHASE_CONFIG[c.phase]) || {
+              label: c.phase,
+            };
+          const meters = typeof computeConduitMeters === 'function' ? computeConduitMeters(c) : 0;
           return `
           <tr>
             <td style="font-weight:700;">${c.tag}</td>
@@ -3216,13 +3239,13 @@ export default function App() {
           </table>
 
           <div class="kpis">
-            <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${cages.length} (${cages[0]?.dimensions || '30m x 30m'})</div></div>
+            <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${safeCages.length} (${safeCages[0]?.dimensions || '30m x 30m'})</div></div>
             <div class="kpi">
               <div class="kpi-label">Checklist Sistemas Instalados</div>
               <div class="checklist-wrap">${checklistItemsHtml}</div>
             </div>
-            <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(totalWatts / 1000).toFixed(2)} kW</div></div>
-            <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${totalCableMetersByPhase.grandTotal} m</div></div>
+            <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(computedTotalWatts / 1000).toFixed(2)} kW</div></div>
+            <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${computedGrandTotalMeters} m</div></div>
           </div>
 
           <table class="inv">
@@ -3242,7 +3265,7 @@ export default function App() {
           </table>
 
           ${
-            conduits.length > 0
+            safeConduits.length > 0
               ? `<table class="inv">
                   <thead>
                     <tr>
