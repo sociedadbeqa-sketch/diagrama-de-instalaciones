@@ -7,7 +7,7 @@ import {
   Magnet, Eye, EyeOff, Info, Layers, Grid, ArrowRightLeft, Building2, Printer,
   Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus,
-  Route, Square, Scissors, ClipboardPaste, Undo2, Redo2, Lock, Unlock, FlipHorizontal2, FlipVertical2, AlignCenterHorizontal
+  Route, Square, Scissors, ClipboardPaste, Undo2, Redo2, Lock, Unlock, FlipHorizontal2, FlipVertical2, AlignCenterHorizontal, Palette
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -59,6 +59,28 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'plano-centro-engorda
 const BASE_CAGE_PX = 112;
 const BASE_CAGE_METERS = 30;
 const STANDARD_WALKWAY_WIDTH = 16;
+
+const TYPE_GENERIC_LABELS = {
+  luminaria: 'Proyector LED Fotoperiodo',
+  enchufe_220v: 'Enchufe Industrial 220V',
+  fotocelda: 'Fotocelda Crepuscular',
+  tablero: 'Tablero Eléctrico IP66',
+  energizador: 'Energizador / Telemetría',
+  sensor: 'Sensor / Sonda Multiparámetro',
+  camara: 'Cámara Submarina / PTZ',
+  alimentador: 'Selector de Alimentación',
+};
+
+const SYMBOL_COLOR_PRESETS = [
+  '#1d4ed8', // Azul técnico
+  '#f59e0b', // Ámbar
+  '#ef4444', // Rojo
+  '#10b981', // Esmeralda
+  '#06b6d4', // Cian
+  '#8b5cf6', // Violeta
+  '#ec4899', // Magenta
+  '#0f172a', // Negro / Grafito
+];
 
 // ============================================================================
 // MODELO DE DATOS INICIAL: CENTRO DE ENGORDA DE SALMONES (MÓDULOS 200 Y 100)
@@ -145,6 +167,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-01',
     tag: 'TAB-200-A',
+    genericName: 'Tablero Eléctrico IP66',
+    brand: 'Schneider Electric',
     type: 'tablero',
     icon: 'zap',
     phase: 'fotoperiodo',
@@ -152,6 +176,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Tablero Distribución Fotoperiodo IP66 400V / 3F',
     status: 'operativo',
     x: 112,
@@ -164,6 +189,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-02',
     tag: 'PROY-201',
+    genericName: 'Proyector LED Fotoperiodo',
+    brand: 'Aqualed',
     type: 'luminaria',
     icon: 'sun',
     phase: 'fotoperiodo',
@@ -171,6 +198,7 @@ const INITIAL_OBJECTS = [
     rotation: 180,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
     status: 'operativo',
     x: 176,
@@ -183,6 +211,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-03',
     tag: 'PROY-203',
+    genericName: 'Proyector LED Fotoperiodo',
+    brand: 'Aqualed',
     type: 'luminaria',
     icon: 'sun',
     phase: 'fotoperiodo',
@@ -190,6 +220,7 @@ const INITIAL_OBJECTS = [
     rotation: 180,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
     status: 'operativo',
     x: 432,
@@ -202,6 +233,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-04',
     tag: 'PROY-205',
+    genericName: 'Proyector LED Fotoperiodo',
+    brand: 'Signify / Philips',
     type: 'luminaria',
     icon: 'sun',
     phase: 'fotoperiodo',
@@ -209,6 +242,7 @@ const INITIAL_OBJECTS = [
     rotation: 180,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
     status: 'mantencion',
     x: 688,
@@ -221,6 +255,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-05',
     tag: 'ERG-200',
+    genericName: 'Energizador / Telemetría',
+    brand: 'JVA',
     type: 'energizador',
     icon: 'radio',
     phase: 'control',
@@ -228,6 +264,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Unidad Energizadora Cerco Lobero / Telemetría',
     status: 'operativo',
     x: 504,
@@ -240,6 +277,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-06',
     tag: 'SEN-O2-204',
+    genericName: 'Sensor / Sonda Multiparámetro',
+    brand: 'OxyGuard',
     type: 'sensor',
     icon: 'cpu',
     phase: 'monitoreo',
@@ -247,6 +286,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Sonda Multiparámetro Oxígeno Disuelto / Temp / Salinidad',
     status: 'operativo',
     x: 560,
@@ -259,6 +299,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-07',
     tag: 'CAM-206',
+    genericName: 'Cámara Submarina / PTZ',
+    brand: 'Hikvision',
     type: 'camara',
     icon: 'camera',
     phase: 'monitoreo',
@@ -266,6 +308,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Cámara Submarina Detección Pellets + Superficie PTZ',
     status: 'operativo',
     x: 816,
@@ -278,6 +321,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-08',
     tag: 'TAB-100-A',
+    genericName: 'Tablero Eléctrico IP66',
+    brand: 'Schneider Electric',
     type: 'tablero',
     icon: 'zap',
     phase: 'fotoperiodo',
@@ -285,6 +330,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Tablero Distribución Fotoperiodo IP66 Módulo 100',
     status: 'operativo',
     x: 1112,
@@ -297,6 +343,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-09',
     tag: 'PROY-102',
+    genericName: 'Proyector LED Fotoperiodo',
+    brand: 'Aqualed',
     type: 'luminaria',
     icon: 'sun',
     phase: 'fotoperiodo',
@@ -304,6 +352,7 @@ const INITIAL_OBJECTS = [
     rotation: 180,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
     status: 'operativo',
     x: 1304,
@@ -316,6 +365,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-10',
     tag: 'PROY-104',
+    genericName: 'Proyector LED Fotoperiodo',
+    brand: 'Signify / Philips',
     type: 'luminaria',
     icon: 'sun',
     phase: 'fotoperiodo',
@@ -323,6 +374,7 @@ const INITIAL_OBJECTS = [
     rotation: 180,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
     status: 'falla',
     x: 1560,
@@ -335,6 +387,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-11',
     tag: 'SEN-O2-103',
+    genericName: 'Sensor / Sonda Multiparámetro',
+    brand: 'Innovasea',
     type: 'sensor',
     icon: 'cpu',
     phase: 'monitoreo',
@@ -342,6 +396,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Estación Oceanográfica & Correntómetro Doppler',
     status: 'operativo',
     x: 1432,
@@ -354,6 +409,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-12',
     tag: 'ALI-105',
+    genericName: 'Selector de Alimentación',
+    brand: 'AKVA Group',
     type: 'alimentador',
     icon: 'compass',
     phase: 'alimentacion',
@@ -361,6 +418,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     spec: 'Selector Rotatorio & Esparcidor Neumático',
     status: 'operativo',
     x: 1688,
@@ -373,6 +431,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-13',
     tag: 'ENCH-200-01',
+    genericName: 'Enchufe Industrial 220V',
+    brand: 'Mennekes',
     type: 'enchufe_220v',
     icon: 'plug',
     phase: 'fuerza_aux',
@@ -380,6 +440,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     amperage: '16A',
     ipGrade: 'IP67',
     spec: 'Toma Industrial CEE 220V 16A 2P+T IP67',
@@ -394,6 +455,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-14',
     tag: 'FC-200-N',
+    genericName: 'Fotocelda Crepuscular',
+    brand: 'Finder',
     type: 'fotocelda',
     icon: 'eye',
     phase: 'fotoperiodo',
@@ -401,6 +464,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     luxThreshold: '15 Lux',
     controlledCircuit: 'Contactor Fotoperiodo Módulo 200',
     spec: 'Fotocelda Crepuscular 220V IP65 (15 Lux)',
@@ -415,6 +479,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-15',
     tag: 'ENCH-100-01',
+    genericName: 'Enchufe Industrial 220V',
+    brand: 'Mennekes',
     type: 'enchufe_220v',
     icon: 'plug',
     phase: 'fuerza_aux',
@@ -422,6 +488,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     amperage: '16A',
     ipGrade: 'IP67',
     spec: 'Toma Industrial CEE 220V 16A 2P+T IP67',
@@ -436,6 +503,8 @@ const INITIAL_OBJECTS = [
   {
     id: 'OBJ-16',
     tag: 'FC-100-N',
+    genericName: 'Fotocelda Crepuscular',
+    brand: 'Finder',
     type: 'fotocelda',
     icon: 'eye',
     phase: 'fotoperiodo',
@@ -443,6 +512,7 @@ const INITIAL_OBJECTS = [
     rotation: 0,
     flipX: false,
     flipY: false,
+    customColor: '',
     luxThreshold: '15 Lux',
     controlledCircuit: 'Contactor Fotoperiodo Módulo 100',
     spec: 'Fotocelda Crepuscular 220V IP65 (15 Lux)',
@@ -515,12 +585,12 @@ const INITIAL_COMPANY_INFO = {
   signatureDataUrl: null,
 };
 
-const PHASE_CONFIG = {
-  fotoperiodo: { label: 'Fotoperiodo LED', color: '#f59e0b', badgeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-  fuerza_aux: { label: 'Fuerza 220V Auxiliar', color: '#2563eb', badgeBg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-  control: { label: 'Fuerza y Control', color: '#ef4444', badgeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
-  monitoreo: { label: 'Sensores / Cámaras', color: '#06b6d4', badgeBg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' },
-  alimentacion: { label: 'Alimentación', color: '#10b981', badgeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+const INITIAL_PHASE_CONFIG = {
+  fotoperiodo: { label: 'Fotoperiodo LED', color: '#f59e0b' },
+  fuerza_aux: { label: 'Fuerza 220V Auxiliar', color: '#2563eb' },
+  control: { label: 'Fuerza y Control', color: '#ef4444' },
+  monitoreo: { label: 'Sensores / Cámaras', color: '#06b6d4' },
+  alimentacion: { label: 'Alimentación', color: '#10b981' },
 };
 
 const CONDUIT_PHASE_CONFIG = {
@@ -563,14 +633,14 @@ const STATUS_CONFIG = {
 };
 
 const SYMBOL_CATALOG = [
-  { type: 'luminaria', label: 'Proyector LED Fotoperiodo', icon: 'sun', phase: 'fotoperiodo', power: 1000, rotation: 180 },
-  { type: 'enchufe_220v', label: 'Enchufe Industrial 220V', icon: 'plug', phase: 'fuerza_aux', power: 3520, rotation: 0, amperage: '16A', ipGrade: 'IP67' },
-  { type: 'fotocelda', label: 'Fotocelda Crepuscular', icon: 'eye', phase: 'fotoperiodo', power: 15, rotation: 0, luxThreshold: '15 Lux', controlledCircuit: 'Contactor Fotoperiodo' },
-  { type: 'tablero', label: 'Tablero Eléctrico IP66', icon: 'zap', phase: 'control', power: 1200, rotation: 0 },
-  { type: 'energizador', label: 'Energizador / Telemetría', icon: 'radio', phase: 'control', power: 450, rotation: 0 },
-  { type: 'sensor', label: 'Sensor Oxígeno / Sonda', icon: 'cpu', phase: 'monitoreo', power: 60, rotation: 0 },
-  { type: 'camara', label: 'Cámara Submarina / PTZ', icon: 'camera', phase: 'monitoreo', power: 85, rotation: 0 },
-  { type: 'alimentador', label: 'Selector Alimentación', icon: 'compass', phase: 'alimentacion', power: 350, rotation: 0 },
+  { type: 'luminaria', label: 'Proyector LED Fotoperiodo', brand: 'Aqualed', icon: 'sun', phase: 'fotoperiodo', power: 1000, rotation: 180, customColor: '' },
+  { type: 'enchufe_220v', label: 'Enchufe Industrial 220V', brand: 'Mennekes', icon: 'plug', phase: 'fuerza_aux', power: 3520, rotation: 0, amperage: '16A', ipGrade: 'IP67', customColor: '' },
+  { type: 'fotocelda', label: 'Fotocelda Crepuscular', brand: 'Finder', icon: 'eye', phase: 'fotoperiodo', power: 15, rotation: 0, luxThreshold: '15 Lux', controlledCircuit: 'Contactor Fotoperiodo', customColor: '' },
+  { type: 'tablero', label: 'Tablero Eléctrico IP66', brand: 'Schneider Electric', icon: 'zap', phase: 'control', power: 1200, rotation: 0, customColor: '' },
+  { type: 'energizador', label: 'Energizador / Telemetría', brand: 'JVA', icon: 'radio', phase: 'control', power: 450, rotation: 0, customColor: '' },
+  { type: 'sensor', label: 'Sensor / Sonda Multiparámetro', brand: 'OxyGuard', icon: 'cpu', phase: 'monitoreo', power: 60, rotation: 0, customColor: '' },
+  { type: 'camara', label: 'Cámara Submarina / PTZ', brand: 'Hikvision', icon: 'camera', phase: 'monitoreo', power: 85, rotation: 0, customColor: '' },
+  { type: 'alimentador', label: 'Selector de Alimentación', brand: 'AKVA Group', icon: 'compass', phase: 'alimentacion', power: 350, rotation: 0, customColor: '' },
 ];
 
 const ICON_TO_TYPE_MAP = {
@@ -589,6 +659,17 @@ const buildGoogleMapsLink = (coordsText, customUrl = '') => {
   const clean = (coordsText || '').trim();
   if (!clean) return 'https://www.google.com/maps';
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clean)}`;
+};
+
+// Cálculo dinámico del ancho del cuadro de texto del Módulo según la longitud del texto
+const getModuleHeaderDimensions = (mod, cageCount = 0) => {
+  const titleText = `${mod?.name || ''} (${cageCount} jaulas)`;
+  const subtitleText = mod?.subtitle || '';
+  const estTitleWidth = titleText.length * 8.6 + 34;
+  const estSubtitleWidth = subtitleText.length * 6.0 + 34;
+  const width = Math.max(190, Math.ceil(Math.max(estTitleWidth, estSubtitleWidth)));
+  const height = subtitleText.trim() ? 44 : 32;
+  return { width, height };
 };
 
 export default function App() {
@@ -615,16 +696,28 @@ export default function App() {
   const [cages, setCages] = useState(generateInitialCages);
   const [objects, setObjects] = useState(INITIAL_OBJECTS);
   const [conduits, setConduits] = useState(INITIAL_CONDUITS);
+  const [phaseConfigs, setPhaseConfigs] = useState(INITIAL_PHASE_CONFIG);
   const [symbolCatalog, setSymbolCatalog] = useState(SYMBOL_CATALOG);
   const [isEditingCatalog, setIsEditingCatalog] = useState(false);
   const [catalogForm, setCatalogForm] = useState({
     editingIndex: null,
     label: '',
+    brand: '',
     icon: 'sun',
     phase: 'fotoperiodo',
     power: 1000,
     rotation: 180,
+    customColor: '',
   });
+
+  // Formulario inline para crear o editar tipos de circuitos en propiedades de simbología
+  const [circuitEditorMode, setCircuitEditorMode] = useState(null); // null | 'create' | 'edit'
+  const [circuitForm, setCircuitForm] = useState({
+    key: '',
+    label: '',
+    color: '#8b5cf6',
+  });
+
   const [companyInfo, setCompanyInfo] = useState(INITIAL_COMPANY_INFO);
   const [trunkLabel, setTrunkLabel] = useState('Troncal Submarina 224m');
   const [showTrunkLabel, setShowTrunkLabel] = useState(true);
@@ -642,6 +735,7 @@ export default function App() {
     cages: JSON.parse(JSON.stringify(cages)),
     objects: JSON.parse(JSON.stringify(objects)),
     conduits: JSON.parse(JSON.stringify(conduits)),
+    phaseConfigs: JSON.parse(JSON.stringify(phaseConfigs)),
     trunkLabel,
     showTrunkLabel,
   });
@@ -666,6 +760,7 @@ export default function App() {
     setCages(previous.cages);
     setObjects(previous.objects);
     setConduits(previous.conduits);
+    if (previous.phaseConfigs) setPhaseConfigs(previous.phaseConfigs);
     setTrunkLabel(previous.trunkLabel);
     setShowTrunkLabel(previous.showTrunkLabel);
     notify('Última acción deshecha (Ctrl+Z)', 'info');
@@ -685,6 +780,7 @@ export default function App() {
     setCages(next.cages);
     setObjects(next.objects);
     setConduits(next.conduits);
+    if (next.phaseConfigs) setPhaseConfigs(next.phaseConfigs);
     setTrunkLabel(next.trunkLabel);
     setShowTrunkLabel(next.showTrunkLabel);
     notify('Acción rehacha (Ctrl+Y)', 'info');
@@ -1003,6 +1099,7 @@ export default function App() {
       const modulesToUse = overrideData?.modules || modules;
       const conduitsToUse = overrideData?.conduits || conduits;
       const catalogToUse = overrideData?.symbolCatalog || symbolCatalog;
+      const phasesToUse = overrideData?.phaseConfigs || phaseConfigs;
 
       const targetId = (customId || currentBlueprintId || `plano-${Date.now()}`)
         .trim()
@@ -1033,6 +1130,7 @@ export default function App() {
         cages: cagesToUse,
         objects: objectsToUse,
         conduits: conduitsToUse,
+        phaseConfigs: phasesToUse,
         symbolCatalog: catalogToUse,
         trunkLabel,
         showTrunkLabel,
@@ -1058,6 +1156,9 @@ export default function App() {
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
     if (Array.isArray(bp.conduits)) setConduits(bp.conduits);
+    if (bp.phaseConfigs && typeof bp.phaseConfigs === 'object') {
+      setPhaseConfigs((prev) => ({ ...prev, ...bp.phaseConfigs }));
+    }
     if (Array.isArray(bp.symbolCatalog) && bp.symbolCatalog.length > 0) {
       setSymbolCatalog(bp.symbolCatalog);
       setPlaceTemplate(bp.symbolCatalog[0]);
@@ -1146,6 +1247,56 @@ export default function App() {
   }, [savedBlueprints, cloudSearchQuery]);
 
   // ============================================================================
+  // GESTIÓN DE TIPOS DE CIRCUITOS (CREAR Y MODIFICAR DESDE INSPECTOR / PALETA)
+  // ============================================================================
+  const handleSaveCircuitType = (e) => {
+    e.preventDefault();
+    const cleanName = circuitForm.label.trim();
+    if (!cleanName) {
+      notify('Ingresa un nombre para el tipo de circuito', 'warn');
+      return;
+    }
+
+    pushHistory();
+
+    if (circuitEditorMode === 'edit' && circuitForm.key && phaseConfigs[circuitForm.key]) {
+      setPhaseConfigs((prev) => ({
+        ...prev,
+        [circuitForm.key]: {
+          label: cleanName,
+          color: circuitForm.color || prev[circuitForm.key].color,
+        },
+      }));
+      notify(`Circuito "${cleanName}" actualizado`, 'success');
+    } else {
+      const slug = cleanName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      const newKey = phaseConfigs[slug] ? `${slug}_${Date.now().toString().slice(-4)}` : slug || `circuito_${Date.now()}`;
+
+      setPhaseConfigs((prev) => ({
+        ...prev,
+        [newKey]: {
+          label: cleanName,
+          color: circuitForm.color || '#8b5cf6',
+        },
+      }));
+
+      if (selectedObject) {
+        updateSelectedObject('phase', newKey);
+      } else if (isEditingCatalog) {
+        setCatalogForm((prev) => ({ ...prev, phase: newKey }));
+      }
+      notify(`Nuevo circuito "${cleanName}" creado`, 'success');
+    }
+
+    setCircuitEditorMode(null);
+  };
+
+  // ============================================================================
   // EDICIÓN Y CREACIÓN EN LA PALETA DE SIMBOLOGÍA
   // ============================================================================
   const handleSaveCatalogSymbol = (e) => {
@@ -1160,10 +1311,12 @@ export default function App() {
     const newItem = {
       type: mappedType,
       label: cleanLabel,
+      brand: (catalogForm.brand || '').trim() || 'Genérico',
       icon: catalogForm.icon,
       phase: catalogForm.phase,
       power: Number(catalogForm.power) || 0,
       rotation: Number(catalogForm.rotation) || 0,
+      customColor: catalogForm.customColor || '',
       amperage: mappedType === 'enchufe_220v' ? '16A' : undefined,
       ipGrade: mappedType === 'enchufe_220v' ? 'IP67' : undefined,
       luxThreshold: mappedType === 'fotocelda' ? '15 Lux' : undefined,
@@ -1187,10 +1340,12 @@ export default function App() {
     setCatalogForm({
       editingIndex: null,
       label: '',
+      brand: '',
       icon: 'sun',
       phase: 'fotoperiodo',
       power: 1000,
       rotation: 180,
+      customColor: '',
     });
     setIsEditingCatalog(false);
   };
@@ -1202,10 +1357,12 @@ export default function App() {
     setCatalogForm({
       editingIndex: idx,
       label: item.label,
+      brand: item.brand || '',
       icon: item.icon || 'zap',
       phase: item.phase || 'control',
       power: Number(item.power) || 0,
       rotation: Number(item.rotation) || 0,
+      customColor: item.customColor || '',
     });
     setIsEditingCatalog(true);
   };
@@ -1347,6 +1504,7 @@ export default function App() {
         conduits: nextConduits,
         cages: nextCages,
         modules: generatedModules,
+        phaseConfigs,
         symbolCatalog,
       });
     }
@@ -1815,9 +1973,14 @@ export default function App() {
         ? `Fotocelda Crepuscular ${placeTemplate.luxThreshold || '15 Lux'} (${placeTemplate.controlledCircuit || `Módulo ${modShort}`})`
         : `${placeTemplate.label} (${placeTemplate.power}W)`;
 
+    const genericName =
+      TYPE_GENERIC_LABELS[placeTemplate.type] || placeTemplate.label || 'Componente Eléctrico';
+
     const newObj = {
       id: `OBJ-${Date.now()}`,
       tag: `${prefix}-${modShort}-${String(count).padStart(2, '0')}`,
+      genericName,
+      brand: placeTemplate.brand || 'Genérico',
       type: placeTemplate.type,
       icon: placeTemplate.icon,
       phase: placeTemplate.phase,
@@ -1825,6 +1988,7 @@ export default function App() {
       rotation: placeTemplate.rotation ?? 180,
       flipX: false,
       flipY: false,
+      customColor: placeTemplate.customColor || '',
       amperage: placeTemplate.amperage || '16A',
       ipGrade: placeTemplate.ipGrade || 'IP67',
       luxThreshold: placeTemplate.luxThreshold || '15 Lux',
@@ -1858,7 +2022,6 @@ export default function App() {
     const modId = detectModuleId(rawX);
     const targetMod = modules.find((m) => m.id === modId) || modules[0];
 
-    // Encaje estricto a la retícula de separación estándar (visualPx + STANDARD_WALKWAY_WIDTH)
     const step = visualPx + STANDARD_WALKWAY_WIDTH;
     const baseOriginX = targetMod ? targetMod.originX : 120;
     const baseOriginY = targetMod ? targetMod.originY : 160;
@@ -2143,9 +2306,10 @@ export default function App() {
 
   const centerModuleHeaderOverCages = (modId) => {
     const bounds = moduleBoundsMap[modId];
-    if (!bounds || !bounds.hasCages) return;
+    const targetMod = modules.find((m) => m.id === modId);
+    if (!bounds || !bounds.hasCages || !targetMod) return;
     pushHistory();
-    const headerWidth = 340;
+    const { width: headerWidth } = getModuleHeaderDimensions(targetMod, bounds.count);
     const centeredOffsetX = Math.round((bounds.totalW - headerWidth) / 2);
     setModules((prev) =>
       prev.map((m) =>
@@ -2239,6 +2403,9 @@ export default function App() {
           setCages(data.cages);
           setObjects(data.objects);
           if (Array.isArray(data.conduits)) setConduits(data.conduits);
+          if (data.phaseConfigs && typeof data.phaseConfigs === 'object') {
+            setPhaseConfigs((prev) => ({ ...prev, ...data.phaseConfigs }));
+          }
           if (Array.isArray(data.symbolCatalog) && data.symbolCatalog.length > 0) {
             setSymbolCatalog(data.symbolCatalog);
             setPlaceTemplate(data.symbolCatalog[0]);
@@ -2262,8 +2429,8 @@ export default function App() {
     e.target.value = '';
   };
 
-  // Exportación SVG adaptativa al encuadre real del proyecto
-  const generateSvgStringForExport = () => {
+  // Exportación SVG adaptativa al encuadre real del proyecto (sin cuadrícula en vista PDF)
+  const generateSvgStringForExport = (removeGrid = true) => {
     const svgEl = svgRef.current;
     if (!svgEl) return null;
 
@@ -2289,6 +2456,11 @@ export default function App() {
     clone.setAttribute('width', String(exportWidth));
     clone.setAttribute('height', String(exportHeight));
 
+    const gridRect = clone.querySelector('#sea-grid-bg');
+    if (gridRect && removeGrid) {
+      gridRect.remove();
+    }
+
     const viewportG = clone.querySelector('#plan-viewport');
     if (viewportG) {
       viewportG.setAttribute('transform', 'translate(0, 0) scale(1)');
@@ -2299,14 +2471,14 @@ export default function App() {
     bgRect.setAttribute('y', String(minY));
     bgRect.setAttribute('width', String(exportWidth));
     bgRect.setAttribute('height', String(exportHeight));
-    bgRect.setAttribute('fill', '#f0f9ff');
+    bgRect.setAttribute('fill', removeGrid ? '#ffffff' : '#f0f9ff');
     clone.insertBefore(bgRect, clone.firstChild);
 
     return new XMLSerializer().serializeToString(clone);
   };
 
   const handleExportPNG = () => {
-    const svgString = generateSvgStringForExport();
+    const svgString = generateSvgStringForExport(false);
     if (!svgString) return;
 
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -2332,15 +2504,24 @@ export default function App() {
     img.src = url;
   };
 
-  // Agrupación resumida de equipos iguales
+  // Agrupación resumida de equipos por nombre genérico, marca y características técnicas
   const summarizedEquipment = useMemo(() => {
     const map = new Map();
     objects.forEach((o) => {
+      const genericName = (
+        o.genericName ||
+        TYPE_GENERIC_LABELS[o.type] ||
+        'Componente Eléctrico'
+      ).trim();
+      const brand = (o.brand || 'Sin Marca').trim();
       const specKey = (o.spec || '').trim();
-      const key = `${specKey}__${o.phase}__${Number(o.power) || 0}`;
+      const key = `${genericName}__${brand}__${specKey}__${o.phase}__${Number(o.power) || 0}`;
+
       if (!map.has(key)) {
         map.set(key, {
           key,
+          genericName,
+          brand,
           spec: specKey,
           phase: o.phase,
           unitPower: Number(o.power) || 0,
@@ -2377,7 +2558,7 @@ export default function App() {
   }, [objects]);
 
   const handleExportPDF = () => {
-    const svgString = generateSvgStringForExport();
+    const svgString = generateSvgStringForExport(true);
     if (!svgString) return;
 
     const totalWatts = objects.reduce((acc, o) => acc + (Number(o.power) || 0), 0);
@@ -2394,10 +2575,12 @@ export default function App() {
         (g) => `
         <tr>
           <td style="text-align:center; font-weight:800;">${g.count}</td>
-          <td style="font-weight:700; font-size:10px;">${g.tagsLabel}</td>
+          <td style="font-weight:700;">${g.genericName}</td>
+          <td style="font-weight:700; color:#0369a1;">${g.brand}</td>
+          <td style="font-size:10px;">${g.tagsLabel}</td>
           <td>${g.modulesLabel}</td>
           <td>${g.spec}</td>
-          <td>${PHASE_CONFIG[g.phase]?.label || g.phase}</td>
+          <td>${phaseConfigs[g.phase]?.label || g.phase}</td>
           <td style="text-align:right;">${g.unitPower} W</td>
           <td style="text-align:right; font-weight:700;">${g.totalPower} W</td>
           <td>${g.summaryStatus}</td>
@@ -2432,7 +2615,7 @@ export default function App() {
           body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
           .logo-bar { margin-bottom: 10px; display: flex; align-items: center; }
           .logo { max-height: 76px; max-width: 280px; object-fit: contain; }
-          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
+          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #ffffff; margin-bottom: 10px; }
           .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
           .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
           .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
@@ -2443,8 +2626,8 @@ export default function App() {
           .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; }
           .kpi-val { font-size: 13px; font-weight: 800; color: #0f172a; }
           h4 { font-size: 11px; text-transform: uppercase; margin: 10px 0 4px 0; color: #0f172a; }
-          table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
-          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
+          table.inv { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 12px; }
+          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; }
           table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
           .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
           .company-footer { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
@@ -2477,14 +2660,16 @@ export default function App() {
           <div class="kpi"><div class="kpi-label">Cableado Total</div><div class="kpi-val">${totalCableMeters} m</div></div>
         </div>
 
-        <h4>1. Resumen de Equipos Instalados</h4>
+        <h4>1. Resumen de Equipos Instalados por Componente Genérico y Marca</h4>
         <table class="inv">
           <thead>
             <tr>
               <th style="text-align:center;">Cant.</th>
+              <th>Componente Genérico</th>
+              <th>Marca</th>
               <th>TAGs Agrupados</th>
               <th>Módulo</th>
-              <th>Especificación Técnica</th>
+              <th>Características Técnicas</th>
               <th>Circuito / Fase</th>
               <th style="text-align:right;">Pot. Unit.</th>
               <th style="text-align:right;">Pot. Total</th>
@@ -2547,8 +2732,9 @@ export default function App() {
         const q = searchQuery.toLowerCase();
         const matchTag = obj.tag.toLowerCase().includes(q);
         const matchSpec = obj.spec.toLowerCase().includes(q);
+        const matchBrand = (obj.brand || '').toLowerCase().includes(q);
         const matchLoc = (obj.locationLabel || '').toLowerCase().includes(q);
-        if (!matchTag && !matchSpec && !matchLoc) return false;
+        if (!matchTag && !matchSpec && !matchBrand && !matchLoc) return false;
       }
       return true;
     });
@@ -2567,7 +2753,9 @@ export default function App() {
   }, [objects, cages]);
 
   const renderSymbolGraphic = (obj, isSelected) => {
-    const phaseColor = PHASE_CONFIG[obj.phase]?.color || '#0284c7';
+    const phaseColor = phaseConfigs[obj.phase]?.color || '#0284c7';
+    const effectiveColor = obj.customColor && obj.customColor.trim() ? obj.customColor.trim() : phaseColor;
+    const luminariaStroke = obj.customColor && obj.customColor.trim() ? obj.customColor.trim() : '#1d4ed8';
     const statusColor = STATUS_CONFIG[obj.status]?.color || '#10b981';
     const rot = Number(obj.rotation) || 0;
     const scaleX = obj.flipX ? -1 : 1;
@@ -2591,8 +2779,8 @@ export default function App() {
             <g>
               <polygon
                 points="10,-12 46,-26 46,26 10,12"
-                fill="url(#ledBeamGrad)"
-                opacity="0.72"
+                fill={luminariaStroke}
+                fillOpacity="0.22"
                 pointerEvents="none"
               />
               <line
@@ -2600,7 +2788,7 @@ export default function App() {
                 y1="-8"
                 x2="40"
                 y2="-18"
-                stroke="#2563eb"
+                stroke={luminariaStroke}
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
@@ -2610,7 +2798,7 @@ export default function App() {
                 y1="0"
                 x2="43"
                 y2="0"
-                stroke="#2563eb"
+                stroke={luminariaStroke}
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
@@ -2620,7 +2808,7 @@ export default function App() {
                 y1="8"
                 x2="40"
                 y2="18"
-                stroke="#2563eb"
+                stroke={luminariaStroke}
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
@@ -2632,13 +2820,13 @@ export default function App() {
                 width="4.5"
                 height="4.8"
                 rx="1.5"
-                fill="#1d4ed8"
+                fill={luminariaStroke}
               />
 
               <path
                 d="M -3,-14.5 L -11.5,-14.5 L -11.5,14.5 L -3,14.5"
                 fill="none"
-                stroke="#1d4ed8"
+                stroke={luminariaStroke}
                 strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -2651,14 +2839,14 @@ export default function App() {
                 height="23"
                 rx="1.2"
                 fill={darkMode ? '#1e293b' : '#ffffff'}
-                stroke="#1d4ed8"
+                stroke={luminariaStroke}
                 strokeWidth="1.8"
               />
-              <line x1="-8.5" y1="-7.5" x2="-4" y2="-7.5" stroke="#1d4ed8" strokeWidth="1.4" />
-              <line x1="-8.5" y1="-3.8" x2="-4" y2="-3.8" stroke="#1d4ed8" strokeWidth="1.4" />
-              <line x1="-8.5" y1="0" x2="-4" y2="0" stroke="#1d4ed8" strokeWidth="1.4" />
-              <line x1="-8.5" y1="3.8" x2="-4" y2="3.8" stroke="#1d4ed8" strokeWidth="1.4" />
-              <line x1="-8.5" y1="7.5" x2="-4" y2="7.5" stroke="#1d4ed8" strokeWidth="1.4" />
+              <line x1="-8.5" y1="-7.5" x2="-4" y2="-7.5" stroke={luminariaStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="-3.8" x2="-4" y2="-3.8" stroke={luminariaStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="0" x2="-4" y2="0" stroke={luminariaStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="3.8" x2="-4" y2="3.8" stroke={luminariaStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="7.5" x2="-4" y2="7.5" stroke={luminariaStroke} strokeWidth="1.4" />
 
               <rect
                 x="-4"
@@ -2667,7 +2855,7 @@ export default function App() {
                 height="25"
                 rx="3"
                 fill={darkMode ? '#0f172a' : '#ffffff'}
-                stroke="#1d4ed8"
+                stroke={luminariaStroke}
                 strokeWidth="2.2"
               />
 
@@ -2678,7 +2866,7 @@ export default function App() {
                     cx={cx}
                     cy={cy}
                     r="1.05"
-                    fill="#1d4ed8"
+                    fill={luminariaStroke}
                   />
                 ))
               )}
@@ -2688,12 +2876,12 @@ export default function App() {
               <circle
                 r="17"
                 fill={darkMode ? '#0f172a' : '#ffffff'}
-                stroke={phaseColor}
+                stroke={effectiveColor}
                 strokeWidth="2.6"
               />
               {obj.type === 'enchufe_220v' && (
                 <g>
-                  <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#2563eb" />
+                  <rect x="-8" y="-8" width="16" height="16" rx="4" fill={effectiveColor} />
                   <circle cx="-3.5" cy="-1.5" r="1.6" fill="#ffffff" />
                   <circle cx="3.5" cy="-1.5" r="1.6" fill="#ffffff" />
                   <rect x="-1.2" y="2.5" width="2.4" height="3.2" rx="0.6" fill="#fde047" />
@@ -2704,7 +2892,7 @@ export default function App() {
                   <path
                     d="M -10,0 Q 0,-9 10,0 Q 0,9 -10,0 Z"
                     fill="#fef3c7"
-                    stroke="#d97706"
+                    stroke={effectiveColor}
                     strokeWidth="1.8"
                   />
                   <circle r="3.8" fill="#0f172a" />
@@ -2713,36 +2901,36 @@ export default function App() {
               )}
               {obj.type === 'tablero' && (
                 <g>
-                  <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#ef4444" />
+                  <rect x="-7" y="-8" width="14" height="16" rx="2" fill={effectiveColor} />
                   <polygon points="1,-5 -3,1 0,1 -1,5 4,-1 1,-1" fill="#ffffff" />
                 </g>
               )}
               {obj.type === 'energizador' && (
                 <g>
-                  <circle r="6" fill="#ef4444" />
+                  <circle r="6" fill={effectiveColor} />
                   <path
                     d="M -10,-6 A 12,12 0 0,1 -10,6 M 10,-6 A 12,12 0 0,0 10,6"
                     fill="none"
-                    stroke="#ef4444"
+                    stroke={effectiveColor}
                     strokeWidth="1.8"
                   />
                 </g>
               )}
               {obj.type === 'sensor' && (
                 <g>
-                  <circle r="6.5" fill="#06b6d4" />
+                  <circle r="6.5" fill={effectiveColor} />
                   <circle r="2.5" fill="#ffffff" />
                 </g>
               )}
               {obj.type === 'camara' && (
                 <g>
-                  <rect x="-8" y="-5" width="11" height="10" rx="2" fill="#06b6d4" />
-                  <polygon points="3,-3 9,-6 9,6 3,3" fill="#0891b2" />
+                  <rect x="-8" y="-5" width="11" height="10" rx="2" fill={effectiveColor} />
+                  <polygon points="3,-3 9,-6 9,6 3,3" fill={effectiveColor} opacity="0.8" />
                 </g>
               )}
               {obj.type === 'alimentador' && (
                 <g>
-                  <polygon points="0,-9 8,6 -8,6" fill="#10b981" />
+                  <polygon points="0,-9 8,6 -8,6" fill={effectiveColor} />
                   <circle r="2.2" fill="#ffffff" />
                 </g>
               )}
@@ -2770,7 +2958,7 @@ export default function App() {
               height="15"
               rx="4"
               fill={darkMode ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.95)'}
-              stroke={phaseColor}
+              stroke={effectiveColor}
               strokeWidth="1"
             />
             <text
@@ -2788,42 +2976,43 @@ export default function App() {
     );
   };
 
-  const renderPalettePreviewIcon = (iconName) => {
+  const renderPalettePreviewIcon = (iconName, colorOverride = '') => {
+    const strokeCol = colorOverride || '#1d4ed8';
     switch (iconName) {
       case 'sun':
         return (
           <svg viewBox="0 0 32 32" className="w-5 h-5">
             <g transform="translate(13, 18) rotate(-42)">
-              <polygon points="6,-8 22,-15 22,15 6,8" fill="#bfdbfe" opacity="0.85" />
-              <line x1="8" y1="-4" x2="19" y2="-9" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="2 2" />
-              <line x1="8" y1="0" x2="20" y2="0" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="2 2" />
-              <line x1="8" y1="4" x2="19" y2="9" stroke="#2563eb" strokeWidth="1.3" strokeDasharray="2 2" />
-              <rect x="-11" y="-2" width="3.5" height="4" rx="1" fill="#1d4ed8" />
-              <path d="M -2,-10 L -8,-10 L -8,10 L -2,10" fill="none" stroke="#1d4ed8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <rect x="-3" y="-8.5" width="9" height="17" rx="2" fill="#ffffff" stroke="#1d4ed8" strokeWidth="1.8" />
-              <circle cx="0" cy="-4" r="1" fill="#1d4ed8" />
-              <circle cx="3" cy="-4" r="1" fill="#1d4ed8" />
-              <circle cx="0" cy="0" r="1" fill="#1d4ed8" />
-              <circle cx="3" cy="0" r="1" fill="#1d4ed8" />
-              <circle cx="0" cy="4" r="1" fill="#1d4ed8" />
-              <circle cx="3" cy="4" r="1" fill="#1d4ed8" />
+              <polygon points="6,-8 22,-15 22,15 6,8" fill={strokeCol} fillOpacity="0.25" />
+              <line x1="8" y1="-4" x2="19" y2="-9" stroke={strokeCol} strokeWidth="1.3" strokeDasharray="2 2" />
+              <line x1="8" y1="0" x2="20" y2="0" stroke={strokeCol} strokeWidth="1.3" strokeDasharray="2 2" />
+              <line x1="8" y1="4" x2="19" y2="9" stroke={strokeCol} strokeWidth="1.3" strokeDasharray="2 2" />
+              <rect x="-11" y="-2" width="3.5" height="4" rx="1" fill={strokeCol} />
+              <path d="M -2,-10 L -8,-10 L -8,10 L -2,10" fill="none" stroke={strokeCol} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="-3" y="-8.5" width="9" height="17" rx="2" fill="#ffffff" stroke={strokeCol} strokeWidth="1.8" />
+              <circle cx="0" cy="-4" r="1" fill={strokeCol} />
+              <circle cx="3" cy="-4" r="1" fill={strokeCol} />
+              <circle cx="0" cy="0" r="1" fill={strokeCol} />
+              <circle cx="3" cy="0" r="1" fill={strokeCol} />
+              <circle cx="0" cy="4" r="1" fill={strokeCol} />
+              <circle cx="3" cy="4" r="1" fill={strokeCol} />
             </g>
           </svg>
         );
       case 'plug':
-        return <Zap className="w-4 h-4 text-blue-500" />;
+        return <Zap className="w-4 h-4" style={{ color: colorOverride || '#2563eb' }} />;
       case 'eye':
-        return <Eye className="w-4 h-4 text-amber-500" />;
+        return <Eye className="w-4 h-4" style={{ color: colorOverride || '#f59e0b' }} />;
       case 'zap':
-        return <Zap className="w-4 h-4 text-rose-500" />;
+        return <Zap className="w-4 h-4" style={{ color: colorOverride || '#ef4444' }} />;
       case 'radio':
-        return <Radio className="w-4 h-4 text-rose-500" />;
+        return <Radio className="w-4 h-4" style={{ color: colorOverride || '#ef4444' }} />;
       case 'cpu':
-        return <Cpu className="w-4 h-4 text-cyan-500" />;
+        return <Cpu className="w-4 h-4" style={{ color: colorOverride || '#06b6d4' }} />;
       case 'camera':
-        return <Camera className="w-4 h-4 text-cyan-500" />;
+        return <Camera className="w-4 h-4" style={{ color: colorOverride || '#06b6d4' }} />;
       default:
-        return <Compass className="w-4 h-4 text-emerald-500" />;
+        return <Compass className="w-4 h-4" style={{ color: colorOverride || '#10b981' }} />;
     }
   };
 
@@ -3400,10 +3589,12 @@ export default function App() {
                     setCatalogForm({
                       editingIndex: null,
                       label: '',
+                      brand: '',
                       icon: 'sun',
-                      phase: 'fotoperiodo',
+                      phase: Object.keys(phaseConfigs)[0] || 'fotoperiodo',
                       power: 1000,
                       rotation: 180,
+                      customColor: '',
                     });
                     setIsEditingCatalog((v) => !v);
                   }}
@@ -3440,6 +3631,25 @@ export default function App() {
                       value={catalogForm.label}
                       onChange={(e) =>
                         setCatalogForm((prev) => ({ ...prev, label: e.target.value }))
+                      }
+                      className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      Marca por Defecto
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Aqualed, Philips, Schneider..."
+                      value={catalogForm.brand}
+                      onChange={(e) =>
+                        setCatalogForm((prev) => ({ ...prev, brand: e.target.value }))
                       }
                       className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
                         darkMode
@@ -3496,27 +3706,42 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      Sistema / Circuito
-                    </label>
-                    <select
-                      value={catalogForm.phase}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({ ...prev, phase: e.target.value }))
-                      }
-                      className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
-                        darkMode
-                          ? 'bg-slate-900 border-slate-700 text-white'
-                          : 'bg-white border-slate-300 text-slate-900'
-                      }`}
-                    >
-                      {Object.entries(PHASE_CONFIG).map(([key, val]) => (
-                        <option key={key} value={key}>
-                          {val.label}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-3 gap-2 items-end">
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Sistema / Circuito
+                      </label>
+                      <select
+                        value={catalogForm.phase}
+                        onChange={(e) =>
+                          setCatalogForm((prev) => ({ ...prev, phase: e.target.value }))
+                        }
+                        className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        {Object.entries(phaseConfigs).map(([key, val]) => (
+                          <option key={key} value={key}>
+                            {val.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Color
+                      </label>
+                      <input
+                        type="color"
+                        value={catalogForm.customColor || phaseConfigs[catalogForm.phase]?.color || '#1d4ed8'}
+                        onChange={(e) =>
+                          setCatalogForm((prev) => ({ ...prev, customColor: e.target.value }))
+                        }
+                        className="w-full h-7 rounded-lg cursor-pointer border border-slate-300 dark:border-slate-700"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -3542,6 +3767,7 @@ export default function App() {
                 {symbolCatalog.map((item, idx) => {
                   const isActivePlace =
                     activeTool === 'place' && placeTemplate?.label === item.label;
+                  const itemColor = item.customColor || phaseConfigs[item.phase]?.color || '';
                   return (
                     <div
                       key={`${item.label}-${idx}`}
@@ -3560,12 +3786,12 @@ export default function App() {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
-                          {renderPalettePreviewIcon(item.icon)}
+                          {renderPalettePreviewIcon(item.icon, itemColor)}
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-bold truncate">{item.label}</div>
-                          <div className="text-[10px] text-slate-400">
-                            {PHASE_CONFIG[item.phase]?.label || item.phase} · {item.power}W
+                          <div className="text-[10px] text-slate-400 truncate">
+                            {phaseConfigs[item.phase]?.label || item.phase} · {item.power}W
                           </div>
                         </div>
                       </div>
@@ -3602,7 +3828,7 @@ export default function App() {
 
               <input
                 type="text"
-                placeholder="Buscar TAG o equipo..."
+                placeholder="Buscar TAG, marca o equipo..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full px-3 py-1.5 rounded-xl text-xs border ${
@@ -3622,7 +3848,7 @@ export default function App() {
                 }`}
               >
                 <option value="all">Todos los Circuitos / Fases</option>
-                {Object.entries(PHASE_CONFIG).map(([k, v]) => (
+                {Object.entries(phaseConfigs).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v.label}
                   </option>
@@ -3809,13 +4035,9 @@ export default function App() {
                 <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.22" />
                 <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
               </radialGradient>
-              <linearGradient id="ledBeamGrad" x1="0%" y1="50%" x2="100%" y2="50%">
-                <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.65" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.06" />
-              </linearGradient>
             </defs>
 
-            <rect width="100%" height="100%" fill="url(#seaGrid)" />
+            <rect id="sea-grid-bg" width="100%" height="100%" fill="url(#seaGrid)" />
 
             <g id="plan-viewport" transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
               {/* Estructuras de Módulos y Pasillos (Zona Gris Autoajustada a las Jaulas) */}
@@ -3823,12 +4045,16 @@ export default function App() {
                 const bounds = moduleBoundsMap[mod.id];
                 if (!bounds || !bounds.hasCages) return null;
 
+                const { width: headerWidth, height: headerHeight } = getModuleHeaderDimensions(
+                  mod,
+                  bounds.count
+                );
                 const headerX = bounds.boxX + (Number(mod.headerOffsetX) || 0);
-                const headerY = bounds.boxY - 54 + (Number(mod.headerOffsetY) || 0);
+                const headerY = bounds.boxY - (headerHeight + 10) + (Number(mod.headerOffsetY) || 0);
 
                 return (
                   <g key={mod.id}>
-                    {/* Cuadro de texto con el nombre del módulo movible y centrable */}
+                    {/* Cuadro de texto con el nombre del módulo autoajustado al texto */}
                     <g
                       transform={`translate(${headerX}, ${headerY})`}
                       onMouseDown={(e) => {
@@ -3852,8 +4078,8 @@ export default function App() {
                       className="cursor-move"
                     >
                       <rect
-                        width="340"
-                        height="44"
+                        width={headerWidth}
+                        height={headerHeight}
                         rx="10"
                         fill={darkMode ? '#0f172a' : '#ffffff'}
                         stroke={
@@ -3867,22 +4093,24 @@ export default function App() {
                       />
                       <text
                         x="14"
-                        y="19"
+                        y={mod.subtitle?.trim() ? '19' : '21'}
                         fontSize="14"
                         fontWeight="800"
                         fill={darkMode ? '#f8fafc' : '#0f172a'}
                       >
                         {mod.name} ({bounds.count} jaulas)
                       </text>
-                      <text
-                        x="14"
-                        y="34"
-                        fontSize="10.5"
-                        fontWeight="600"
-                        fill={darkMode ? '#94a3b8' : '#475569'}
-                      >
-                        {mod.subtitle}
-                      </text>
+                      {mod.subtitle?.trim() && (
+                        <text
+                          x="14"
+                          y="34"
+                          fontSize="10.5"
+                          fontWeight="600"
+                          fill={darkMode ? '#94a3b8' : '#475569'}
+                        >
+                          {mod.subtitle}
+                        </text>
+                      )}
                     </g>
 
                     {/* Zona gris que se adapta automáticamente a la cantidad de jaulas */}
@@ -4432,13 +4660,50 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Identificador (TAG)</label>
+                    <input
+                      type="text"
+                      value={selectedObject.tag}
+                      onChange={(e) => updateSelectedObject('tag', e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Marca del Equipo</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Aqualed, Philips..."
+                      value={selectedObject.brand || ''}
+                      onChange={(e) => updateSelectedObject('brand', e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-sky-300'
+                          : 'bg-slate-50 border-slate-200 text-sky-800'
+                      }`}
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-bold mb-1">Identificador (TAG)</label>
+                  <label className="block text-xs font-bold mb-1">
+                    Componente Genérico (Agrupación Resumen)
+                  </label>
                   <input
                     type="text"
-                    value={selectedObject.tag}
-                    onChange={(e) => updateSelectedObject('tag', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
+                    placeholder="Ej. Proyector LED Fotoperiodo"
+                    value={
+                      selectedObject.genericName !== undefined
+                        ? selectedObject.genericName
+                        : TYPE_GENERIC_LABELS[selectedObject.type] || ''
+                    }
+                    onChange={(e) => updateSelectedObject('genericName', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -4447,7 +4712,7 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1">Especificación Técnica</label>
+                  <label className="block text-xs font-bold mb-1">Características / Especificación</label>
                   <input
                     type="text"
                     value={selectedObject.spec}
@@ -4460,38 +4725,184 @@ export default function App() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Sistema / Circuito</label>
+                {/* Sistema / Circuito con creación y edición directa */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold">Sistema / Circuito</label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentCfg = phaseConfigs[selectedObject.phase] || {
+                            label: selectedObject.phase,
+                            color: '#0284c7',
+                          };
+                          setCircuitForm({
+                            key: selectedObject.phase,
+                            label: currentCfg.label,
+                            color: currentCfg.color,
+                          });
+                          setCircuitEditorMode(circuitEditorMode === 'edit' ? null : 'edit');
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-slate-200 dark:bg-slate-800 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center gap-1"
+                        title="Modificar nombre o color de este circuito"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCircuitForm({
+                            key: '',
+                            label: '',
+                            color: '#8b5cf6',
+                          });
+                          setCircuitEditorMode(circuitEditorMode === 'create' ? null : 'create');
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-600 text-white hover:bg-sky-700 flex items-center gap-1"
+                        title="Crear un nuevo tipo de circuito"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Nuevo</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
                     <select
                       value={selectedObject.phase}
                       onChange={(e) => updateSelectedObject('phase', e.target.value)}
-                      className={`w-full px-2.5 py-2 rounded-xl text-xs border ${
+                      className={`col-span-2 px-2.5 py-2 rounded-xl text-xs font-bold border ${
                         darkMode
                           ? 'bg-slate-800 border-slate-700 text-white'
                           : 'bg-slate-50 border-slate-200 text-slate-900'
                       }`}
                     >
-                      {Object.entries(PHASE_CONFIG).map(([k, v]) => (
+                      {Object.entries(phaseConfigs).map(([k, v]) => (
                         <option key={k} value={k}>
                           {v.label}
                         </option>
                       ))}
                     </select>
+
+                    <div>
+                      <input
+                        type="number"
+                        placeholder="Watts"
+                        value={selectedObject.power}
+                        onChange={(e) => updateSelectedObject('power', Number(e.target.value))}
+                        className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border ${
+                          darkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                        title="Potencia en Watts (W)"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Potencia (W)</label>
-                    <input
-                      type="number"
-                      value={selectedObject.power}
-                      onChange={(e) => updateSelectedObject('power', Number(e.target.value))}
-                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                  {circuitEditorMode && (
+                    <form
+                      onSubmit={handleSaveCircuitType}
+                      className={`p-2.5 rounded-xl border space-y-2 ${
                         darkMode
-                          ? 'bg-slate-800 border-slate-700 text-white'
-                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                          ? 'bg-slate-800 border-slate-700'
+                          : 'bg-sky-50 border-sky-200'
                       }`}
+                    >
+                      <div className="text-[10px] font-extrabold uppercase text-sky-600 dark:text-sky-400">
+                        {circuitEditorMode === 'edit'
+                          ? 'Modificar Tipo de Circuito'
+                          : 'Crear Nuevo Tipo de Circuito'}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nombre del circuito (Ej. Respaldo UPS)"
+                          value={circuitForm.label}
+                          onChange={(e) =>
+                            setCircuitForm((p) => ({ ...p, label: e.target.value }))
+                          }
+                          className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs border ${
+                            darkMode
+                              ? 'bg-slate-900 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
+                          }`}
+                        />
+                        <input
+                          type="color"
+                          value={circuitForm.color}
+                          onChange={(e) =>
+                            setCircuitForm((p) => ({ ...p, color: e.target.value }))
+                          }
+                          className="w-8 h-7 rounded cursor-pointer border border-slate-300"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setCircuitEditorMode(null)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-200 dark:bg-slate-700"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-3 py-1 rounded-lg text-[11px] font-extrabold bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          Guardar Circuito
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Selector de Color de la Simbología */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-sky-500" />
+                      <span>Color de la Simbología</span>
+                    </label>
+                    {selectedObject.customColor && (
+                      <button
+                        type="button"
+                        onClick={() => updateSelectedObject('customColor', '')}
+                        className="text-[10px] font-extrabold text-sky-600 dark:text-sky-400 hover:underline"
+                      >
+                        Usar color del circuito
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <input
+                      type="color"
+                      value={
+                        selectedObject.customColor ||
+                        (selectedObject.type === 'luminaria'
+                          ? '#1d4ed8'
+                          : phaseConfigs[selectedObject.phase]?.color || '#0284c7')
+                      }
+                      onChange={(e) => updateSelectedObject('customColor', e.target.value)}
+                      className="w-8 h-7 rounded-lg cursor-pointer border border-slate-300 dark:border-slate-700 shrink-0"
+                      title="Elegir color personalizado"
                     />
+                    {SYMBOL_COLOR_PRESETS.map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        onClick={() => updateSelectedObject('customColor', hex)}
+                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                          selectedObject.customColor === hex
+                            ? 'border-sky-400 scale-110'
+                            : 'border-white dark:border-slate-800'
+                        }`}
+                        style={{ backgroundColor: hex }}
+                        title={`Aplicar color ${hex}`}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -4846,7 +5257,7 @@ export default function App() {
                 </div>
               </div>
             ) : selectedModule ? (
-              /* EDITOR DE TÍTULO DE MÓDULO (CON CENTRADO AUTOMÁTICO) */
+              /* EDITOR DE TÍTULO DE MÓDULO (CON CENTRADO AUTOMÁTICO Y ANCHO DINÁMICO) */
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -4893,7 +5304,7 @@ export default function App() {
                   />
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Puedes arrastrar el cuadro de texto en el plano o usar <strong>Shift + Flechas</strong> para alinearlo con precisión.
+                  El tamaño del cuadro se ajusta automáticamente al texto. Puedes arrastrarlo o usar <strong>Shift + Flechas</strong> para alinearlo con precisión.
                 </p>
               </div>
             ) : selectedKind === 'trunk' ? (
@@ -5360,25 +5771,24 @@ export default function App() {
                   }
                   className="w-4 h-4 accent-emerald-600"
                 />
-                <span className="text-xs font-semibold">
+                <span className="font-semibold">
                   Iniciar con el plano limpio (sin equipos ni canalizaciones previas)
                 </span>
               </label>
 
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowNewProjectModal(false)}
-                  className="px-4 py-2 rounded-xl font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  className="px-4 py-2 rounded-xl font-bold bg-slate-200 dark:bg-slate-800"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2 rounded-xl font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Crear Proyecto</span>
+                  Crear Proyecto
                 </button>
               </div>
             </form>
@@ -5387,113 +5797,145 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: BUSCAR Y GESTIONAR PROYECTOS GUARDADOS EN CLOUD FIRESTORE
+          MODAL: BASE DE DATOS DE PROYECTOS EN LA NUBE (FIREBASE FIRESTORE)
       ==================================================================== */}
       {showCloudModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
+            className={`w-full max-w-3xl max-h-[88vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
               darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-slate-950 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-sky-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Cloud className="w-5 h-5 text-sky-400" />
+                <Cloud className="w-5 h-5" />
                 <div>
                   <h3 className="text-base font-extrabold">
-                    Buscar Proyectos Guardados en Base de Datos
+                    Base de Datos de Proyectos en la Nube
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Carga cualquier centro o proyecto guardado anteriormente en Firebase
+                  <p className="text-xs text-sky-100">
+                    Búsqueda por centro, cliente o proyecto · Sincronización en tiempo real
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowCloudModal(false)}
-                className="p-1 rounded-lg hover:bg-white/10"
+                className="p-1.5 rounded-xl hover:bg-white/20"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto">
-              <div className="flex flex-col sm:flex-row gap-2">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-2.5">
+              <input
+                type="text"
+                placeholder="Buscar proyecto por nombre de centro, cliente o código..."
+                value={cloudSearchQuery}
+                onChange={(e) => setCloudSearchQuery(e.target.value)}
+                className={`w-full px-3.5 py-2 rounded-xl text-xs font-semibold border ${
+                  darkMode
+                    ? 'bg-slate-800 border-slate-700 text-white'
+                    : 'bg-slate-50 border-slate-300 text-slate-900'
+                }`}
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="text"
-                  autoFocus
-                  placeholder="Buscar por nombre de centro, proyecto, cliente o empresa..."
-                  value={cloudSearchQuery}
-                  onChange={(e) => setCloudSearchQuery(e.target.value)}
-                  className={`flex-1 px-3.5 py-2 rounded-xl border text-xs font-semibold ${
+                  placeholder="Nombre del centro / proyecto actual..."
+                  value={blueprintNameInput}
+                  onChange={(e) => setBlueprintNameInput(e.target.value)}
+                  className={`flex-1 min-w-[200px] px-3 py-2 rounded-xl text-xs font-bold border ${
                     darkMode
                       ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-300 text-slate-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
                 <button
-                  onClick={() => handleSaveToCloud()}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-1.5 shrink-0"
+                  onClick={() => handleSaveToCloud(currentBlueprintId, blueprintNameInput)}
+                  disabled={isSavingCloud}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center gap-1.5"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Guardar Actual</span>
                 </button>
+                <button
+                  onClick={() =>
+                    handleSaveToCloud(`plano-${Date.now()}`, `${blueprintNameInput} (Copia)`)
+                  }
+                  disabled={isSavingCloud}
+                  className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Guardar Como Nuevo</span>
+                </button>
               </div>
+            </div>
 
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {filteredBlueprints.length === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-xs text-slate-500">
-                  No se encontraron proyectos con ese criterio en la nube.
+                <div className="text-center py-12 text-slate-400 text-sm">
+                  <Cloud className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="font-bold">No se encontraron proyectos con ese criterio</p>
+                  <p className="text-xs mt-1">
+                    Usa "Nuevo Proyecto" o "Guardar Actual" para almacenar tu centro en la nube.
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-2.5">
-                  {filteredBlueprints.map((bp) => (
+                filteredBlueprints.map((bp) => {
+                  const isCurrent = bp.id === currentBlueprintId;
+                  const displayCenter = bp.companyInfo?.centerName || bp.title || bp.id;
+                  const displayProject = bp.companyInfo?.projectName || bp.projectName || '';
+                  const displayClient = bp.companyInfo?.clientName || bp.clientName || '';
+                  return (
                     <div
                       key={bp.id}
-                      className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        bp.id === currentBlueprintId
+                      className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+                        isCurrent
                           ? 'border-sky-500 bg-sky-500/10'
                           : darkMode
-                          ? 'border-slate-800 bg-slate-800/60'
-                          : 'border-slate-200 bg-slate-50'
+                          ? 'border-slate-800 bg-slate-800/50'
+                          : 'border-slate-200 bg-slate-50/70'
                       }`}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm truncate">
-                            {bp.centerName || bp.title || bp.id}
-                          </span>
-                          {bp.id === currentBlueprintId && (
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-sky-600 text-white">
-                              Abierto
+                          <span className="font-extrabold text-sm truncate">{displayCenter}</span>
+                          {isCurrent && (
+                            <span className="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-extrabold">
+                              Activo
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {bp.projectName || 'Proyecto'} {bp.clientName ? `· Cliente: ${bp.clientName}` : ''}
-                        </div>
+                        {displayProject && (
+                          <div className="text-xs font-semibold text-sky-600 dark:text-sky-400 truncate">
+                            {displayProject} {displayClient ? `· Cliente: ${displayClient}` : ''}
+                          </div>
+                        )}
                         <div className="text-[11px] text-slate-400 mt-0.5">
-                          {bp.totalObjects || 0} equipos · Actualizado:{' '}
-                          {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString('es-CL') : '-'}
+                          {bp.totalCages || 0} jaulas · {bp.totalObjects || 0} equipos ·{' '}
+                          {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString() : 'Sin fecha'}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleLoadFromCloud(bp)}
-                          className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
                         >
                           Abrir Proyecto
                         </button>
                         <button
-                          onClick={() => handleDeleteFromCloud(bp.id, bp.title || bp.id)}
-                          className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/15"
+                          onClick={() => handleDeleteFromCloud(bp.id, displayCenter)}
+                          className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
                           title="Eliminar de la nube"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -5501,183 +5943,294 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: CONFIGURAR EMPRESA Y FIRMA TÉCNICA
+          MODAL: CONFIGURAR EMPRESA, PROYECTO, COORDENADAS Y FIRMA DIGITAL
       ==================================================================== */}
       {showCompanyModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+            className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl p-5 space-y-4 ${
               darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-slate-950 text-white flex items-center justify-between">
-              <h3 className="text-base font-extrabold">Datos de Empresa y Viñeta Técnica</h3>
-              <button onClick={() => setShowCompanyModal(false)} className="p-1">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-extrabold">
+                Datos del Proyecto, Empresa y Responsable Técnico
+              </h3>
+              <button
+                onClick={() => setShowCompanyModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5 space-y-3 text-xs max-h-[80vh] overflow-y-auto">
-              <div>
-                <label className="block font-bold mb-1">Empresa Ejecutora</label>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="sm:col-span-2">
+                <label className="block font-bold mb-1">Nombre del Proyecto</label>
                 <input
                   type="text"
-                  value={companyInfo.companyName}
+                  value={companyInfo.projectName || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border font-semibold ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Cliente / Mandante</label>
+                <input
+                  type="text"
+                  value={companyInfo.clientName || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Centro / Pontón</label>
+                <input
+                  type="text"
+                  value={companyInfo.centerName || ''}
+                  onChange={(e) => {
+                    setCompanyInfo((p) => ({ ...p, centerName: e.target.value }));
+                    setBlueprintNameInput(e.target.value);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-bold mb-1">Descripción del Proyecto</label>
+                <input
+                  type="text"
+                  value={companyInfo.projectDescription || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, projectDescription: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
+                <input
+                  type="text"
+                  placeholder="-41.784520, -73.124890"
+                  value={companyInfo.coordinates || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, coordinates: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border font-mono ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Enlace Google Maps</label>
+                <input
+                  type="url"
+                  placeholder="https://www.google.com/maps/..."
+                  value={companyInfo.googleMapsUrl || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, googleMapsUrl: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1">Empresa Instaladora (Pie PDF)</label>
+                <input
+                  type="text"
+                  value={companyInfo.companyName || ''}
                   onChange={(e) =>
                     setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 />
               </div>
+
               <div>
-                <label className="block font-bold mb-1">Nombre del Proyecto</label>
+                <label className="block font-bold mb-1">Responsable Técnico</label>
                 <input
                   type="text"
-                  value={companyInfo.projectName}
+                  value={companyInfo.responsibleName || ''}
                   onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                    setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Cliente</label>
-                  <input
-                    type="text"
-                    value={companyInfo.clientName || ''}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold mb-1">Nombre del Centro</label>
-                  <input
-                    type="text"
-                    value={companyInfo.centerName}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, centerName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
-                    }`}
-                  />
-                </div>
+
+              <div>
+                <label className="block font-bold mb-1">Cargo</label>
+                <input
+                  type="text"
+                  value={companyInfo.responsibleRole || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, responsibleRole: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Coordenadas</label>
-                  <input
-                    type="text"
-                    value={companyInfo.coordinates || ''}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({
-                        ...p,
-                        coordinates: e.target.value,
-                        googleMapsUrl: buildGoogleMapsLink(e.target.value),
-                      }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border font-mono ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold mb-1">Responsable Técnico</label>
-                  <input
-                    type="text"
-                    value={companyInfo.responsibleName}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-300'
-                    }`}
-                  />
-                </div>
+
+              <div>
+                <label className="block font-bold mb-1">Registro / Licencia SEC</label>
+                <input
+                  type="text"
+                  value={companyInfo.responsibleLicense || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, responsibleLicense: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                />
               </div>
-              <div className="pt-3 flex justify-end">
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
+                <div className="text-xs font-bold">Logotipo Empresa</div>
+                {companyInfo.logoDataUrl && (
+                  <img
+                    src={companyInfo.logoDataUrl}
+                    alt="Logo"
+                    className="max-h-14 mx-auto object-contain"
+                  />
+                )}
                 <button
-                  onClick={() => setShowCompanyModal(false)}
-                  className="px-5 py-2 rounded-xl bg-sky-600 text-white font-extrabold"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-bold"
                 >
-                  Listo
+                  Subir Logo
                 </button>
               </div>
+              <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
+                <div className="text-xs font-bold">Firma Digital</div>
+                {companyInfo.signatureDataUrl && (
+                  <img
+                    src={companyInfo.signatureDataUrl}
+                    alt="Firma"
+                    className="max-h-14 mx-auto object-contain"
+                  />
+                )}
+                <button
+                  onClick={() => signatureInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                >
+                  Subir Firma
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowCompanyModal(false)}
+                className="px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-extrabold"
+              >
+                Listo
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL: INVENTARIO TÉCNICO RESUMIDO Y CUBICACIÓN DE CABLE
+          MODAL: INVENTARIO RESUMIDO POR COMPONENTE GENÉRICO, MARCA Y CABLEADO
       ==================================================================== */}
       {showInventoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
+            className={`w-full max-w-5xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
               darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-violet-700 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-violet-600 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-extrabold">
-                  Inventario Técnico y Cubicación de Cable ({totalCableMeters} m totales)
+                  Resumen de Equipos Instalados (Componente Genérico y Marca) + Cableado
                 </h3>
-                <p className="text-xs text-violet-200">
-                  Equipos agrupados y cálculo automático de canalizaciones por fase
+                <p className="text-xs text-violet-100">
+                  {objects.length} equipos instalados · {(metrics.totalPower / 1000).toFixed(2)} kW · {totalCableMeters} m de cable
                 </p>
               </div>
-              <button onClick={() => setShowInventoryModal(false)} className="p-1">
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="p-1.5 rounded-xl hover:bg-white/20"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 overflow-auto space-y-6">
+
+            <div className="flex-1 overflow-auto p-4 space-y-5">
               <div>
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
-                  Equipos Instalados ({objects.length} unidades)
+                  1. Equipos Agrupados por Componente Genérico, Marca y Características
                 </h4>
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
+                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400">
                       <th className="py-2 px-2 text-center">Cant.</th>
+                      <th className="py-2 px-2">Componente Genérico</th>
+                      <th className="py-2 px-2">Marca</th>
                       <th className="py-2 px-2">TAGs Agrupados</th>
                       <th className="py-2 px-2">Módulo</th>
-                      <th className="py-2 px-2">Especificación</th>
+                      <th className="py-2 px-2">Características Técnicas</th>
+                      <th className="py-2 px-2">Circuito / Fase</th>
+                      <th className="py-2 px-2 text-right">Pot. Unit.</th>
                       <th className="py-2 px-2 text-right">Pot. Total</th>
                       <th className="py-2 px-2">Estado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {summarizedEquipment.map((g) => (
-                      <tr
-                        key={g.key}
-                        onClick={() => {
-                          const firstObj = objects.find((o) => o.tag === g.tags[0]);
-                          if (firstObj) {
-                            setSelectedId(firstObj.id);
-                            setSelectedKind('object');
-                            setShowInventoryModal(false);
-                            setShowRightSidebar(true);
-                          }
-                        }}
-                        className="cursor-pointer hover:bg-sky-500/10"
-                      >
-                        <td className="py-2.5 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
+                      <tr key={g.key} className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="py-2 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
                           {g.count}
                         </td>
-                        <td className="py-2.5 px-2 font-bold">{g.tagsLabel}</td>
-                        <td className="py-2.5 px-2">{g.modulesLabel}</td>
-                        <td className="py-2.5 px-2">{g.spec}</td>
-                        <td className="py-2.5 px-2 text-right font-extrabold">{g.totalPower} W</td>
-                        <td className="py-2.5 px-2">{g.summaryStatus}</td>
+                        <td className="py-2 px-2 font-extrabold">{g.genericName}</td>
+                        <td className="py-2 px-2 font-bold text-indigo-600 dark:text-indigo-400">
+                          {g.brand}
+                        </td>
+                        <td className="py-2 px-2 text-[11px] font-mono">{g.tagsLabel}</td>
+                        <td className="py-2 px-2">{g.modulesLabel}</td>
+                        <td className="py-2 px-2">{g.spec}</td>
+                        <td className="py-2 px-2">
+                          <span
+                            className="inline-flex items-center gap-1.5 font-bold"
+                            style={{ color: phaseConfigs[g.phase]?.color || '#0284c7' }}
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: phaseConfigs[g.phase]?.color || '#0284c7' }}
+                            />
+                            {phaseConfigs[g.phase]?.label || g.phase}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 text-right">{g.unitPower} W</td>
+                        <td className="py-2 px-2 text-right font-extrabold">{g.totalPower} W</td>
+                        <td className="py-2 px-2">{g.summaryStatus}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -5686,45 +6239,44 @@ export default function App() {
 
               <div>
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
-                  Tramos de Canalización y Cable por Fase ({conduits.length} tramos · {totalCableMeters} m)
+                  2. Cubicación de Canalizaciones y Tramos de Cable por Fase
                 </h4>
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
+                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400">
                       <th className="py-2 px-2">TAG Tramo</th>
-                      <th className="py-2 px-2">Fase</th>
-                      <th className="py-2 px-2">Conductor</th>
-                      <th className="py-2 px-2 text-right">Pasillo</th>
-                      <th className="py-2 px-2 text-right">Bajada</th>
+                      <th className="py-2 px-2">Fase Eléctrica</th>
+                      <th className="py-2 px-2">Conductor / Canalización</th>
+                      <th className="py-2 px-2 text-right">Tramo Pasillo</th>
+                      <th className="py-2 px-2 text-right">Bajada / Holgura</th>
                       <th className="py-2 px-2 text-right">Total Cable</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {conduits.map((c) => {
                       const m = calculateConduitMetrics(c);
                       const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
                       return (
-                        <tr
-                          key={c.id}
-                          onClick={() => {
-                            setSelectedId(c.id);
-                            setSelectedKind('conduit');
-                            setShowInventoryModal(false);
-                            setShowRightSidebar(true);
-                          }}
-                          className="cursor-pointer hover:bg-sky-500/10"
-                        >
-                          <td className="py-2 px-2 font-bold">{c.tag}</td>
+                        <tr key={c.id} className="border-b border-slate-100 dark:border-slate-800">
+                          <td className="py-2 px-2 font-extrabold">{c.tag}</td>
                           <td className="py-2 px-2 font-bold" style={{ color: pCfg.color }}>
                             {pCfg.label}
                           </td>
-                          <td className="py-2 px-2">{c.cableSpec}</td>
+                          <td className="py-2 px-2">{c.cableSpec || '-'}</td>
                           <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
                           <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
                           <td className="py-2 px-2 text-right font-extrabold">{m.totalMeters} m</td>
                         </tr>
                       );
                     })}
+                    <tr className="bg-slate-100/70 dark:bg-slate-800/70 font-extrabold">
+                      <td colSpan={5} className="py-2 px-2 text-right">
+                        TOTAL GENERAL DE CABLE UTILIZADO:
+                      </td>
+                      <td className="py-2 px-2 text-right text-sky-600 dark:text-sky-400">
+                        {totalCableMeters} m
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -5734,85 +6286,99 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: VISTA PREVIA DE IMPRESIÓN / PLANO
+          MODAL: VISTA PREVIA DE LÁMINA TÉCNICA (SIN CUADRÍCULA)
       ==================================================================== */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+          <div className="w-full max-w-6xl bg-white text-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
             <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
               <span className="text-sm font-extrabold">
-                Vista Previa de Lámina Técnica · {companyInfo.centerName}
+                Vista Previa de Lámina Técnica (Sin Cuadrícula · Igual a PDF)
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleExportPDF}
-                  className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-extrabold flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-extrabold flex items-center gap-1"
                 >
-                  <Printer className="w-3.5 h-3.5" /> Imprimir / Guardar PDF
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / Guardar PDF</span>
                 </button>
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="p-1 hover:bg-white/15 rounded-lg"
+                  className="p-1.5 rounded-xl hover:bg-white/20"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
-            <div className="p-6 overflow-auto space-y-4">
-              {companyInfo.logoDataUrl && (
-                <div className="flex items-center">
-                  <img
-                    src={companyInfo.logoDataUrl}
-                    alt="Logo Empresa"
-                    className="max-h-20 max-w-[280px] object-contain"
-                  />
-                </div>
-              )}
+            <div className="p-6 overflow-auto bg-slate-100 flex-1 space-y-3">
+              <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-3">
+                {companyInfo.logoDataUrl && (
+                  <div className="flex items-center">
+                    <img
+                      src={companyInfo.logoDataUrl}
+                      alt="Logo"
+                      className="max-h-16 object-contain"
+                    />
+                  </div>
+                )}
 
-              <div
-                className="border border-slate-300 rounded-xl p-2 bg-sky-50"
-                dangerouslySetInnerHTML={{ __html: generateSvgStringForExport() || '' }}
-              />
+                <div
+                  className="border border-slate-300 rounded-lg p-2 bg-white"
+                  dangerouslySetInnerHTML={{ __html: generateSvgStringForExport(true) || '' }}
+                />
 
-              <div className="border-2 border-slate-900 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-slate-500 block">
-                    Proyecto
-                  </span>
-                  <strong className="text-sm">{companyInfo.projectName}</strong>
-                  <p className="text-slate-600 mt-0.5">{companyInfo.projectDescription}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-slate-500 block">
-                    Cliente y Centro
-                  </span>
-                  <strong>{companyInfo.clientName}</strong>
-                  <div className="text-slate-700">{companyInfo.centerName}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-slate-500 block">
-                    Ubicación Geográfica y Cableado
-                  </span>
-                  <a
-                    href={mapsHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sky-700 font-bold underline flex items-center gap-1 mt-0.5"
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>{companyInfo.coordinates || 'Ver en Google Maps'}</span>
-                  </a>
-                  <div className="mt-1 font-extrabold text-slate-800">
-                    Total Cableado: {totalCableMeters} m
+                <div className="grid grid-cols-1 sm:grid-cols-3 border border-slate-900 text-xs">
+                  <div className="p-2.5 border-b sm:border-b-0 sm:border-r border-slate-900">
+                    <div className="text-[10px] font-extrabold uppercase text-slate-500">
+                      Proyecto
+                    </div>
+                    <div className="font-extrabold">{companyInfo.projectName}</div>
+                    <div className="text-[11px] text-slate-600">
+                      {companyInfo.projectDescription}
+                    </div>
+                  </div>
+                  <div className="p-2.5 border-b sm:border-b-0 sm:border-r border-slate-900">
+                    <div className="text-[10px] font-extrabold uppercase text-slate-500">
+                      Cliente & Centro
+                    </div>
+                    <div className="font-bold">Cliente: {companyInfo.clientName}</div>
+                    <div className="font-bold">Centro: {companyInfo.centerName}</div>
+                  </div>
+                  <div className="p-2.5">
+                    <div className="text-[10px] font-extrabold uppercase text-slate-500">
+                      Coordenadas & Cableado
+                    </div>
+                    <a
+                      href={mapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-sky-700 underline block"
+                    >
+                      {companyInfo.coordinates || 'Sin coordenadas'}
+                    </a>
+                    <div className="font-extrabold text-slate-800 mt-1">
+                      Cableado Total: {totalCableMeters} m
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
-                <strong className="text-sm">{companyInfo.companyName}</strong>
-                <span className="text-slate-600">
-                  Responsable: <strong>{companyInfo.responsibleName}</strong>
-                </span>
+                <div className="flex justify-between items-end pt-3 border-t border-slate-200">
+                  <div className="text-sm font-extrabold text-slate-900">
+                    {companyInfo.companyName}
+                  </div>
+                  <div className="text-center text-xs border-t border-slate-400 pt-1 px-6">
+                    {companyInfo.signatureDataUrl && (
+                      <img
+                        src={companyInfo.signatureDataUrl}
+                        alt="Firma"
+                        className="max-h-12 mx-auto mb-1"
+                      />
+                    )}
+                    <div className="font-extrabold">{companyInfo.responsibleName}</div>
+                    <div className="text-slate-600">{companyInfo.responsibleRole}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -5822,12 +6388,12 @@ export default function App() {
       {/* NOTIFICACIÓN FLOTANTE (TOAST) */}
       {toast && (
         <div
-          className={`fixed bottom-24 right-5 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-extrabold text-white flex items-center gap-2 ${
+          className={`fixed bottom-24 right-4 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-extrabold text-white flex items-center gap-2 ${
             toast.type === 'success'
               ? 'bg-emerald-600'
               : toast.type === 'warn'
               ? 'bg-amber-600'
-              : 'bg-slate-800'
+              : 'bg-slate-900'
           }`}
         >
           <CheckCircle2 className="w-4 h-4" />
