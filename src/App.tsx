@@ -3071,36 +3071,75 @@ export default function App() {
       return;
     }
 
+    // Construcción dinámica del Checklist de Sistemas Instalados
+    const installedSystems = [];
+    const hasPhotoperiodLamps = objects.some(
+      (o) =>
+        o.phase === 'fotoperiodo' ||
+        o.icon === 'led_lamp' ||
+        /fotoperiodo/i.test(`${o.label || ''} ${o.spec || ''}`)
+    );
+
+    if (hasPhotoperiodLamps) {
+      installedSystems.push('Fotoperiodo LED');
+    }
+    if (
+      objects.some((o) => o.phase === 'fuerza_aux') ||
+      conduits.some((c) => ['L1', 'L2', 'L3', 'TRIFASICO'].includes(c.phase))
+    ) {
+      installedSystems.push('Fuerza / Iluminación');
+    }
+    if (objects.some((o) => o.phase === 'control') || conduits.some((c) => c.phase === 'CONTROL')) {
+      installedSystems.push('Control / Tableros');
+    }
+    if (objects.some((o) => o.phase === 'monitoreo')) {
+      installedSystems.push('Monitoreo / Cámaras');
+    }
+    if (objects.some((o) => o.phase === 'alimentacion')) {
+      installedSystems.push('Alimentación');
+    }
+
+    const checklistItemsHtml =
+      installedSystems.length > 0
+        ? installedSystems
+            .map(
+              (sys) => `
+              <span style="display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #10b981;color:#065f46;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;">
+                <span style="font-weight:900;color:#059669;">✓</span> ${sys}
+              </span>`
+            )
+            .join(' ')
+        : '<span style="font-size:10.5px;color:#64748b;font-weight:600;">Sin sistemas registrados</span>';
+
     const rowsHtml = summarizedEquipment
-      .map(
-        (g) => `
+      .map((g) => {
+        const cleanTags = (g.tags || []).filter((t) => t && String(t).trim() !== '');
+        const displayTags = cleanTags.length > 0 ? cleanTags.join(', ') : 'SIN INFORMACION';
+        return `
         <tr>
           <td style="text-align:center; font-weight:800;">${g.count}</td>
-          <td style="font-weight:700;">${g.genericName}</td>
-          <td style="font-weight:700; color:#0369a1;">${g.brand}</td>
-          <td style="font-size:10px;">${g.tagsLabel}</td>
+          <td style="font-weight:700; ${cleanTags.length === 0 ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
           <td>${g.modulesLabel}</td>
           <td>${g.spec}</td>
-          <td>${phaseConfigs[g.phase]?.label || g.phase}</td>
+          <td>${PHASE_CONFIG[g.phase]?.label || g.phase}</td>
           <td style="text-align:right;">${g.unitPower} W</td>
           <td style="text-align:right; font-weight:700;">${g.totalPower} W</td>
           <td>${g.summaryStatus}</td>
-        </tr>`
-      )
+        </tr>`;
+      })
       .join('');
 
     const conduitRowsHtml = conduits
       .map((c) => {
-        const m = calculateConduitMetrics(c);
-        const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+        const phaseInfo = CONDUIT_PHASE_CONFIG[c.phase] || { label: c.phase };
+        const meters = computeConduitMeters(c);
         return `
         <tr>
           <td style="font-weight:700;">${c.tag}</td>
-          <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${pCfg.color};margin-right:5px;"></span>${pCfg.label}</td>
+          <td>${phaseInfo.label}</td>
           <td>${c.cableSpec || '-'}</td>
-          <td style="text-align:right;">${m.horizontalMeters} m</td>
-          <td style="text-align:right;">${m.dropMeters} m</td>
-          <td style="text-align:right; font-weight:800;">${m.totalMeters} m</td>
+          <td style="text-align:center;">+${c.slackPercent || 0}%</td>
+          <td style="text-align:right; font-weight:800;">${meters} m</td>
         </tr>`;
       })
       .join('');
@@ -3114,22 +3153,21 @@ export default function App() {
         <style>
           @page { margin: 8mm; }
           body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
-          .header-pdf { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 12px; }
-          .logo { max-height: 70px; max-width: 240px; object-fit: contain; }
-          .platform-title { flex: 1; text-align: center; font-size: 14px; font-weight: 800; letter-spacing: 0.4px; color: #0f172a; }
-          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #ffffff; margin-bottom: 10px; }
+          .logo-bar { margin-bottom: 8px; }
+          .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
+          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
           .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
           .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
           .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
           .tb-label { font-size: 8.5px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
           .tb-val { font-size: 11.5px; font-weight: 700; color: #0f172a; }
-          .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
+          .kpis { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
           .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; background: #f1f5f9; }
-          .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+          .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 3px; }
           .kpi-val { font-size: 13px; font-weight: 800; color: #0f172a; }
-          h4 { font-size: 11px; text-transform: uppercase; margin: 10px 0 4px 0; color: #0f172a; }
-          table.inv { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 12px; }
-          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; }
+          .checklist-wrap { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+          table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
+          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
           table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
           .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
           .company-footer { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
@@ -3138,11 +3176,7 @@ export default function App() {
         </style>
       </head>
       <body>
-        <div class="header-pdf">
-          ${companyInfo.logoDataUrl ? `<img src="${companyInfo.logoDataUrl}" class="logo" />` : '<div></div>'}
-          <div class="platform-title">PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO</div>
-          <div style="width:80px;"></div>
-        </div>
+        ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
 
         <div class="plan-box">${svgString}</div>
 
@@ -3159,11 +3193,13 @@ export default function App() {
         </table>
 
         <div class="kpis">
-          <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${cages.length} Unidades</div></div>
-          <div class="kpi"><div class="kpi-label">Con Fotoperiodo</div><div class="kpi-val">${activePhotoperiodCages} Jaulas</div></div>
-          <div class="kpi"><div class="kpi-label">Equipos Instalados</div><div class="kpi-val">${objects.length} Equipos</div></div>
+          <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${cages.length} (${cages[0]?.dimensions || '30m x 30m'})</div></div>
+          <div class="kpi">
+            <div class="kpi-label">Checklist Sistemas Instalados</div>
+            <div class="checklist-wrap">${checklistItemsHtml}</div>
+          </div>
           <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(totalWatts / 1000).toFixed(2)} kW</div></div>
-          <div class="kpi"><div class="kpi-label">Cableado Total</div><div class="kpi-val">${totalCableMeters} m</div></div>
+          <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${totalCableMetersByPhase.grandTotal} m</div></div>
         </div>
 
         <h4>1. Resumen de Equipos Instalados por Componente Genérico y Marca</h4>
