@@ -63,7 +63,8 @@ const BASE_CAGE_METERS = 30;
 const STANDARD_WALKWAY_WIDTH = 16;
 
 const TYPE_GENERIC_LABELS = {
-  luminaria: 'Proyector LED Fotoperiodo',
+  luminaria: 'Luz Fotoperiodo',
+  proyector_led: 'Proyector LED',
   enchufe_220v: 'Enchufe Industrial 220V',
   fotocelda: 'Fotocelda Crepuscular',
   tablero: 'Tablero Eléctrico IP66',
@@ -197,18 +198,18 @@ const INITIAL_OBJECTS = [
   },
   {
     id: 'OBJ-02',
-    tag: 'PROY-201',
-    genericName: 'Proyector LED Fotoperiodo',
+    tag: 'FOT-201',
+    genericName: 'Luz Fotoperiodo',
     brand: 'Aqualed',
     type: 'luminaria',
-    icon: 'sun',
+    icon: 'submersible',
     phase: 'fotoperiodo',
     power: 1000,
-    rotation: 180,
+    rotation: 0,
     flipX: false,
     flipY: false,
     customColor: '',
-    spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
+    spec: 'Luz Fotoperiodo Sumergible 1000W 5000K',
     status: 'operativo',
     x: 176,
     y: 280,
@@ -219,18 +220,18 @@ const INITIAL_OBJECTS = [
   },
   {
     id: 'OBJ-03',
-    tag: 'PROY-203',
-    genericName: 'Proyector LED Fotoperiodo',
+    tag: 'FOT-203',
+    genericName: 'Luz Fotoperiodo',
     brand: 'Aqualed',
     type: 'luminaria',
-    icon: 'sun',
+    icon: 'submersible',
     phase: 'fotoperiodo',
     power: 1000,
-    rotation: 180,
+    rotation: 0,
     flipX: false,
     flipY: false,
     customColor: '',
-    spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
+    spec: 'Luz Fotoperiodo Sumergible 1000W 5000K',
     status: 'operativo',
     x: 432,
     y: 280,
@@ -241,18 +242,18 @@ const INITIAL_OBJECTS = [
   },
   {
     id: 'OBJ-04',
-    tag: 'PROY-205',
-    genericName: 'Proyector LED Fotoperiodo',
+    tag: 'FOT-205',
+    genericName: 'Luz Fotoperiodo',
     brand: 'Signify / Philips',
     type: 'luminaria',
-    icon: 'sun',
+    icon: 'submersible',
     phase: 'fotoperiodo',
     power: 1000,
-    rotation: 180,
+    rotation: 0,
     flipX: false,
     flipY: false,
     customColor: '',
-    spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
+    spec: 'Luz Fotoperiodo Sumergible 1000W',
     status: 'mantencion',
     x: 688,
     y: 280,
@@ -351,18 +352,18 @@ const INITIAL_OBJECTS = [
   },
   {
     id: 'OBJ-09',
-    tag: 'PROY-102',
-    genericName: 'Proyector LED Fotoperiodo',
+    tag: 'FOT-102',
+    genericName: 'Luz Fotoperiodo',
     brand: 'Aqualed',
     type: 'luminaria',
-    icon: 'sun',
+    icon: 'submersible',
     phase: 'fotoperiodo',
     power: 1000,
-    rotation: 180,
+    rotation: 0,
     flipX: false,
     flipY: false,
     customColor: '',
-    spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
+    spec: 'Luz Fotoperiodo Sumergible 1000W',
     status: 'operativo',
     x: 1304,
     y: 280,
@@ -373,18 +374,18 @@ const INITIAL_OBJECTS = [
   },
   {
     id: 'OBJ-10',
-    tag: 'PROY-104',
-    genericName: 'Proyector LED Fotoperiodo',
+    tag: 'FOT-104',
+    genericName: 'Luz Fotoperiodo',
     brand: 'Signify / Philips',
     type: 'luminaria',
-    icon: 'sun',
+    icon: 'submersible',
     phase: 'fotoperiodo',
     power: 1000,
-    rotation: 180,
+    rotation: 0,
     flipX: false,
     flipY: false,
     customColor: '',
-    spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
+    spec: 'Luz Fotoperiodo Sumergible 1000W',
     status: 'falla',
     x: 1560,
     y: 280,
@@ -530,7 +531,7 @@ const INITIAL_OBJECTS = [
     y: 168,
     moduleId: 'MOD-100',
     locationLabel: 'Mástil Cabecera Módulo 100',
-    description: 'Sensor crepuscular automático para encendido de proyectores sumergibles Módulo 100.',
+    description: 'Sensor crepuscular automático para encendido de luminarias sumergibles Módulo 100.',
     lastInspection: '2026-10-21',
   },
 ];
@@ -581,7 +582,7 @@ const INITIAL_CONDUITS = [
 const INITIAL_COMPANY_INFO = {
   companyName: 'SERVICIOS BEQA SPA',
   projectName: 'Instalación Sistema Fotoperiodo e Infraestructura Eléctrica',
-  projectDescription: 'Distribución de proyectores LED sumergibles, tableros IP66, tomas auxiliares 220V y telemetría en trenes de cultivo.',
+  projectDescription: 'Distribución de luminarias sumergibles de fotoperiodo, proyectores LED, tableros IP66, tomas auxiliares 220V y telemetría en trenes de cultivo.',
   clientName: 'Salmones Austral S.A.',
   centerName: 'Centro de Engorda Navarro · Módulos 200 y 100',
   coordinates: '-41.784520, -73.124890',
@@ -644,7 +645,8 @@ const STATUS_CONFIG = {
 };
 
 const SYMBOL_CATALOG = [
-  { type: 'luminaria', label: 'Proyector LED Fotoperiodo', brand: 'Aqualed', icon: 'sun', phase: 'fotoperiodo', power: 1000, rotation: 180, customColor: '' },
+  { type: 'luminaria', label: 'Luz Fotoperiodo', brand: 'Aqualed', icon: 'submersible', phase: 'fotoperiodo', power: 1000, rotation: 0, customColor: '' },
+  { type: 'proyector_led', label: 'Proyector LED', brand: 'Signify / Philips', icon: 'sun', phase: 'luces_perimetrales', power: 400, rotation: 180, customColor: '' },
   { type: 'enchufe_220v', label: 'Enchufe Industrial 220V', brand: 'Mennekes', icon: 'plug', phase: 'fuerza_aux', power: 3520, rotation: 0, amperage: '16A', ipGrade: 'IP67', customColor: '' },
   { type: 'fotocelda', label: 'Fotocelda Crepuscular', brand: 'Finder', icon: 'eye', phase: 'fotoperiodo', power: 15, rotation: 0, luxThreshold: '15 Lux', controlledCircuit: 'Contactor Fotoperiodo', customColor: '' },
   { type: 'tablero', label: 'Tablero Eléctrico IP66', brand: 'Schneider Electric', icon: 'zap', phase: 'control', power: 1200, rotation: 0, customColor: '' },
@@ -655,7 +657,8 @@ const SYMBOL_CATALOG = [
 ];
 
 const ICON_TO_TYPE_MAP = {
-  sun: 'luminaria',
+  submersible: 'luminaria',
+  sun: 'proyector_led',
   plug: 'enchufe_220v',
   eye: 'fotocelda',
   zap: 'tablero',
@@ -714,10 +717,10 @@ export default function App() {
     editingIndex: null,
     label: '',
     brand: '',
-    icon: 'sun',
+    icon: 'submersible',
     phase: 'fotoperiodo',
     power: 1000,
-    rotation: 180,
+    rotation: 0,
     customColor: '',
   });
 
@@ -725,13 +728,13 @@ export default function App() {
   const [showAddSymbolModal, setShowAddSymbolModal] = useState(false);
   const [batchSymbolForm, setBatchSymbolForm] = useState({
     symbolType: 'luminaria',
-    genericName: 'Proyector LED Fotoperiodo',
-    spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
+    genericName: 'Luz Fotoperiodo',
+    spec: 'Luz Fotoperiodo Sumergible 1000W 5000K',
     phase: 'fotoperiodo',
     power: 1000,
     brand: 'Aqualed',
     quantity: 4,
-    rotation: 180,
+    rotation: 0,
     customColor: '',
     targetModuleId: 'MOD-200',
     saveInPalette: false,
@@ -920,20 +923,26 @@ export default function App() {
   const openAddSymbolModal = (presetItem = null) => {
     const baseItem = presetItem || symbolCatalog[0];
     const defaultMod = modules[0]?.id || 'MOD-200';
+    const defaultSpec =
+      baseItem.type === 'luminaria'
+        ? `Luz Fotoperiodo Sumergible ${baseItem.power || 1000}W 5000K`
+        : baseItem.type === 'proyector_led'
+        ? `Proyector LED Exterior IP66 ${baseItem.power || 400}W`
+        : baseItem.type === 'enchufe_220v'
+        ? 'Toma Industrial CEE 220V 16A 2P+T IP67'
+        : baseItem.type === 'fotocelda'
+        ? 'Fotocelda Crepuscular 220V IP65 (15 Lux)'
+        : `${baseItem.label} (${baseItem.power}W)`;
+
     setBatchSymbolForm({
       symbolType: baseItem.type || 'luminaria',
-      genericName: TYPE_GENERIC_LABELS[baseItem.type] || baseItem.label || 'Proyector LED Fotoperiodo',
-      spec:
-        baseItem.type === 'enchufe_220v'
-          ? 'Toma Industrial CEE 220V 16A 2P+T IP67'
-          : baseItem.type === 'fotocelda'
-          ? 'Fotocelda Crepuscular 220V IP65 (15 Lux)'
-          : `${baseItem.label} (${baseItem.power}W)`,
+      genericName: TYPE_GENERIC_LABELS[baseItem.type] || baseItem.label || 'Luz Fotoperiodo',
+      spec: defaultSpec,
       phase: baseItem.phase || 'fotoperiodo',
       power: Number(baseItem.power) || 0,
       brand: baseItem.brand || 'Aqualed',
-      quantity: 1,
-      rotation: baseItem.rotation ?? (baseItem.type === 'luminaria' ? 180 : 0),
+      quantity: 4,
+      rotation: baseItem.rotation ?? (baseItem.type === 'proyector_led' ? 180 : 0),
       customColor: baseItem.customColor || '',
       targetModuleId: defaultMod,
       saveInPalette: false,
@@ -945,7 +954,11 @@ export default function App() {
     const templateMatch = symbolCatalog.find((s) => s.type === newType) || symbolCatalog[0];
     const genericLabel = TYPE_GENERIC_LABELS[newType] || templateMatch?.label || 'Componente Eléctrico';
     const defaultSpec =
-      newType === 'enchufe_220v'
+      newType === 'luminaria'
+        ? `Luz Fotoperiodo Sumergible ${templateMatch?.power ?? 1000}W 5000K`
+        : newType === 'proyector_led'
+        ? `Proyector LED Exterior IP66 ${templateMatch?.power ?? 400}W`
+        : newType === 'enchufe_220v'
         ? 'Toma Industrial CEE 220V 16A 2P+T IP67'
         : newType === 'fotocelda'
         ? 'Fotocelda Crepuscular 220V IP65 (15 Lux)'
@@ -959,7 +972,7 @@ export default function App() {
       phase: templateMatch?.phase || prev.phase,
       power: templateMatch?.power ?? prev.power,
       brand: templateMatch?.brand || prev.brand,
-      rotation: newType === 'luminaria' ? 180 : 0,
+      rotation: newType === 'proyector_led' ? 180 : 0,
     }));
   };
 
@@ -968,10 +981,16 @@ export default function App() {
     const qty = Math.min(200, Math.max(1, Math.floor(Number(batchSymbolForm.quantity) || 1)));
     const symType = batchSymbolForm.symbolType || 'luminaria';
     const templateMatch = symbolCatalog.find((s) => s.type === symType) || symbolCatalog[0];
-    const iconName = templateMatch?.icon || 'zap';
+    const iconName =
+      symType === 'luminaria'
+        ? 'submersible'
+        : symType === 'proyector_led'
+        ? 'sun'
+        : templateMatch?.icon || 'zap';
 
     const prefixMap = {
-      luminaria: 'PROY',
+      luminaria: 'FOT',
+      proyector_led: 'PROY',
       enchufe_220v: 'ENCH',
       fotocelda: 'FC',
       tablero: 'TAB',
@@ -988,7 +1007,6 @@ export default function App() {
 
     const existingCount = objects.filter((o) => o.type === symType).length;
 
-    // Determinar punto de partida en el pasillo central del módulo seleccionado o centro visible
     const modCages = cages.filter((c) => c.moduleId === modId);
     let startX = 180;
     let startY = 280;
@@ -1548,10 +1566,10 @@ export default function App() {
       editingIndex: null,
       label: '',
       brand: '',
-      icon: 'sun',
+      icon: 'submersible',
       phase: 'fotoperiodo',
       power: 1000,
-      rotation: 180,
+      rotation: 0,
       customColor: '',
     });
     setIsEditingCatalog(false);
@@ -1565,7 +1583,7 @@ export default function App() {
       editingIndex: idx,
       label: item.label,
       brand: item.brand || '',
-      icon: item.icon || 'zap',
+      icon: item.icon || (item.type === 'luminaria' ? 'submersible' : 'zap'),
       phase: item.phase || 'control',
       power: Number(item.power) || 0,
       rotation: Number(item.rotation) || 0,
@@ -2214,7 +2232,8 @@ export default function App() {
     const modId = detectModuleId(snapped.x);
     const modShort = modId === 'MOD-200' ? '200' : '100';
     const prefixMap = {
-      luminaria: 'PROY',
+      luminaria: 'FOT',
+      proyector_led: 'PROY',
       enchufe_220v: 'ENCH',
       fotocelda: 'FC',
       tablero: 'TAB',
@@ -2226,7 +2245,11 @@ export default function App() {
     const prefix = prefixMap[placeTemplate.type] || placeTemplate.type.slice(0, 3).toUpperCase();
     const count = objects.filter((o) => o.type === placeTemplate.type).length + 1;
     const defaultSpec =
-      placeTemplate.type === 'enchufe_220v'
+      placeTemplate.type === 'luminaria'
+        ? `Luz Fotoperiodo Sumergible ${placeTemplate.power || 1000}W 5000K`
+        : placeTemplate.type === 'proyector_led'
+        ? `Proyector LED Exterior IP66 ${placeTemplate.power || 400}W`
+        : placeTemplate.type === 'enchufe_220v'
         ? `Toma Industrial CEE 220V ${placeTemplate.amperage || '16A'} 2P+T ${placeTemplate.ipGrade || 'IP67'}`
         : placeTemplate.type === 'fotocelda'
         ? `Fotocelda Crepuscular ${placeTemplate.luxThreshold || '15 Lux'} (${placeTemplate.controlledCircuit || `Módulo ${modShort}`})`
@@ -2241,10 +2264,15 @@ export default function App() {
       genericName,
       brand: placeTemplate.brand || 'Genérico',
       type: placeTemplate.type,
-      icon: placeTemplate.icon,
+      icon:
+        placeTemplate.type === 'luminaria'
+          ? 'submersible'
+          : placeTemplate.type === 'proyector_led'
+          ? 'sun'
+          : placeTemplate.icon,
       phase: placeTemplate.phase,
       power: placeTemplate.power,
-      rotation: placeTemplate.rotation ?? 180,
+      rotation: placeTemplate.rotation ?? (placeTemplate.type === 'proyector_led' ? 180 : 0),
       flipX: false,
       flipY: false,
       customColor: placeTemplate.customColor || '',
@@ -3281,7 +3309,7 @@ export default function App() {
   const renderSymbolGraphic = (obj, isSelected) => {
     const phaseColor = phaseConfigs[obj.phase]?.color || '#0284c7';
     const effectiveColor = obj.customColor && obj.customColor.trim() ? obj.customColor.trim() : phaseColor;
-    const luminariaStroke = obj.customColor && obj.customColor.trim() ? obj.customColor.trim() : '#1d4ed8';
+    const proyectorStroke = obj.customColor && obj.customColor.trim() ? obj.customColor.trim() : '#1d4ed8';
     const statusColor = STATUS_CONFIG[obj.status]?.color || '#10b981';
     const rot = Number(obj.rotation) || 0;
     const scaleX = obj.flipX ? -1 : 1;
@@ -3301,10 +3329,108 @@ export default function App() {
 
         <g transform={`scale(${scaleX}, ${scaleY}) rotate(${rot})`}>
           {obj.type === 'luminaria' ? (
+            /* ÍCONO SUMERGIBLE PARA LUZ FOTOPERIODO (IP68 SUBACUÁTICO) */
+            <g>
+              {/* Halo luminoso sumergido 360° */}
+              <circle
+                cx="0"
+                cy="2"
+                r="22"
+                fill={effectiveColor}
+                fillOpacity="0.22"
+                pointerEvents="none"
+              />
+
+              {/* Ondas de agua subacuáticas laterales */}
+              <path
+                d="M -18,-4 Q -15,-7 -12,-4 Q -9,-1 -6,-4"
+                fill="none"
+                stroke="#0284c7"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 6,-4 Q 9,-7 12,-4 Q 15,-1 18,-4"
+                fill="none"
+                stroke="#0284c7"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+
+              {/* Cable umbilical y prensaestopa estanco IP68 superior */}
+              <line
+                x1="0"
+                y1="-20"
+                x2="0"
+                y2="-14"
+                stroke={effectiveColor}
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              />
+              <rect
+                x="-3.2"
+                y="-15"
+                width="6.4"
+                height="4"
+                rx="1.2"
+                fill={effectiveColor}
+              />
+
+              {/* Cabezal superior hermético */}
+              <rect
+                x="-6.5"
+                y="-11.5"
+                width="13"
+                height="4.5"
+                rx="1.8"
+                fill={darkMode ? '#1e293b' : '#ffffff'}
+                stroke={effectiveColor}
+                strokeWidth="2"
+              />
+
+              {/* Tubo difusor central sumergible */}
+              <rect
+                x="-5.5"
+                y="-7"
+                width="11"
+                height="16.5"
+                rx="4.5"
+                fill="#fef3c7"
+                stroke={effectiveColor}
+                strokeWidth="2"
+              />
+
+              {/* Núcleo LED interior */}
+              <rect
+                x="-2.2"
+                y="-4.5"
+                width="4.4"
+                height="11.5"
+                rx="2"
+                fill={effectiveColor}
+              />
+
+              {/* Canastillo protector y lastre inferior */}
+              <line x1="-6.5" y1="-2" x2="6.5" y2="-2" stroke={effectiveColor} strokeWidth="1.4" />
+              <line x1="-6.5" y1="4" x2="6.5" y2="4" stroke={effectiveColor} strokeWidth="1.4" />
+              <path
+                d="M -5.5,9.5 L 5.5,9.5 L 3.8,13.5 L -3.8,13.5 Z"
+                fill={effectiveColor}
+              />
+
+              {/* Rayos radiales subacuáticos */}
+              <line x1="-10" y1="-1" x2="-15" y2="-3" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="-10" y1="5" x2="-15" y2="8" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="10" y1="-1" x2="15" y2="-3" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="10" y1="5" x2="15" y2="8" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="0" y1="15.5" x2="0" y2="20" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
+            </g>
+          ) : obj.type === 'proyector_led' ? (
+            /* ÍCONO PROYECTOR LED DIRECCIONAL */
             <g>
               <polygon
                 points="10,-12 46,-26 46,26 10,12"
-                fill={luminariaStroke}
+                fill={proyectorStroke}
                 fillOpacity="0.22"
                 pointerEvents="none"
               />
@@ -3313,7 +3439,7 @@ export default function App() {
                 y1="-8"
                 x2="40"
                 y2="-18"
-                stroke={luminariaStroke}
+                stroke={proyectorStroke}
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
@@ -3323,7 +3449,7 @@ export default function App() {
                 y1="0"
                 x2="43"
                 y2="0"
-                stroke={luminariaStroke}
+                stroke={proyectorStroke}
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
@@ -3333,7 +3459,7 @@ export default function App() {
                 y1="8"
                 x2="40"
                 y2="18"
-                stroke={luminariaStroke}
+                stroke={proyectorStroke}
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
@@ -3345,13 +3471,13 @@ export default function App() {
                 width="4.5"
                 height="4.8"
                 rx="1.5"
-                fill={luminariaStroke}
+                fill={proyectorStroke}
               />
 
               <path
                 d="M -3,-14.5 L -11.5,-14.5 L -11.5,14.5 L -3,14.5"
                 fill="none"
-                stroke={luminariaStroke}
+                stroke={proyectorStroke}
                 strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -3364,14 +3490,14 @@ export default function App() {
                 height="23"
                 rx="1.2"
                 fill={darkMode ? '#1e293b' : '#ffffff'}
-                stroke={luminariaStroke}
+                stroke={proyectorStroke}
                 strokeWidth="1.8"
               />
-              <line x1="-8.5" y1="-7.5" x2="-4" y2="-7.5" stroke={luminariaStroke} strokeWidth="1.4" />
-              <line x1="-8.5" y1="-3.8" x2="-4" y2="-3.8" stroke={luminariaStroke} strokeWidth="1.4" />
-              <line x1="-8.5" y1="0" x2="-4" y2="0" stroke={luminariaStroke} strokeWidth="1.4" />
-              <line x1="-8.5" y1="3.8" x2="-4" y2="3.8" stroke={luminariaStroke} strokeWidth="1.4" />
-              <line x1="-8.5" y1="7.5" x2="-4" y2="7.5" stroke={luminariaStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="-7.5" x2="-4" y2="-7.5" stroke={proyectorStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="-3.8" x2="-4" y2="-3.8" stroke={proyectorStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="0" x2="-4" y2="0" stroke={proyectorStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="3.8" x2="-4" y2="3.8" stroke={proyectorStroke} strokeWidth="1.4" />
+              <line x1="-8.5" y1="7.5" x2="-4" y2="7.5" stroke={proyectorStroke} strokeWidth="1.4" />
 
               <rect
                 x="-4"
@@ -3380,7 +3506,7 @@ export default function App() {
                 height="25"
                 rx="3"
                 fill={darkMode ? '#0f172a' : '#ffffff'}
-                stroke={luminariaStroke}
+                stroke={proyectorStroke}
                 strokeWidth="2.2"
               />
 
@@ -3391,7 +3517,7 @@ export default function App() {
                     cx={cx}
                     cy={cy}
                     r="1.05"
-                    fill={luminariaStroke}
+                    fill={proyectorStroke}
                   />
                 ))
               )}
@@ -3500,25 +3626,43 @@ export default function App() {
   };
 
   const renderPalettePreviewIcon = (iconName, colorOverride = '') => {
-    const strokeCol = colorOverride || '#1d4ed8';
+    const strokeCol = colorOverride || '#f59e0b';
+    const proyCol = colorOverride || '#1d4ed8';
     switch (iconName) {
+      case 'submersible':
+        return (
+          <svg viewBox="0 0 32 32" className="w-5 h-5">
+            <g transform="translate(16, 16)">
+              <circle cx="0" cy="1" r="13" fill={strokeCol} fillOpacity="0.2" />
+              <line x1="0" y1="-14" x2="0" y2="-9" stroke={strokeCol} strokeWidth="2.2" strokeLinecap="round" />
+              <rect x="-5.5" y="-9" width="11" height="3.5" rx="1.5" fill={strokeCol} />
+              <rect x="-4.5" y="-5.5" width="9" height="14" rx="4" fill="#fef3c7" stroke={strokeCol} strokeWidth="1.8" />
+              <rect x="-1.8" y="-3.5" width="3.6" height="9.5" rx="1.5" fill={strokeCol} />
+              <line x1="-5" y1="0" x2="5" y2="0" stroke={strokeCol} strokeWidth="1.3" />
+              <line x1="-5" y1="4.5" x2="5" y2="4.5" stroke={strokeCol} strokeWidth="1.3" />
+              <path d="M -4,8.5 L 4,8.5 L 2.8,11.5 L -2.8,11.5 Z" fill={strokeCol} />
+              <line x1="-8" y1="0" x2="-12" y2="-2" stroke={strokeCol} strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="8" y1="0" x2="12" y2="-2" stroke={strokeCol} strokeWidth="1.5" strokeLinecap="round" />
+            </g>
+          </svg>
+        );
       case 'sun':
         return (
           <svg viewBox="0 0 32 32" className="w-5 h-5">
             <g transform="translate(13, 18) rotate(-42)">
-              <polygon points="6,-8 22,-15 22,15 6,8" fill={strokeCol} fillOpacity="0.25" />
-              <line x1="8" y1="-4" x2="19" y2="-9" stroke={strokeCol} strokeWidth="1.3" strokeDasharray="2 2" />
-              <line x1="8" y1="0" x2="20" y2="0" stroke={strokeCol} strokeWidth="1.3" strokeDasharray="2 2" />
-              <line x1="8" y1="4" x2="19" y2="9" stroke={strokeCol} strokeWidth="1.3" strokeDasharray="2 2" />
-              <rect x="-11" y="-2" width="3.5" height="4" rx="1" fill={strokeCol} />
-              <path d="M -2,-10 L -8,-10 L -8,10 L -2,10" fill="none" stroke={strokeCol} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <rect x="-3" y="-8.5" width="9" height="17" rx="2" fill="#ffffff" stroke={strokeCol} strokeWidth="1.8" />
-              <circle cx="0" cy="-4" r="1" fill={strokeCol} />
-              <circle cx="3" cy="-4" r="1" fill={strokeCol} />
-              <circle cx="0" cy="0" r="1" fill={strokeCol} />
-              <circle cx="3" cy="0" r="1" fill={strokeCol} />
-              <circle cx="0" cy="4" r="1" fill={strokeCol} />
-              <circle cx="3" cy="4" r="1" fill={strokeCol} />
+              <polygon points="6,-8 22,-15 22,15 6,8" fill={proyCol} fillOpacity="0.25" />
+              <line x1="8" y1="-4" x2="19" y2="-9" stroke={proyCol} strokeWidth="1.3" strokeDasharray="2 2" />
+              <line x1="8" y1="0" x2="20" y2="0" stroke={proyCol} strokeWidth="1.3" strokeDasharray="2 2" />
+              <line x1="8" y1="4" x2="19" y2="9" stroke={proyCol} strokeWidth="1.3" strokeDasharray="2 2" />
+              <rect x="-11" y="-2" width="3.5" height="4" rx="1" fill={proyCol} />
+              <path d="M -2,-10 L -8,-10 L -8,10 L -2,10" fill="none" stroke={proyCol} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="-3" y="-8.5" width="9" height="17" rx="2" fill="#ffffff" stroke={proyCol} strokeWidth="1.8" />
+              <circle cx="0" cy="-4" r="1" fill={proyCol} />
+              <circle cx="3" cy="-4" r="1" fill={proyCol} />
+              <circle cx="0" cy="0" r="1" fill={proyCol} />
+              <circle cx="3" cy="0" r="1" fill={proyCol} />
+              <circle cx="0" cy="4" r="1" fill={proyCol} />
+              <circle cx="3" cy="4" r="1" fill={proyCol} />
             </g>
           </svg>
         );
@@ -3665,7 +3809,6 @@ export default function App() {
 
         {/* Derecha: Acciones Principales */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* BOTÓN DIRECTO AGREGAR SÍMBOLO (INSERCIÓN MÚLTIPLE) */}
           <button
             onClick={() => openAddSymbolModal()}
             className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5 shadow-xs transition-colors"
@@ -3911,7 +4054,6 @@ export default function App() {
               darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
             }`}
           >
-            {/* BOTÓN DESTACADO PARA AGREGAR SÍMBOLOS EN LOTE O INDIVIDUAL */}
             <div>
               <button
                 type="button"
@@ -3929,7 +4071,6 @@ export default function App() {
                 Herramientas de Trazado
               </span>
 
-              {/* 1. Dibujar Canalización por Fase */}
               <div
                 className={`p-2.5 rounded-xl border space-y-2 ${
                   activeTool === 'draw_conduit'
@@ -4018,7 +4159,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 2. Dibujar Jaula con Separación Estándar */}
               <div
                 className={`p-2.5 rounded-xl border space-y-2 ${
                   activeTool === 'draw_cage'
@@ -4129,7 +4269,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* PALETA RÁPIDA DE SIMBOLOGÍA (1 A 1 O ABRIR MENÚ POR CANTIDAD) */}
+            {/* PALETA RÁPIDA DE SIMBOLOGÍA */}
             <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
@@ -4141,10 +4281,10 @@ export default function App() {
                       editingIndex: null,
                       label: '',
                       brand: '',
-                      icon: 'sun',
+                      icon: 'submersible',
                       phase: Object.keys(phaseConfigs)[0] || 'fotoperiodo',
                       power: 1000,
-                      rotation: 180,
+                      rotation: 0,
                       customColor: '',
                     });
                     setIsEditingCatalog((v) => !v);
@@ -4178,7 +4318,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="Ej. Proyector LED 1500W"
+                      placeholder="Ej. Proyector LED 500W"
                       value={catalogForm.label}
                       onChange={(e) =>
                         setCatalogForm((prev) => ({ ...prev, label: e.target.value }))
@@ -4226,6 +4366,7 @@ export default function App() {
                             : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       >
+                        <option value="submersible">Luz Fotoperiodo (Sumergible)</option>
                         <option value="sun">Proyector LED</option>
                         <option value="plug">Enchufe 220V</option>
                         <option value="eye">Fotocelda</option>
@@ -4313,6 +4454,12 @@ export default function App() {
                   const isActivePlace =
                     activeTool === 'place' && placeTemplate?.label === item.label;
                   const itemColor = item.customColor || phaseConfigs[item.phase]?.color || '';
+                  const previewIcon =
+                    item.type === 'luminaria'
+                      ? 'submersible'
+                      : item.type === 'proyector_led'
+                      ? 'sun'
+                      : item.icon;
                   return (
                     <div
                       key={`${item.label}-${idx}`}
@@ -4331,7 +4478,7 @@ export default function App() {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
-                          {renderPalettePreviewIcon(item.icon, itemColor)}
+                          {renderPalettePreviewIcon(previewIcon, itemColor)}
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-bold truncate">{item.label}</div>
@@ -5508,7 +5655,7 @@ export default function App() {
                   </label>
                   <input
                     type="text"
-                    placeholder="Ej. Proyector LED Fotoperiodo"
+                    placeholder="Ej. Luz Fotoperiodo / Proyector LED"
                     value={
                       selectedObject.genericName !== undefined
                         ? selectedObject.genericName
@@ -5642,33 +5789,39 @@ export default function App() {
                             : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
-                      {renderBasic32ColorGrid(circuitForm.color, (hex) =>
-                        setCircuitForm((p) => ({ ...p, color: hex }))
-                      )}
-                      <div className="flex justify-end gap-1.5">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                          Color del Circuito (32 colores básicos)
+                        </label>
+                        {renderBasic32ColorGrid(circuitForm.color, (hex) =>
+                          setCircuitForm((p) => ({ ...p, color: hex }))
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="submit"
+                          className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold"
+                        >
+                          Guardar Circuito
+                        </button>
                         <button
                           type="button"
                           onClick={() => setCircuitEditorMode(null)}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-200 dark:bg-slate-700"
+                          className="px-2 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-[11px] font-bold"
                         >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-3 py-1 rounded-lg text-[11px] font-extrabold bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                          Guardar Circuito
+                          Cerrar
                         </button>
                       </div>
                     </form>
                   )}
                 </div>
 
+                {/* Paleta de 32 colores básicos para el símbolo */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold flex items-center gap-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold flex items-center gap-1">
                       <Palette className="w-3.5 h-3.5 text-sky-500" />
-                      <span>Color de la Simbología (32 colores)</span>
+                      <span>Color del Símbolo (32 colores)</span>
                     </label>
                     {selectedObject.customColor && (
                       <button
@@ -5676,104 +5829,87 @@ export default function App() {
                         onClick={() => updateSelectedObject('customColor', '')}
                         className="text-[10px] font-extrabold text-sky-600 dark:text-sky-400 hover:underline"
                       >
-                        Usar color circuito
+                        Usar color del circuito
                       </button>
                     )}
                   </div>
-                  {renderBasic32ColorGrid(selectedObject.customColor, (hex) =>
-                    updateSelectedObject('customColor', hex)
+                  {renderBasic32ColorGrid(
+                    selectedObject.customColor || phaseConfigs[selectedObject.phase]?.color || '',
+                    (hex) => updateSelectedObject('customColor', hex)
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold mb-1.5">
-                    Volteo Asimétrico (Tipo Espejo)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updateSelectedObject('flipX', !selectedObject.flipX)}
-                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
-                        selectedObject.flipX
-                          ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-300'
-                          : darkMode
-                          ? 'border-slate-700 bg-slate-800 text-slate-300'
-                          : 'border-slate-200 bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <FlipHorizontal2 className="w-4 h-4" />
-                      <span>Espejo Horizontal</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateSelectedObject('flipY', !selectedObject.flipY)}
-                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
-                        selectedObject.flipY
-                          ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-300'
-                          : darkMode
-                          ? 'border-slate-700 bg-slate-800 text-slate-300'
-                          : 'border-slate-200 bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <FlipVertical2 className="w-4 h-4" />
-                      <span>Espejo Vertical</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs font-bold mb-1.5">
-                    <span>Orientación / Ángulo del Haz (°)</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min="0"
-                        max="360"
-                        step="1"
-                        value={selectedObject.rotation ?? 0}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          const clamped = Number.isNaN(val)
-                            ? 0
-                            : ((val % 360) + 360) % 360;
-                          updateSelectedObject('rotation', val === 360 ? 360 : clamped);
-                        }}
-                        className={`w-20 px-2 py-1 rounded-lg text-right text-xs font-extrabold border ${
-                          darkMode
-                            ? 'bg-slate-800 border-slate-600 text-sky-400'
-                            : 'bg-slate-50 border-slate-300 text-sky-700'
-                        }`}
-                      />
-                      <span className="text-sky-500 font-extrabold">°</span>
-                    </div>
+                {/* Orientación, Giro y Simetría */}
+                <div
+                  className={`p-3 rounded-xl border space-y-2.5 ${
+                    darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span>Orientación / Giro (°)</span>
+                    <span className="text-sky-500 font-extrabold">
+                      {selectedObject.rotation || 0}°
+                    </span>
                   </div>
                   <input
                     type="range"
                     min="0"
                     max="360"
-                    step="1"
-                    value={selectedObject.rotation ?? 0}
+                    step="15"
+                    value={selectedObject.rotation || 0}
                     onChange={(e) => updateSelectedObject('rotation', Number(e.target.value))}
                     className="w-full accent-sky-600"
                   />
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedObject('flipX', !selectedObject.flipX)}
+                      className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
+                        selectedObject.flipX
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : darkMode
+                          ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-sky-500'
+                          : 'bg-white border-slate-300 text-slate-800 hover:border-sky-500'
+                      }`}
+                    >
+                      <FlipHorizontal2 className="w-3.5 h-3.5" />
+                      <span>Voltear Horiz.</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedObject('flipY', !selectedObject.flipY)}
+                      className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
+                        selectedObject.flipY
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : darkMode
+                          ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-sky-500'
+                          : 'bg-white border-slate-300 text-slate-800 hover:border-sky-500'
+                      }`}
+                    >
+                      <FlipVertical2 className="w-3.5 h-3.5" />
+                      <span>Voltear Vert.</span>
+                    </button>
+                  </div>
                 </div>
 
+                {/* Estado Operativo */}
                 <div>
-                  <label className="block text-xs font-bold mb-1.5">Estado Operativo</label>
+                  <label className="block text-xs font-bold mb-1">Estado Operativo</label>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                    {Object.entries(STATUS_CONFIG).map(([k, st]) => (
                       <button
-                        key={key}
-                        onClick={() => updateSelectedObject('status', key)}
-                        className={`py-2 px-2 rounded-xl text-[11px] font-extrabold border transition-all ${
-                          selectedObject.status === key
-                            ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-300'
-                            : darkMode
-                            ? 'border-slate-700 bg-slate-800 text-slate-400'
-                            : 'border-slate-200 bg-slate-50 text-slate-600'
+                        key={k}
+                        onClick={() => updateSelectedObject('status', k)}
+                        className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold border transition-all ${
+                          selectedObject.status === k
+                            ? 'border-slate-900 dark:border-white ring-1 ring-sky-500'
+                            : 'border-slate-200 dark:border-slate-700 opacity-70'
                         }`}
                       >
-                        {cfg.label}
+                        <span className={`inline-block w-2 h-2 rounded-full mr-1 ${st.dot}`} />
+                        {st.label.split(' ')[0]}
                       </button>
                     ))}
                   </div>
@@ -5792,237 +5928,149 @@ export default function App() {
                     }`}
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Observaciones de Terreno</label>
+                  <textarea
+                    rows={2}
+                    value={selectedObject.description || ''}
+                    onChange={(e) => updateSelectedObject('description', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
               </div>
             ) : selectedConduit ? (
               /* EDITOR DE CANALIZACIÓN SELECCIONADA */
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase text-rose-500">
-                      Canalización / Tramo Eléctrico
-                    </span>
-                    <h2 className="text-lg font-extrabold">{selectedConduit.tag}</h2>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={copySelectedToClipboard}
-                      className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
-                      title="Copiar (Ctrl+C)"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={cutSelectedToClipboard}
-                      className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
-                      title="Cortar (Ctrl+X)"
-                    >
-                      <Scissors className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => deleteConduit(selectedConduit.id)}
-                      className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                      title="Eliminar canalización (Supr)"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">Identificador de Tramo (TAG)</label>
-                  <input
-                    type="text"
-                    value={selectedConduit.tag}
-                    onChange={(e) => updateSelectedConduit('tag', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">Fase Eléctrica</label>
-                  <select
-                    value={selectedConduit.phase}
-                    onChange={(e) => updateSelectedConduit('phase', e.target.value)}
-                    className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  >
-                    {Object.entries(CONDUIT_PHASE_CONFIG).map(([k, v]) => (
-                      <option key={k} value={k}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">
-                    Tipo de Conductor y Canalización
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedConduit.cableSpec || ''}
-                    onChange={(e) => updateSelectedConduit('cableSpec', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">
-                    Bajada Sumergida / Holgura Vertical (m)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={selectedConduit.dropMeters ?? 0}
-                    onChange={(e) => updateSelectedConduit('dropMeters', Number(e.target.value))}
-                    className={`w-full px-3 py-2 rounded-xl text-sm font-extrabold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-sky-400'
-                        : 'bg-slate-50 border-slate-200 text-sky-700'
-                    }`}
-                  />
-                </div>
-
+              <div className="space-y-4">
                 {(() => {
-                  const m = calculateConduitMetrics(selectedConduit);
+                  const cMetrics = calculateConduitMetrics(selectedConduit);
+                  const pCfg =
+                    CONDUIT_PHASE_CONFIG[selectedConduit.phase] || CONDUIT_PHASE_CONFIG.fase_r;
                   return (
-                    <div
-                      className={`p-3 rounded-xl border space-y-1.5 text-xs ${
-                        darkMode
-                          ? 'bg-slate-800/70 border-slate-700'
-                          : 'bg-sky-50 border-sky-200'
-                      }`}
-                    >
-                      <div className="font-extrabold text-sky-600 dark:text-sky-400 uppercase text-[10px]">
-                        Cubicación Automática del Tramo
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-extrabold uppercase text-rose-500">
+                            Canalización Eléctrica
+                          </span>
+                          <h2 className="text-lg font-extrabold">{selectedConduit.tag}</h2>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={copySelectedToClipboard}
+                            className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
+                            title="Copiar (Ctrl+C)"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={cutSelectedToClipboard}
+                            className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                            title="Cortar (Ctrl+X)"
+                          >
+                            <Scissors className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteConduit(selectedConduit.id)}
+                            className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                            title="Eliminar canalización (Supr)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Recorrido Horizontal:</span>
-                        <span className="font-bold">{m.horizontalMeters} m</span>
+
+                      <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-[10px] text-slate-500 font-bold">Pasillo</div>
+                          <div className="text-sm font-extrabold">{cMetrics.horizontalMeters} m</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 font-bold">Bajada</div>
+                          <div className="text-sm font-extrabold">{cMetrics.dropMeters} m</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-sky-600 font-extrabold">Total Cable</div>
+                          <div className="text-sm font-extrabold text-sky-600 dark:text-sky-400">
+                            {cMetrics.totalMeters} m
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Bajada / Holgura:</span>
-                        <span className="font-bold">{m.dropMeters} m</span>
+
+                      <div>
+                        <label className="block text-xs font-bold mb-1">TAG del Tramo</label>
+                        <input
+                          type="text"
+                          value={selectedConduit.tag}
+                          onChange={(e) => updateSelectedConduit('tag', e.target.value)}
+                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-900'
+                          }`}
+                        />
                       </div>
-                      <div className="flex justify-between border-t border-slate-300 dark:border-slate-700 pt-1.5 text-sm font-extrabold">
-                        <span>Total Cable Tramo:</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">
-                          {m.totalMeters} m
-                        </span>
+
+                      <div>
+                        <label className="block text-xs font-bold mb-1">Fase Eléctrica</label>
+                        <select
+                          value={selectedConduit.phase}
+                          onChange={(e) => updateSelectedConduit('phase', e.target.value)}
+                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-900'
+                          }`}
+                          style={{ borderLeftWidth: '6px', borderLeftColor: pCfg.color }}
+                        >
+                          {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
+                            <option key={key} value={key}>
+                              {cfg.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    </div>
+
+                      <div>
+                        <label className="block text-xs font-bold mb-1">
+                          Bajada / Holgura Vertical (metros)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={selectedConduit.dropMeters ?? 0}
+                          onChange={(e) =>
+                            updateSelectedConduit('dropMeters', Number(e.target.value))
+                          }
+                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-900'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold mb-1">Tipo de Conductor</label>
+                        <input
+                          type="text"
+                          value={selectedConduit.cableSpec || ''}
+                          onChange={(e) => updateSelectedConduit('cableSpec', e.target.value)}
+                          className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-900'
+                          }`}
+                        />
+                      </div>
+                    </>
                   );
                 })()}
-              </div>
-            ) : selectedModule ? (
-              /* EDITOR DE MÓDULO DE CULTIVO */
-              <div className="space-y-4">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                    Módulo de Cultivo Seleccionado
-                  </span>
-                  <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">Nombre del Módulo</label>
-                  <input
-                    type="text"
-                    value={selectedModule.name}
-                    onChange={(e) => updateSelectedModule('name', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-sm font-extrabold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">Subtítulo / Descripción del Tren</label>
-                  <input
-                    type="text"
-                    value={selectedModule.subtitle || ''}
-                    onChange={(e) => updateSelectedModule('subtitle', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => centerModuleHeaderOverCages(selectedModule.id)}
-                    className="py-2 px-3 rounded-xl text-xs font-extrabold bg-sky-600 text-white hover:bg-sky-700 flex items-center justify-center gap-1.5"
-                  >
-                    <AlignCenterHorizontal className="w-3.5 h-3.5" />
-                    <span>Centrar Encabezado</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateSelectedModule('headerOffsetX', 0);
-                      updateSelectedModule('headerOffsetY', 0);
-                    }}
-                    className="py-2 px-3 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 hover:bg-sky-500/20"
-                  >
-                    Alinear Izquierda
-                  </button>
-                </div>
-              </div>
-            ) : selectedKind === 'trunk' ? (
-              /* EDITOR DE ETIQUETA DE TRONCAL */
-              <div className="space-y-4">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                    Línea Troncal entre Módulos
-                  </span>
-                  <h2 className="text-lg font-extrabold">Etiqueta de Troncal Submarina</h2>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">Texto de la Etiqueta</label>
-                  <input
-                    type="text"
-                    value={trunkLabel}
-                    onChange={(e) => setTrunkLabel(e.target.value)}
-                    placeholder="Ej. Troncal Submarina 224m"
-                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-bold">Mostrar etiqueta en el plano</span>
-                  <button
-                    onClick={() => setShowTrunkLabel((v) => !v)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold ${
-                      showTrunkLabel
-                        ? 'bg-sky-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {showTrunkLabel ? 'Visible' : 'Oculta'}
-                  </button>
-                </div>
               </div>
             ) : selectedCage ? (
               /* EDITOR DE JAULA SELECCIONADA */
@@ -6030,10 +6078,13 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-extrabold uppercase text-amber-500">
-                      Unidad de Cultivo Seleccionada
+                      Unidad de Cultivo (Balsa Jaula)
                     </span>
                     <h2 className="text-lg font-extrabold">
-                      Jaula {selectedCage.label || selectedCage.number}
+                      Jaula{' '}
+                      {selectedCage.label !== undefined
+                        ? selectedCage.label
+                        : selectedCage.number}
                     </h2>
                   </div>
                   <div className="flex items-center gap-1">
@@ -6063,74 +6114,66 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold mb-1">
-                    Número o Texto Interior de Jaula
+                    Tamaño / Lado de Jaula (metros)
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={selectedCage.label !== undefined ? selectedCage.label : String(selectedCage.number)}
-                      onChange={(e) => updateSelectedCage('label', e.target.value)}
-                      placeholder="Ej. 201 o dejar vacío"
-                      className={`flex-1 px-3 py-2 rounded-xl text-sm font-extrabold border ${
-                        darkMode
-                          ? 'bg-slate-800 border-slate-700 text-white'
-                          : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    />
-                    <button
-                      onClick={() => updateSelectedCage('label', '')}
-                      className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-700 hover:bg-rose-500/20 text-slate-700 dark:text-slate-200"
-                      title="Borrar número interior"
-                    >
-                      Limpiar
-                    </button>
-                  </div>
+                  <input
+                    type="number"
+                    min="5"
+                    max="150"
+                    value={selectedCage.sizeMeters || BASE_CAGE_METERS}
+                    onChange={(e) => updateSelectedCage('sizeMeters', Number(e.target.value))}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-extrabold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Escala activa: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (recalcula los metros de cable automáticamente).
+                  </span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold mb-1">
-                    Dimensión de Jaula Cuadrada (metros por lado)
+                    Número o Etiqueta de la Jaula
                   </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="5"
-                      max="150"
-                      value={selectedCage.sizeMeters || BASE_CAGE_METERS}
-                      onChange={(e) => updateSelectedCage('sizeMeters', e.target.value)}
-                      className={`w-28 px-3 py-2 rounded-xl text-sm font-extrabold border ${
-                        darkMode
-                          ? 'bg-slate-800 border-slate-700 text-sky-400'
-                          : 'bg-slate-50 border-slate-200 text-sky-700'
-                      }`}
-                    />
-                    <span className="text-xs font-bold text-slate-500">
-                      m × {selectedCage.sizeMeters || BASE_CAGE_METERS} m
-                    </span>
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ej. 201, J-01..."
+                    value={
+                      selectedCage.label !== undefined
+                        ? selectedCage.label
+                        : String(selectedCage.number)
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateSelectedCage('label', val);
+                      const parsed = parseInt(val, 10);
+                      if (!Number.isNaN(parsed)) {
+                        updateSelectedCage('number', parsed);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                   <div>
-                    <div className="text-xs font-extrabold">Sistema Fotoperiodo</div>
-                    <div className="text-[11px] text-slate-400">
-                      {selectedCage.photoperiodActive
-                        ? 'Encendido (180 Lux objetivo)'
-                        : 'Apagado / Luz natural'}
+                    <div className="text-xs font-extrabold">Fotoperiodo Activo</div>
+                    <div className="text-[11px] text-slate-500">
+                      Iluminación sumergida en esta jaula
                     </div>
                   </div>
-                  <button
-                    onClick={() =>
-                      updateSelectedCage('photoperiodActive', !selectedCage.photoperiodActive)
-                    }
-                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold ${
-                      selectedCage.photoperiodActive
-                        ? 'bg-amber-500 text-slate-950'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {selectedCage.photoperiodActive ? 'Activo' : 'Inactivo'}
-                  </button>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(selectedCage.photoperiodActive)}
+                    onChange={(e) => updateSelectedCage('photoperiodActive', e.target.checked)}
+                    className="w-5 h-5 accent-amber-500"
+                  />
                 </div>
 
                 <div>
@@ -6146,38 +6189,126 @@ export default function App() {
                     }`}
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Notas Operativas</label>
+                  <textarea
+                    rows={3}
+                    value={selectedCage.notes}
+                    onChange={(e) => updateSelectedCage('notes', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+            ) : selectedModule ? (
+              /* EDITOR DE ENCABEZADO DEL MÓDULO */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                      Encabezado de Módulo
+                    </span>
+                    <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => centerModuleHeaderOverCages(selectedModule.id)}
+                    className="px-2.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold flex items-center gap-1 shadow-xs"
+                    title="Centrar encabezado sobre las jaulas"
+                  >
+                    <AlignCenterHorizontal className="w-3.5 h-3.5" />
+                    <span>Centrar</span>
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Título del Módulo</label>
+                  <input
+                    type="text"
+                    value={selectedModule.name}
+                    onChange={(e) => updateSelectedModule('name', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Descripción / Subtítulo</label>
+                  <input
+                    type="text"
+                    value={selectedModule.subtitle}
+                    onChange={(e) => updateSelectedModule('subtitle', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+            ) : selectedKind === 'trunk' ? (
+              /* EDITOR DE ETIQUETA TRONCAL SUBMARINA */
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                    Alimentación Principal
+                  </span>
+                  <h2 className="text-lg font-extrabold">Troncal Submarina</h2>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Texto de Etiqueta</label>
+                  <input
+                    type="text"
+                    value={trunkLabel}
+                    onChange={(e) => setTrunkLabel(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
               </div>
             ) : (
-              /* RESUMEN GENERAL */
-              <div className="space-y-4">
-                <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs space-y-1.5">
-                  <div className="font-extrabold text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
-                    <Info className="w-4 h-4" /> Inspector de Elementos
-                  </div>
-                  <p className="text-slate-500 dark:text-slate-300 leading-relaxed">
-                    Usa el botón <strong>Agregar Símbolo</strong> para insertar uno o varios equipos idénticos de una sola vez, o haz <strong>doble clic</strong> sobre cualquier elemento del plano para editar sus propiedades.
+              /* VISTA POR DEFECTO DEL INSPECTOR CON RESUMEN DE CABLEADO */
+              <div className="space-y-3">
+                <div className="text-center py-4 space-y-2 border-b border-slate-200 dark:border-slate-800">
+                  <Info className="w-8 h-8 text-sky-500 mx-auto opacity-80" />
+                  <h3 className="text-sm font-extrabold">Selecciona un Elemento</h3>
+                  <p className="text-xs text-slate-500">
+                    Haz <strong>doble clic</strong> sobre cualquier equipo, texto, figura, jaula o canalización para editar sus propiedades.
                   </p>
                 </div>
 
-                {/* Resumen de Metros de Cable por Fase */}
-                <div className="space-y-2">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                    Cubicación de Cable por Fase
-                  </span>
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                    Resumen de Cableado por Fase
+                  </div>
                   <div className="space-y-1.5">
                     {cableSummaryByPhase.map((item) => (
                       <div
                         key={item.phase}
-                        className="flex items-center justify-between text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800"
+                        className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs ${
+                          darkMode
+                            ? 'bg-slate-800/60 border-slate-700'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 font-bold">
                           <span
-                            className="w-3 h-3 rounded-full"
+                            className="w-2.5 h-2.5 rounded-full"
                             style={{ backgroundColor: item.color }}
                           />
-                          <span className="font-semibold">{item.label}</span>
-                        </div>
-                        <span className="font-extrabold">{item.totalMeters} m</span>
+                          <span>{item.label}</span>
+                        </span>
+                        <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                          {item.totalMeters} m
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -6189,60 +6320,56 @@ export default function App() {
       </div>
 
       {/* ====================================================================
-          MODAL DEDICADO: AGREGAR SÍMBOLO / OBJETO POR CANTIDAD
+          MODAL DEDICADO: AGREGAR SÍMBOLO (POR TIPO, DESCRIPCIÓN Y CANTIDAD)
       ==================================================================== */}
       {showAddSymbolModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
           <form
             onSubmit={handleInsertBatchSymbols}
-            className={`w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
+            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
               darkMode
-                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                ? 'bg-slate-900 border-slate-800 text-slate-100'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-sky-600 text-white">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-sky-600 text-white">
               <div className="flex items-center gap-2">
                 <PlusCircle className="w-5 h-5" />
                 <div>
-                  <h3 className="text-sm font-extrabold uppercase tracking-wide">
-                    Agregar Símbolo / Objeto al Plano
-                  </h3>
+                  <h3 className="text-base font-extrabold">Agregar Símbolos al Plano</h3>
                   <p className="text-[11px] text-sky-100">
-                    Configura el equipo una vez e inserta toda la cantidad requerida con TAGs correlativos
+                    Define el equipo, su descripción técnica, marca y la cantidad a insertar
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddSymbolModal(false)}
-                className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25"
+                className="p-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
-              {/* Fila 1: Tipo de Símbolo y Cantidad */}
+            <div className="p-5 space-y-3.5 max-h-[80vh] overflow-y-auto text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                    Tipo de Símbolo / Objeto *
-                  </label>
+                  <label className="block font-bold mb-1">Tipo de Símbolo / Equipo</label>
                   <select
                     value={batchSymbolForm.symbolType}
                     onChange={(e) => handleBatchSymbolTypeChange(e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-xl border text-xs font-extrabold ${
+                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-300 text-slate-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   >
-                    <option value="luminaria">Proyector LED Fotoperiodo</option>
+                    <option value="luminaria">Luz Fotoperiodo (Sumergible IP68)</option>
+                    <option value="proyector_led">Proyector LED (Exterior / Perimetral)</option>
                     <option value="enchufe_220v">Enchufe Industrial 220V</option>
                     <option value="fotocelda">Fotocelda Crepuscular</option>
                     <option value="tablero">Tablero Eléctrico IP66</option>
-                    <option value="energizador">Energizador / Cerco Eléctrico</option>
+                    <option value="energizador">Energizador / Telemetría</option>
                     <option value="sensor">Sensor / Sonda Multiparámetro</option>
                     <option value="camara">Cámara Submarina / PTZ</option>
                     <option value="alimentador">Selector de Alimentación</option>
@@ -6250,8 +6377,8 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block font-extrabold mb-1 text-sky-600 dark:text-sky-400">
-                    Cantidad a Insertar *
+                  <label className="block font-extrabold text-sky-600 dark:text-sky-400 mb-1">
+                    Cantidad de Símbolos
                   </label>
                   <input
                     type="number"
@@ -6260,120 +6387,137 @@ export default function App() {
                     required
                     value={batchSymbolForm.quantity}
                     onChange={(e) =>
-                      setBatchSymbolForm((p) => ({ ...p, quantity: Number(e.target.value) }))
+                      setBatchSymbolForm((prev) => ({
+                        ...prev,
+                        quantity: Number(e.target.value),
+                      }))
                     }
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm font-extrabold text-center ${
-                      darkMode
-                        ? 'bg-slate-800 border-sky-500/60 text-sky-300'
-                        : 'bg-sky-50 border-sky-400 text-sky-800'
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-extrabold border-2 border-sky-500 ${
+                      darkMode ? 'bg-slate-800 text-white' : 'bg-sky-50 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
 
-              {/* Fila 2: Descripción técnica */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">
+                    Nombre Genérico (Para Resumen)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Luz Fotoperiodo / Proyector LED"
+                    value={batchSymbolForm.genericName}
+                    onChange={(e) =>
+                      setBatchSymbolForm((prev) => ({
+                        ...prev,
+                        genericName: e.target.value,
+                      }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold mb-1">Marca del Equipo</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Aqualed, Philips, Schneider..."
+                    value={batchSymbolForm.brand}
+                    onChange={(e) =>
+                      setBatchSymbolForm((prev) => ({ ...prev, brand: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-sky-300'
+                        : 'bg-slate-50 border-slate-200 text-sky-800'
+                    }`}
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                  Descripción / Especificación Técnica *
+                <label className="block font-bold mb-1">
+                  Descripción / Especificación Técnica (Aplicada a los {batchSymbolForm.quantity || 1} símbolos)
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. Proyector LED Fotoperiodo Sumergible 1000W 5000K"
+                  placeholder="Ej. Luz Fotoperiodo Sumergible 1000W 5000K IP68"
                   value={batchSymbolForm.spec}
                   onChange={(e) =>
-                    setBatchSymbolForm((p) => ({ ...p, spec: e.target.value }))
+                    setBatchSymbolForm((prev) => ({ ...prev, spec: e.target.value }))
                   }
-                  className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold ${
+                  className={`w-full px-3 py-2 rounded-xl font-semibold border ${
                     darkMode
                       ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
 
-              {/* Fila 3: Sistema / Circuito al que pertenece y Potencia */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                    Circuito / Sistema al que Pertenece *
-                  </label>
+                <div>
+                  <label className="block font-bold mb-1">Circuito / Sistema</label>
                   <select
                     value={batchSymbolForm.phase}
                     onChange={(e) =>
-                      setBatchSymbolForm((p) => ({ ...p, phase: e.target.value }))
+                      setBatchSymbolForm((prev) => ({ ...prev, phase: e.target.value }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-bold ${
+                    className={`w-full px-2.5 py-2 rounded-xl font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   >
-                    {Object.entries(phaseConfigs).map(([key, cfg]) => (
-                      <option key={key} value={key}>
-                        {cfg.label}
+                    {Object.entries(phaseConfigs).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.label}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                    Potencia Unitaria (W) *
-                  </label>
+                  <label className="block font-bold mb-1">Potencia Unitaria (W)</label>
                   <input
                     type="number"
                     min="0"
-                    step="1"
-                    required
                     value={batchSymbolForm.power}
                     onChange={(e) =>
-                      setBatchSymbolForm((p) => ({ ...p, power: Number(e.target.value) }))
+                      setBatchSymbolForm((prev) => ({
+                        ...prev,
+                        power: Number(e.target.value),
+                      }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-extrabold ${
+                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* Fila 4: Marca, Módulo de destino y Orientación */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                    Marca *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Aqualed, Schneider, JVA..."
-                    value={batchSymbolForm.brand}
-                    onChange={(e) =>
-                      setBatchSymbolForm((p) => ({ ...p, brand: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-bold ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-sky-300'
-                        : 'bg-white border-slate-300 text-sky-800'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
 
                 <div>
-                  <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                    Módulo de Ubicación
-                  </label>
+                  <label className="block font-bold mb-1">Módulo de Destino</label>
                   <select
                     value={batchSymbolForm.targetModuleId}
                     onChange={(e) =>
-                      setBatchSymbolForm((p) => ({ ...p, targetModuleId: e.target.value }))
+                      setBatchSymbolForm((prev) => ({
+                        ...prev,
+                        targetModuleId: e.target.value,
+                      }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-bold ${
+                    className={`w-full px-2.5 py-2 rounded-xl font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   >
                     {modules.map((m) => (
@@ -6383,199 +6527,183 @@ export default function App() {
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block font-extrabold mb-1 text-slate-600 dark:text-slate-300">
-                    Orientación (°)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="360"
-                    value={batchSymbolForm.rotation}
-                    onChange={(e) =>
-                      setBatchSymbolForm((p) => ({ ...p, rotation: Number(e.target.value) }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-bold ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
-                  />
-                </div>
               </div>
 
-              {/* Color opcional */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-extrabold text-slate-600 dark:text-slate-300">
-                    Color de Símbolo (Opcional · por defecto usa color del circuito)
-                  </label>
+                  <label className="font-bold">Color del Símbolo (Opcional · 32 colores)</label>
                   {batchSymbolForm.customColor && (
                     <button
                       type="button"
-                      onClick={() => setBatchSymbolForm((p) => ({ ...p, customColor: '' }))}
-                      className="text-[11px] font-bold text-sky-600 hover:underline"
+                      onClick={() =>
+                        setBatchSymbolForm((prev) => ({ ...prev, customColor: '' }))
+                      }
+                      className="text-[10px] font-extrabold text-sky-600 hover:underline"
                     >
-                      Restaurar color circuito
+                      Color por defecto del circuito
                     </button>
                   )}
                 </div>
                 {renderBasic32ColorGrid(batchSymbolForm.customColor, (hex) =>
-                  setBatchSymbolForm((p) => ({ ...p, customColor: hex }))
+                  setBatchSymbolForm((prev) => ({ ...prev, customColor: hex }))
                 )}
               </div>
 
-              {/* Resumen previo de la carga a insertar */}
-              <div
-                className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
-                  darkMode
-                    ? 'bg-slate-800/80 border-slate-700'
-                    : 'bg-sky-50 border-sky-200'
-                }`}
-              >
-                <div>
-                  <span className="font-extrabold text-sky-600 dark:text-sky-400">
-                    Resumen a insertar:{' '}
-                  </span>
-                  <span className="font-bold">
-                    {Math.max(1, Number(batchSymbolForm.quantity) || 1)} ×{' '}
-                    {batchSymbolForm.genericName} ({batchSymbolForm.brand || 'Genérico'})
-                  </span>
-                </div>
-                <div className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                  Potencia Total:{' '}
-                  {(
-                    ((Math.max(1, Number(batchSymbolForm.quantity) || 1) *
-                      (Number(batchSymbolForm.power) || 0)) /
-                      1000)
-                  ).toFixed(2)}{' '}
-                  kW
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 dark:text-slate-300">
+              <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={batchSymbolForm.saveInPalette}
                   onChange={(e) =>
-                    setBatchSymbolForm((p) => ({ ...p, saveInPalette: e.target.checked }))
+                    setBatchSymbolForm((prev) => ({
+                      ...prev,
+                      saveInPalette: e.target.checked,
+                    }))
                   }
-                  className="rounded accent-sky-600"
+                  className="w-4 h-4 accent-sky-600"
                 />
-                <span>Guardar también como plantilla en la paleta rápida izquierda</span>
+                <span className="font-bold text-slate-600 dark:text-slate-300">
+                  Guardar también esta configuración como plantilla en la Paleta Rápida
+                </span>
               </label>
             </div>
 
-            <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAddSymbolModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5 shadow-sm"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>
-                  Insertar {Math.max(1, Number(batchSymbolForm.quantity) || 1)} Símbolo(s) en el Plano
-                </span>
-              </button>
+            <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/80">
+              <span className="text-[11px] font-bold text-slate-500">
+                Potencia total lote:{' '}
+                <strong className="text-emerald-600">
+                  {(((Number(batchSymbolForm.quantity) || 1) * (Number(batchSymbolForm.power) || 0)) / 1000).toFixed(2)} kW
+                </strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSymbolModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
+                >
+                  Insertar {batchSymbolForm.quantity || 1} Símbolo(s)
+                </button>
+              </div>
             </div>
           </form>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL NUEVO PROYECTO (CON DISTRIBUCIÓN DE JAULAS CONFIGURABLE)
+          MODAL NUEVO PROYECTO CON DISTRIBUCIÓN DE JAULAS
       ==================================================================== */}
       {showNewProjectModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
           <form
             onSubmit={handleCreateNewProject}
-            className={`w-full max-w-2xl rounded-2xl border p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto ${
+            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden ${
               darkMode
-                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                ? 'bg-slate-900 border-slate-800 text-slate-100'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FolderPlus className="w-5 h-5 text-emerald-500" />
-                <h3 className="text-base font-extrabold">Crear Nuevo Proyecto en la Plataforma</h3>
+                <div>
+                  <h3 className="text-base font-extrabold">Crear Nuevo Proyecto y Distribución</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Define los datos del centro y la cantidad de jaulas por módulo
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowNewProjectModal(false)}
-                className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-rose-500/20"
+                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="sm:col-span-2">
-                <label className="block font-bold mb-1">Nombre del Proyecto *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Instalación Fotoperiodo Tren Norte y Sur"
-                  value={newProjectForm.projectName}
-                  onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, projectName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border font-semibold ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Nombre del Proyecto *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Instalación Fotoperiodo 2026"
+                    value={newProjectForm.projectName}
+                    onChange={(e) =>
+                      setNewProjectForm((p) => ({ ...p, projectName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Centro / Pontón *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Centro Isla Guar · Trenes A y B"
+                    value={newProjectForm.centerName}
+                    onChange={(e) =>
+                      setNewProjectForm((p) => ({ ...p, centerName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Cliente / Mandante</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Salmones Austral S.A."
+                    value={newProjectForm.clientName}
+                    onChange={(e) =>
+                      setNewProjectForm((p) => ({ ...p, clientName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Coordenadas Geográficas</label>
+                  <input
+                    type="text"
+                    placeholder="-41.784520, -73.124890"
+                    value={newProjectForm.coordinates}
+                    onChange={(e) =>
+                      setNewProjectForm((p) => ({ ...p, coordinates: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Cliente / Empresa Mandante *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Salmones Austral S.A."
-                  value={newProjectForm.clientName}
-                  onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, clientName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Nombre del Centro de Cultivo *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Centro Punta Arenas"
-                  value={newProjectForm.centerName}
-                  onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, centerName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block font-bold mb-1">Descripción del Proyecto</label>
+                <label className="block font-bold mb-1">Descripción del Alcance</label>
                 <textarea
                   rows={2}
-                  placeholder="Detalle técnico del alcance..."
+                  placeholder="Describe brevemente los trabajos..."
                   value={newProjectForm.projectDescription}
                   onChange={(e) =>
                     setNewProjectForm((p) => ({ ...p, projectDescription: e.target.value }))
@@ -6588,77 +6716,46 @@ export default function App() {
                 />
               </div>
 
-              <div>
-                <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
-                <input
-                  type="text"
-                  placeholder="-41.784520, -73.124890"
-                  value={newProjectForm.coordinates}
-                  onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, coordinates: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Enlace Google Maps (Opcional)</label>
-                <input
-                  type="url"
-                  placeholder="https://maps.google.com/..."
-                  value={newProjectForm.googleMapsUrl}
-                  onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, googleMapsUrl: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              {/* CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS DEL CENTRO */}
-              <div className="sm:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              {/* CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                    Distribución de Jaulas y Dimensiones (Separación Estándar Automática)
+                  <span className="font-extrabold uppercase text-[11px] text-sky-600 dark:text-sky-400">
+                    Distribución de Jaulas por Módulo
+                  </span>
+                  <span className="text-[11px] font-extrabold text-emerald-600">
+                    Total:{' '}
+                    {Math.max(1, Number(newProjectForm.mod1Rows) || 1) *
+                      Math.max(1, Number(newProjectForm.mod1Cols) || 1) +
+                      (newProjectForm.hasMod2
+                        ? Math.max(1, Number(newProjectForm.mod2Rows) || 1) *
+                          Math.max(1, Number(newProjectForm.mod2Cols) || 1)
+                        : 0)}{' '}
+                    jaulas
                   </span>
                 </div>
 
-                {/* Módulo 1 */}
                 <div
-                  className={`p-3 rounded-xl border space-y-2 ${
-                    darkMode
-                      ? 'bg-slate-800/70 border-slate-700'
-                      : 'bg-sky-50/70 border-sky-200'
+                  className={`p-3 rounded-xl border space-y-2.5 ${
+                    darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 >
-                  <div className="text-[11px] font-extrabold text-sky-700 dark:text-sky-300">
-                    Tren / Módulo 1 ({Math.max(1, Number(newProjectForm.mod1Rows) || 1) * Math.max(1, Number(newProjectForm.mod1Cols) || 1)} jaulas)
-                  </div>
+                  <div className="font-extrabold text-xs">Módulo / Tren Principal</div>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[10px] font-bold mb-0.5">Nombre</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Nombre</label>
                       <input
                         type="text"
                         value={newProjectForm.mod1Name}
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, mod1Name: e.target.value }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-700 text-white'
-                            : 'bg-white border-slate-300 text-slate-900'
+                        className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
+                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold mb-0.5">Filas</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Filas</label>
                       <input
                         type="number"
                         min="1"
@@ -6667,15 +6764,13 @@ export default function App() {
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, mod1Rows: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-700 text-white'
-                            : 'bg-white border-slate-300 text-slate-900'
+                        className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
+                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold mb-0.5">Columnas</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Columnas</label>
                       <input
                         type="number"
                         min="1"
@@ -6684,102 +6779,80 @@ export default function App() {
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, mod1Cols: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-700 text-white'
-                            : 'bg-white border-slate-300 text-slate-900'
+                        className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
+                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold mb-0.5">N° Inicial</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">N° Inicial</label>
                       <input
                         type="number"
                         min="1"
                         value={newProjectForm.mod1StartNumber}
                         onChange={(e) =>
-                          setNewProjectForm((p) => ({
-                            ...p,
-                            mod1StartNumber: Number(e.target.value),
-                          }))
+                          setNewProjectForm((p) => ({ ...p, mod1StartNumber: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-700 text-white'
-                            : 'bg-white border-slate-300 text-slate-900'
+                        className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
+                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold mb-0.5">Lado Jaula (m)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Lado (m)</label>
                       <input
                         type="number"
                         min="5"
                         max="150"
                         value={newProjectForm.mod1CageMeters}
                         onChange={(e) =>
-                          setNewProjectForm((p) => ({
-                            ...p,
-                            mod1CageMeters: Number(e.target.value),
-                          }))
+                          setNewProjectForm((p) => ({ ...p, mod1CageMeters: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border font-extrabold text-sky-600 ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-700'
-                            : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
+                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                         }`}
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Módulo 2 Opcional */}
                 <div
-                  className={`p-3 rounded-xl border space-y-2 ${
-                    darkMode
-                      ? 'bg-slate-800/70 border-slate-700'
-                      : 'bg-slate-50 border-slate-200'
+                  className={`p-3 rounded-xl border space-y-2.5 ${
+                    darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
-                      Tren / Módulo 2{' '}
-                      {newProjectForm.hasMod2
-                        ? `(${Math.max(1, Number(newProjectForm.mod2Rows) || 1) * Math.max(1, Number(newProjectForm.mod2Cols) || 1)} jaulas)`
-                        : '(Desactivado)'}
-                    </span>
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer">
+                    <span className="font-extrabold text-xs">Segundo Módulo / Tren</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={newProjectForm.hasMod2}
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, hasMod2: e.target.checked }))
                         }
-                        className="rounded text-emerald-600"
+                        className="w-4 h-4 accent-sky-600"
                       />
-                      <span>Incluir segundo módulo</span>
+                      <span className="font-bold">Incluir 2° Módulo</span>
                     </label>
                   </div>
 
                   {newProjectForm.hasMod2 && (
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       <div className="col-span-2 sm:col-span-1">
-                        <label className="block text-[10px] font-bold mb-0.5">Nombre</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Nombre</label>
                         <input
                           type="text"
                           value={newProjectForm.mod2Name}
                           onChange={(e) =>
                             setNewProjectForm((p) => ({ ...p, mod2Name: e.target.value }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                            darkMode
-                              ? 'bg-slate-900 border-slate-700 text-white'
-                              : 'bg-white border-slate-300 text-slate-900'
+                          className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
+                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold mb-0.5">Filas</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Filas</label>
                         <input
                           type="number"
                           min="1"
@@ -6788,15 +6861,13 @@ export default function App() {
                           onChange={(e) =>
                             setNewProjectForm((p) => ({ ...p, mod2Rows: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                            darkMode
-                              ? 'bg-slate-900 border-slate-700 text-white'
-                              : 'bg-white border-slate-300 text-slate-900'
+                          className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
+                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold mb-0.5">Columnas</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Columnas</label>
                         <input
                           type="number"
                           min="1"
@@ -6805,49 +6876,37 @@ export default function App() {
                           onChange={(e) =>
                             setNewProjectForm((p) => ({ ...p, mod2Cols: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                            darkMode
-                              ? 'bg-slate-900 border-slate-700 text-white'
-                              : 'bg-white border-slate-300 text-slate-900'
+                          className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
+                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold mb-0.5">N° Inicial</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">N° Inicial</label>
                         <input
                           type="number"
                           min="1"
                           value={newProjectForm.mod2StartNumber}
                           onChange={(e) =>
-                            setNewProjectForm((p) => ({
-                              ...p,
-                              mod2StartNumber: Number(e.target.value),
-                            }))
+                            setNewProjectForm((p) => ({ ...p, mod2StartNumber: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
-                            darkMode
-                              ? 'bg-slate-900 border-slate-700 text-white'
-                              : 'bg-white border-slate-300 text-slate-900'
+                          className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
+                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold mb-0.5">Lado Jaula (m)</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Lado (m)</label>
                         <input
                           type="number"
                           min="5"
                           max="150"
                           value={newProjectForm.mod2CageMeters}
                           onChange={(e) =>
-                            setNewProjectForm((p) => ({
-                              ...p,
-                              mod2CageMeters: Number(e.target.value),
-                            }))
+                            setNewProjectForm((p) => ({ ...p, mod2CageMeters: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border font-extrabold text-sky-600 ${
-                            darkMode
-                              ? 'bg-slate-900 border-slate-700'
-                              : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
+                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
                           }`}
                         />
                       </div>
@@ -6856,23 +6915,25 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="sm:col-span-2 flex items-center gap-2 pt-1">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <div>
+                  <div className="font-extrabold">Iniciar lienzo limpio sin equipos previos</div>
+                  <div className="text-[11px] text-slate-500">
+                    Si lo desmarcas, conservarás los equipos actuales sobre las nuevas jaulas
+                  </div>
+                </div>
                 <input
-                  id="clearObjectsChk"
                   type="checkbox"
                   checked={newProjectForm.clearExistingObjects}
                   onChange={(e) =>
                     setNewProjectForm((p) => ({ ...p, clearExistingObjects: e.target.checked }))
                   }
-                  className="rounded text-emerald-600"
+                  className="w-5 h-5 accent-emerald-600"
                 />
-                <label htmlFor="clearObjectsChk" className="font-semibold cursor-pointer">
-                  Iniciar con el plano limpio (sin equipos ni canalizaciones previas)
-                </label>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowNewProjectModal(false)}
@@ -6882,10 +6943,9 @@ export default function App() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                <FolderPlus className="w-4 h-4" />
-                <span>Crear y Guardar Proyecto</span>
+                Crear Proyecto
               </button>
             </div>
           </form>
@@ -6893,46 +6953,46 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: BASE DE DATOS DE PROYECTOS EN LA NUBE (FIREBASE)
+          MODAL PROYECTOS GUARDADOS EN LA NUBE
       ==================================================================== */}
       {showCloudModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-4xl max-h-[88vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
+            className={`w-full max-w-2xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
               darkMode
-                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                ? 'bg-slate-900 border-slate-800 text-slate-100'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Cloud className="w-5 h-5 text-sky-500" />
                 <div>
-                  <h3 className="text-base font-extrabold">
-                    Proyectos Guardados en Base de Datos en la Nube
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Proyecto activo: <strong>{companyInfo.projectName}</strong> · Centro:{' '}
-                    <strong>{companyInfo.centerName}</strong>
+                  <h3 className="text-base font-extrabold">Proyectos Guardados en la Nube</h3>
+                  <p className="text-xs text-slate-500">
+                    Carga, actualiza o busca tus proyectos sincronizados
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowCloudModal(false)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800"
+                className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
               >
                 Cerrar
               </button>
             </div>
 
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-sky-500/5 space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-2 bg-sky-500/5">
+              <label className="block text-xs font-extrabold text-sky-600 dark:text-sky-400">
+                Guardar Proyecto Actual en la Nube
+              </label>
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="text"
-                  placeholder="Título para guardar versión actual..."
+                  placeholder="Nombre del centro o proyecto..."
                   value={blueprintNameInput}
                   onChange={(e) => setBlueprintNameInput(e.target.value)}
-                  className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border ${
+                  className={`flex-1 min-w-[200px] px-3 py-2 rounded-xl text-xs font-bold border ${
                     darkMode
                       ? 'bg-slate-800 border-slate-700 text-white'
                       : 'bg-white border-slate-300 text-slate-900'
@@ -6941,36 +7001,49 @@ export default function App() {
                 <button
                   onClick={() => handleSaveToCloud(currentBlueprintId, blueprintNameInput)}
                   disabled={isSavingCloud}
-                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center gap-1.5"
                 >
-                  <CloudUpload className="w-4 h-4" />
-                  <span>{isSavingCloud ? 'Guardando...' : 'Actualizar Proyecto Actual'}</span>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Actualizar</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const newId = `${blueprintNameInput || 'plano'}-${Date.now()}`;
+                    handleSaveToCloud(newId, blueprintNameInput);
+                  }}
+                  disabled={isSavingCloud}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Guardar Como Nuevo</span>
                 </button>
               </div>
+            </div>
 
+            <div className="px-4 pt-3">
               <input
                 type="text"
-                placeholder="Buscar proyecto guardado por nombre, cliente, centro..."
+                placeholder="Buscar proyecto guardado..."
                 value={cloudSearchQuery}
                 onChange={(e) => setCloudSearchQuery(e.target.value)}
                 className={`w-full px-3 py-2 rounded-xl text-xs border ${
                   darkMode
                     ? 'bg-slate-800 border-slate-700 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
+                    : 'bg-slate-50 border-slate-200 text-slate-900'
                 }`}
               />
             </div>
 
-            <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
               {filteredBlueprints.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-400">
+                <div className="text-center py-8 text-xs text-slate-500">
                   No se encontraron proyectos guardados en la nube.
                 </div>
               ) : (
                 filteredBlueprints.map((bp) => (
                   <div
                     key={bp.id}
-                    className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
                       bp.id === currentBlueprintId
                         ? 'border-sky-500 bg-sky-500/10'
                         : darkMode
@@ -6978,39 +7051,38 @@ export default function App() {
                         : 'border-slate-200 bg-slate-50'
                     }`}
                   >
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-extrabold text-sm">
-                          {bp.projectName || bp.title || bp.id}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-extrabold truncate">
+                          {bp.companyInfo?.centerName || bp.title || bp.id}
                         </span>
                         {bp.id === currentBlueprintId && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-600 text-white">
-                            ACTIVO
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-600 text-white">
+                            Activo
                           </span>
                         )}
                       </div>
-                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        Cliente: {bp.clientName || bp.companyInfo?.clientName || '-'} · Centro:{' '}
-                        {bp.centerName || bp.companyInfo?.centerName || '-'}
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate">
+                        {bp.companyInfo?.projectName || bp.projectName || 'Sin título'} ·{' '}
+                        {bp.companyInfo?.clientName || bp.clientName || 'Sin cliente'}
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        {bp.totalCages || bp.cages?.length || 0} jaulas ·{' '}
-                        {bp.totalObjects || bp.objects?.length || 0} equipos · Actualizado:{' '}
-                        {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString('es-CL') : 'Reciente'}
+                      <div className="text-[11px] text-slate-500">
+                        {bp.totalCages || 0} jaulas · {bp.totalObjects || 0} equipos · Actualizado:{' '}
+                        {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString() : 'Reciente'}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleLoadFromCloud(bp)}
-                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
+                        className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold"
                       >
-                        Abrir Proyecto
+                        Abrir
                       </button>
                       <button
-                        onClick={() => handleDeleteFromCloud(bp.id, bp.projectName || bp.title || bp.id)}
-                        className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                        title="Eliminar proyecto de la nube"
+                        onClick={() => handleDeleteFromCloud(bp.id, bp.title || bp.id)}
+                        className="p-1.5 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                        title="Eliminar de la nube"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -7024,189 +7096,206 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL DE INVENTARIO RESUMIDO POR EQUIPO GENÉRICO, MARCA Y CABLEADO
+          MODAL INVENTARIO Y RESUMEN AGRUPADO POR COMPONENTE Y MARCA
       ==================================================================== */}
       {showInventoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
             className={`w-full max-w-5xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
               darkMode
-                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                ? 'bg-slate-900 border-slate-800 text-slate-100'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-extrabold">
                   Resumen General de Equipos y Cubicación de Cableado
                 </h3>
-                <p className="text-xs text-slate-400">
-                  {companyInfo.projectName} · {companyInfo.centerName} ·{' '}
-                  {summarizedEquipment.length} tipos de equipos ({objects.length} uds.) ·{' '}
-                  {metrics.totalPowerKw} kW · {totalCableMeters} m cable
+                <p className="text-xs text-slate-500">
+                  Agrupación por componente genérico y marca ({objects.length} equipos ·{' '}
+                  {metrics.totalPowerKw} kW · {totalCableMeters} m cable)
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleExportPDF}
-                  className="px-3 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-bold flex items-center gap-1"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Imprimir PDF
-                </button>
-                <button
-                  onClick={() => setShowInventoryModal(false)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
-                >
-                  Cerrar
-                </button>
-              </div>
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
+              >
+                Cerrar
+              </button>
             </div>
-
-            <div className="overflow-auto p-4 space-y-5">
+            <div className="flex-1 overflow-auto p-4 space-y-5">
               <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-sky-600 mb-2">
                   1. Resumen de Equipos Instalados por Componente Genérico y Marca
                 </h4>
-                <table className="w-full text-xs border-collapse">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-800 text-white text-left">
-                      <th className="p-2.5 text-center">Cant.</th>
-                      <th className="p-2.5">Componente Genérico</th>
-                      <th className="p-2.5">Marca</th>
-                      <th className="p-2.5">TAGs Agrupados</th>
-                      <th className="p-2.5">Módulo</th>
-                      <th className="p-2.5">Características Técnicas</th>
-                      <th className="p-2.5">Circuito / Fase</th>
-                      <th className="p-2.5 text-right">Pot. Unit.</th>
-                      <th className="p-2.5 text-right">Pot. Total</th>
-                      <th className="p-2.5">Estado</th>
+                    <tr className="border-b border-slate-300 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                      <th className="py-2 px-2 text-center">Cant.</th>
+                      <th className="py-2 px-2">Componente Genérico</th>
+                      <th className="py-2 px-2">Marca</th>
+                      <th className="py-2 px-2">TAGs Agrupados</th>
+                      <th className="py-2 px-2">Módulo</th>
+                      <th className="py-2 px-2">Características Técnicas</th>
+                      <th className="py-2 px-2">Circuito / Fase</th>
+                      <th className="py-2 px-2 text-right">Pot. Unit.</th>
+                      <th className="py-2 px-2 text-right">Pot. Total</th>
+                      <th className="py-2 px-2">Estado</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summarizedEquipment.map((g) => (
                       <tr
                         key={g.key}
-                        className="border-b border-slate-200 dark:border-slate-800 hover:bg-sky-500/5"
+                        className="border-b border-slate-200/70 dark:border-slate-800 hover:bg-sky-500/5"
                       >
-                        <td className="p-2.5 text-center font-extrabold text-sm text-sky-600 dark:text-sky-400">
+                        <td className="py-2 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
                           {g.count}
                         </td>
-                        <td className="p-2.5 font-extrabold">{g.genericName}</td>
-                        <td className="p-2.5 font-bold text-sky-700 dark:text-sky-300">
+                        <td className="py-2 px-2 font-extrabold">{g.genericName}</td>
+                        <td className="py-2 px-2 font-bold text-indigo-600 dark:text-indigo-400">
                           {g.brand}
                         </td>
-                        <td className="p-2.5 text-[11px] text-slate-500 max-w-[160px] truncate" title={g.tagsLabel}>
+                        <td className="py-2 px-2 text-[11px] text-slate-500 max-w-[160px] truncate" title={g.tagsLabel}>
                           {g.tagsLabel}
                         </td>
-                        <td className="p-2.5">{g.modulesLabel}</td>
-                        <td className="p-2.5">{g.spec}</td>
-                        <td className="p-2.5 font-semibold">
+                        <td className="py-2 px-2 font-semibold">{g.modulesLabel}</td>
+                        <td className="py-2 px-2">{g.spec}</td>
+                        <td className="py-2 px-2 font-bold">
                           {phaseConfigs[g.phase]?.label || g.phase}
                         </td>
-                        <td className="p-2.5 text-right">{g.unitPower} W</td>
-                        <td className="p-2.5 text-right font-extrabold">{g.totalPower} W</td>
-                        <td className="p-2.5 font-bold">{g.summaryStatus}</td>
+                        <td className="py-2 px-2 text-right">{g.unitPower} W</td>
+                        <td className="py-2 px-2 text-right font-extrabold">{g.totalPower} W</td>
+                        <td className="py-2 px-2 font-bold">{g.summaryStatus}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2">
-                  2. Cubicación de Canalizaciones y Metros de Cable por Fase
-                </h4>
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-800 text-white text-left">
-                      <th className="p-2.5">TAG Tramo</th>
-                      <th className="p-2.5">Fase Eléctrica</th>
-                      <th className="p-2.5">Conductor / Ducto</th>
-                      <th className="p-2.5 text-right">Tramo Pasillo</th>
-                      <th className="p-2.5 text-right">Bajada / Holgura</th>
-                      <th className="p-2.5 text-right">Total Cable</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {conduits.map((c) => {
-                      const m = calculateConduitMetrics(c);
-                      const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
-                      return (
-                        <tr
-                          key={c.id}
-                          onClick={() => {
-                            setSelectedId(c.id);
-                            setSelectedKind('conduit');
-                            setShowRightSidebar(true);
-                            setShowInventoryModal(false);
-                          }}
-                          className="border-b border-slate-200 dark:border-slate-800 hover:bg-sky-500/10 cursor-pointer"
-                        >
-                          <td className="p-2.5 font-extrabold">{c.tag}</td>
-                          <td className="p-2.5 font-bold flex items-center gap-1.5">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: pCfg.color }}
-                            />
-                            <span>{pCfg.label}</span>
-                          </td>
-                          <td className="p-2.5">{c.cableSpec}</td>
-                          <td className="p-2.5 text-right">{m.horizontalMeters} m</td>
-                          <td className="p-2.5 text-right">{m.dropMeters} m</td>
-                          <td className="p-2.5 text-right font-extrabold text-emerald-600 dark:text-emerald-400">
-                            {m.totalMeters} m
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="bg-slate-100 dark:bg-slate-800 font-extrabold">
-                      <td colSpan={5} className="p-2.5 text-right">
-                        TOTAL GENERAL DE CABLE UTILIZADO:
-                      </td>
-                      <td className="p-2.5 text-right text-sky-600 dark:text-sky-400">
-                        {totalCableMeters} m
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {conduits.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-500 mb-2">
+                    2. Cubicación de Canalizaciones y Tramos de Cable por Fase
+                  </h4>
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-300 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                        <th className="py-2 px-2">TAG Tramo</th>
+                        <th className="py-2 px-2">Fase Eléctrica</th>
+                        <th className="py-2 px-2">Conductor</th>
+                        <th className="py-2 px-2 text-right">Tramo Pasillo</th>
+                        <th className="py-2 px-2 text-right">Bajada</th>
+                        <th className="py-2 px-2 text-right">Total Cable</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {conduits.map((c) => {
+                        const m = calculateConduitMetrics(c);
+                        const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                        return (
+                          <tr
+                            key={c.id}
+                            className="border-b border-slate-200/70 dark:border-slate-800"
+                          >
+                            <td className="py-2 px-2 font-extrabold">{c.tag}</td>
+                            <td className="py-2 px-2 font-bold" style={{ color: pCfg.color }}>
+                              {pCfg.label}
+                            </td>
+                            <td className="py-2 px-2">{c.cableSpec}</td>
+                            <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
+                            <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
+                            <td className="py-2 px-2 text-right font-extrabold">
+                              {m.totalMeters} m
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-slate-500/10 font-extrabold">
+                        <td colSpan={5} className="py-2 px-2 text-right">
+                          TOTAL GENERAL DE CABLE UTILIZADO:
+                        </td>
+                        <td className="py-2 px-2 text-right text-sky-600 dark:text-sky-400">
+                          {totalCableMeters} m
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL CONFIGURACIÓN DE PROYECTO, COORDENADAS Y FIRMA PDF
+          MODAL CONFIGURACIÓN PROYECTO Y EMPRESA
       ==================================================================== */}
       {showCompanyModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-2xl rounded-2xl border p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto ${
+            className={`w-full max-w-xl rounded-2xl border shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto ${
               darkMode
-                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                ? 'bg-slate-900 border-slate-800 text-slate-100'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <h3 className="text-base font-extrabold">
-              Datos del Proyecto, Ubicación y Firma Técnica
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="sm:col-span-2">
-                <label className="block font-bold mb-1">Nombre del Proyecto</label>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-extrabold">Datos del Proyecto, Ubicación y Empresa</h3>
+              <button
+                onClick={() => setShowCompanyModal(false)}
+                className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800"
+              >
+                Listo
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold mb-1">Nombre de la Empresa Ejecutora</label>
                 <input
                   type="text"
-                  value={companyInfo.projectName}
+                  value={companyInfo.companyName}
                   onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                    setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
                   }
-                  className={`w-full px-3 py-2 rounded-xl border font-bold ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 />
               </div>
-              <div className="sm:col-span-2">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Nombre del Proyecto</label>
+                  <input
+                    type="text"
+                    value={companyInfo.projectName || ''}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Cliente / Mandante</label>
+                  <input
+                    type="text"
+                    value={companyInfo.clientName || ''}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div>
                 <label className="block font-bold mb-1">Descripción del Proyecto</label>
                 <textarea
                   rows={2}
@@ -7215,217 +7304,211 @@ export default function App() {
                     setCompanyInfo((p) => ({ ...p, projectDescription: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 />
               </div>
-              <div>
-                <label className="block font-bold mb-1">Cliente / Empresa Mandante</label>
-                <input
-                  type="text"
-                  value={companyInfo.clientName || ''}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
+
               <div>
                 <label className="block font-bold mb-1">Centro de Cultivo / Pontón</label>
                 <input
                   type="text"
                   value={companyInfo.centerName}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, centerName: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    setCompanyInfo((p) => ({ ...p, centerName: e.target.value }));
+                    setBlueprintNameInput(e.target.value);
+                  }}
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                   }`}
                 />
               </div>
-              <div>
-                <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
-                <input
-                  type="text"
-                  placeholder="-41.784520, -73.124890"
-                  value={companyInfo.coordinates || ''}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, coordinates: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
+                  <input
+                    type="text"
+                    placeholder="-41.784520, -73.124890"
+                    value={companyInfo.coordinates || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCompanyInfo((p) => ({
+                        ...p,
+                        coordinates: val,
+                        googleMapsUrl: buildGoogleMapsLink(val),
+                      }));
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Enlace Directo Google Maps</label>
+                  <input
+                    type="url"
+                    placeholder="https://maps.google.com/..."
+                    value={companyInfo.googleMapsUrl || ''}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, googleMapsUrl: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block font-bold mb-1">Enlace Google Maps</label>
-                <input
-                  type="url"
-                  placeholder="https://maps.google.com/..."
-                  value={companyInfo.googleMapsUrl || ''}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, googleMapsUrl: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold mb-1">Ingeniero / Técnico Responsable</label>
+                  <input
+                    type="text"
+                    value={companyInfo.responsibleName}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold mb-1">Registro / Licencia SEC</label>
+                  <input
+                    type="text"
+                    value={companyInfo.responsibleLicense}
+                    onChange={(e) =>
+                      setCompanyInfo((p) => ({ ...p, responsibleLicense: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl border ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block font-bold mb-1">Empresa Ejecutora (Pie de página PDF)</label>
-                <input
-                  type="text"
-                  value={companyInfo.companyName}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-              <div>
-                <label className="block font-bold mb-1">Responsable Técnico</label>
-                <input
-                  type="text"
-                  value={companyInfo.responsibleName}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => {
-                  setShowCompanyModal(false);
-                  notify('Datos del proyecto actualizados', 'success');
-                }}
-                className="px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-extrabold"
-              >
-                Guardar Cambios
-              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL DE VISTA PREVIA DE LÁMINA TÉCNICA
+          MODAL VISTA PREVIA LÁMINA TÉCNICA
       ==================================================================== */}
       {showPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-6xl max-h-[92vh] bg-white text-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MonitorPlay className="w-4 h-4 text-sky-400" />
-                <span className="text-xs font-extrabold uppercase tracking-wider">
-                  Vista Previa Lámina Técnica · {companyInfo.centerName}
+                <span className="text-sm font-extrabold">
+                  Vista Previa de Lámina Técnica — {companyInfo.centerName}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleExportPNG}
-                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-xs font-bold flex items-center gap-1"
-                >
-                  <ImageIcon className="w-3.5 h-3.5" /> Descargar PNG
-                </button>
-                <button
                   onClick={handleExportPDF}
-                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-bold flex items-center gap-1"
+                  className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1.5"
                 >
-                  <Printer className="w-3.5 h-3.5" /> Exportar PDF
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / Guardar PDF</span>
                 </button>
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold"
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200"
                 >
-                  Cerrar
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                {companyInfo.logoDataUrl ? (
-                  <img
-                    src={companyInfo.logoDataUrl}
-                    alt="Logo"
-                    className="h-16 max-w-[230px] object-contain"
-                  />
-                ) : (
-                  <div className="w-12" />
-                )}
-                <div className="flex-1 text-center text-sm sm:text-base font-extrabold tracking-wide text-slate-900">
-                  PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO
-                </div>
-                <div className="w-12" />
-              </div>
-
-              <div
-                className="border-2 border-slate-300 rounded-xl p-2 bg-white"
-                dangerouslySetInnerHTML={{
-                  __html: generateSvgStringForExport(true) || '',
-                }}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-3 border-2 border-slate-900 text-xs">
-                <div className="p-2.5 border-b md:border-b-0 md:border-r border-slate-900">
-                  <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                    Proyecto
-                  </span>
-                  <span className="font-extrabold">{companyInfo.projectName}</span>
-                </div>
-                <div className="p-2.5 border-b md:border-b-0 md:border-r border-slate-900">
-                  <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                    Cliente
-                  </span>
-                  <span className="font-bold">{companyInfo.clientName}</span>
-                </div>
-                <div className="p-2.5">
-                  <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                    Centro / Coordenadas
-                  </span>
-                  <span className="font-bold block">{companyInfo.centerName}</span>
-                  {companyInfo.coordinates && (
-                    <a
-                      href={mapsHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sky-600 font-bold underline text-[11px]"
-                    >
-                      {companyInfo.coordinates} (Abrir en Google Maps)
-                    </a>
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
+              <div className="max-w-5xl mx-auto bg-white border-2 border-slate-300 rounded-xl p-6 shadow-md space-y-4">
+                <div className="flex items-center justify-between gap-4 border-b pb-3">
+                  {companyInfo.logoDataUrl ? (
+                    <img
+                      src={companyInfo.logoDataUrl}
+                      alt="Logo"
+                      className="max-h-16 max-w-[220px] object-contain"
+                    />
+                  ) : (
+                    <div className="w-24" />
                   )}
+                  <div className="flex-1 text-center font-extrabold text-sm tracking-wide uppercase text-slate-900">
+                    PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO
+                  </div>
+                  <div className="w-24" />
                 </div>
-              </div>
 
-              <div className="flex justify-between items-end pt-3 border-t border-slate-200">
-                <div className="text-sm font-extrabold text-slate-900">
-                  {companyInfo.companyName}
-                </div>
-                <div className="text-right text-xs">
-                  <span className="font-bold">{companyInfo.responsibleName}</span> ·{' '}
-                  <span className="text-slate-500">{companyInfo.responsibleLicense}</span>
+                <div
+                  className="border border-slate-300 rounded-lg p-3 bg-white overflow-hidden"
+                  dangerouslySetInnerHTML={{
+                    __html: generateSvgStringForExport(true) || '',
+                  }}
+                />
+
+                <table className="w-full border-collapse border border-slate-900 text-xs">
+                  <tbody>
+                    <tr>
+                      <td className="border border-slate-900 p-2 w-2/5">
+                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                          Proyecto
+                        </span>
+                        <span className="font-extrabold">{companyInfo.projectName}</span>
+                      </td>
+                      <td className="border border-slate-900 p-2 w-1/4">
+                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                          Cliente
+                        </span>
+                        <span className="font-bold">{companyInfo.clientName}</span>
+                      </td>
+                      <td className="border border-slate-900 p-2">
+                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                          Centro / Pontón
+                        </span>
+                        <span className="font-bold">{companyInfo.centerName}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={2} className="border border-slate-900 p-2">
+                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                          Descripción
+                        </span>
+                        <span>{companyInfo.projectDescription || '-'}</span>
+                      </td>
+                      <td className="border border-slate-900 p-2">
+                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                          Coordenadas
+                        </span>
+                        <a
+                          href={mapsHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-sky-600 underline"
+                        >
+                          {companyInfo.coordinates || 'Sin coordenadas'}
+                        </a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="flex items-end justify-between pt-4 border-t border-slate-200">
+                  <div className="text-sm font-extrabold uppercase tracking-wide text-slate-900">
+                    {companyInfo.companyName}
+                  </div>
+                  <div className="text-center border-t border-slate-500 pt-1 px-6 text-xs">
+                    {companyInfo.signatureDataUrl && (
+                      <img
+                        src={companyInfo.signatureDataUrl}
+                        alt="Firma"
+                        className="max-h-12 mx-auto mb-1"
+                      />
+                    )}
+                    <div className="font-extrabold">{companyInfo.responsibleName}</div>
+                    <div className="text-[11px] text-slate-600">{companyInfo.responsibleRole}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7433,35 +7516,36 @@ export default function App() {
         </div>
       )}
 
-      {/* TOOLTIP FLOTANTE AL PASAR EL CURSOR POR UN EQUIPO */}
+      {/* TOOLTIP FLOTANTE AL PASAR EL MOUSE */}
       {hoveredObj && !draggingObjId && (
         <div
-          className={`fixed bottom-24 right-5 z-30 p-3 rounded-2xl border shadow-xl max-w-xs pointer-events-none ${
+          className={`fixed bottom-24 right-4 z-30 pointer-events-none px-3.5 py-2.5 rounded-2xl border shadow-xl text-xs max-w-xs ${
             darkMode
               ? 'bg-slate-900/95 border-slate-700 text-slate-100'
               : 'bg-white/95 border-slate-200 text-slate-900'
           }`}
         >
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-xs font-extrabold text-sky-500">{hoveredObj.tag}</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-500/15">
+            <span className="font-extrabold text-sky-500">{hoveredObj.tag}</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-500/15">
               {STATUS_CONFIG[hoveredObj.status]?.label}
             </span>
           </div>
-          <div className="text-xs font-bold">
-            {hoveredObj.spec}
-            {hoveredObj.brand ? ` · Marca: ${hoveredObj.brand}` : ''}
+          <div className="font-bold">
+            {hoveredObj.genericName || TYPE_GENERIC_LABELS[hoveredObj.type]} ·{' '}
+            <span className="text-indigo-500">{hoveredObj.brand || 'Genérico'}</span>
           </div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{hoveredObj.spec}</div>
           <div className="text-[11px] text-slate-400 mt-0.5">
-            {phaseConfigs[hoveredObj.phase]?.label || hoveredObj.phase} · {hoveredObj.power}W
+            {hoveredObj.locationLabel} · {hoveredObj.power}W
           </div>
         </div>
       )}
 
       {/* NOTIFICACIÓN TOAST */}
       {toast && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-bold shadow-xl border border-slate-700 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold shadow-xl flex items-center gap-2 border border-slate-700">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toast.message}</span>
         </div>
       )}
