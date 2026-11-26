@@ -3059,210 +3059,221 @@ export default function App() {
   }, [objects]);
 
   const handleExportPDF = () => {
-    const svgString = generateSvgStringForExport(true);
-    if (!svgString) return;
+    try {
+      const svgEl = svgRef.current;
+      if (!svgEl) return;
 
-    const totalWatts = objects.reduce((acc, o) => acc + (Number(o.power) || 0), 0);
-    const activePhotoperiodCages = cages.filter((c) => c.photoperiodActive).length;
-    const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
-    const printWin = window.open('', '_blank', 'width=1200,height=850');
-    if (!printWin) {
-      notify('Permite ventanas emergentes para generar el PDF', 'warn');
-      return;
-    }
+      const clonedSvg = svgEl.cloneNode(true);
+      const gridRect = clonedSvg.querySelector('rect[fill="url(#techGrid)"]');
+      if (gridRect) gridRect.remove();
 
-    // Construcción dinámica del Checklist de Sistemas Instalados
-    const installedSystems = [];
-    const hasPhotoperiodLamps = objects.some(
-      (o) =>
-        o.phase === 'fotoperiodo' ||
-        o.icon === 'led_lamp' ||
-        /fotoperiodo/i.test(`${o.label || ''} ${o.spec || ''}`)
-    );
+      const innerG = clonedSvg.querySelector('g');
+      if (innerG) innerG.setAttribute('transform', 'translate(0, 0) scale(1)');
+      clonedSvg.setAttribute('viewBox', '0 0 1850 560');
 
-    if (hasPhotoperiodLamps) {
-      installedSystems.push('Fotoperiodo LED');
-    }
-    if (
-      objects.some((o) => o.phase === 'fuerza_aux') ||
-      conduits.some((c) => ['L1', 'L2', 'L3', 'TRIFASICO'].includes(c.phase))
-    ) {
-      installedSystems.push('Fuerza / Iluminación');
-    }
-    if (objects.some((o) => o.phase === 'control') || conduits.some((c) => c.phase === 'CONTROL')) {
-      installedSystems.push('Control / Tableros');
-    }
-    if (objects.some((o) => o.phase === 'monitoreo')) {
-      installedSystems.push('Monitoreo / Cámaras');
-    }
-    if (objects.some((o) => o.phase === 'alimentacion')) {
-      installedSystems.push('Alimentación');
-    }
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(clonedSvg);
+      const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
 
-    const checklistItemsHtml =
-      installedSystems.length > 0
-        ? installedSystems
-            .map(
-              (sys) => `
-              <span style="display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #10b981;color:#065f46;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;">
-                <span style="font-weight:900;color:#059669;">✓</span> ${sys}
-              </span>`
-            )
-            .join(' ')
-        : '<span style="font-size:10.5px;color:#64748b;font-weight:600;">Sin sistemas registrados</span>';
+      // Checklist automático de sistemas instalados en el plano
+      const installedSystems = [];
+      const hasPhotoperiodLamps = objects.some(
+        (o) =>
+          o.phase === 'fotoperiodo' ||
+          o.icon === 'led_lamp' ||
+          /fotoperiodo/i.test(`${o.label || ''} ${o.spec || ''}`)
+      );
 
-    const rowsHtml = summarizedEquipment
-      .map((g) => {
-        const cleanTags = (g.tags || []).filter((t) => t && String(t).trim() !== '');
-        const displayTags = cleanTags.length > 0 ? cleanTags.join(', ') : 'SIN INFORMACION';
-        return `
-        <tr>
-          <td style="text-align:center; font-weight:800;">${g.count}</td>
-          <td style="font-weight:700; ${cleanTags.length === 0 ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
-          <td>${g.modulesLabel}</td>
-          <td>${g.spec}</td>
-          <td>${PHASE_CONFIG[g.phase]?.label || g.phase}</td>
-          <td style="text-align:right;">${g.unitPower} W</td>
-          <td style="text-align:right; font-weight:700;">${g.totalPower} W</td>
-          <td>${g.summaryStatus}</td>
-        </tr>`;
-      })
-      .join('');
+      if (hasPhotoperiodLamps) {
+        installedSystems.push('Fotoperiodo LED');
+      }
+      if (
+        objects.some((o) => o.phase === 'fuerza_aux') ||
+        conduits.some((c) => ['L1', 'L2', 'L3', 'TRIFASICO'].includes(c.phase))
+      ) {
+        installedSystems.push('Fuerza / Iluminación');
+      }
+      if (
+        objects.some((o) => o.phase === 'control') ||
+        conduits.some((c) => c.phase === 'CONTROL')
+      ) {
+        installedSystems.push('Control / Tableros');
+      }
+      if (objects.some((o) => o.phase === 'monitoreo')) {
+        installedSystems.push('Monitoreo / Cámaras');
+      }
+      if (objects.some((o) => o.phase === 'alimentacion')) {
+        installedSystems.push('Alimentación');
+      }
 
-    const conduitRowsHtml = conduits
-      .map((c) => {
-        const phaseInfo = CONDUIT_PHASE_CONFIG[c.phase] || { label: c.phase };
-        const meters = computeConduitMeters(c);
-        return `
-        <tr>
-          <td style="font-weight:700;">${c.tag}</td>
-          <td>${phaseInfo.label}</td>
-          <td>${c.cableSpec || '-'}</td>
-          <td style="text-align:center;">+${c.slackPercent || 0}%</td>
-          <td style="text-align:right; font-weight:800;">${meters} m</td>
-        </tr>`;
-      })
-      .join('');
+      const checklistItemsHtml =
+        installedSystems.length > 0
+          ? installedSystems
+              .map(
+                (sys) => `
+                <span style="display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #10b981;color:#065f46;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;">
+                  <span style="font-weight:900;color:#059669;">✓</span> ${sys}
+                </span>`
+              )
+              .join(' ')
+          : '<span style="font-size:10.5px;color:#64748b;font-weight:600;">Sin sistemas registrados</span>';
 
-    const htmlDoc = `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8" />
-        <title>${companyInfo.centerName}</title>
-        <style>
-          @page { margin: 8mm; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
-          .logo-bar { margin-bottom: 8px; }
-          .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
-          .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
-          .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
-          .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
-          .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
-          .tb-label { font-size: 8.5px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
-          .tb-val { font-size: 11.5px; font-weight: 700; color: #0f172a; }
-          .kpis { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-          .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; background: #f1f5f9; }
-          .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 3px; }
-          .kpi-val { font-size: 13px; font-weight: 800; color: #0f172a; }
-          .checklist-wrap { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
-          table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
-          table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
-          table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
-          .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
-          .company-footer { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
-          .sign-box { width: 250px; text-align: center; border-top: 1px solid #334155; padding-top: 5px; font-size: 10.5px; }
-          .sign-img { max-height: 46px; margin: 0 auto 4px auto; display: block; }
-        </style>
-      </head>
-      <body>
-        ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
+      const rowsHtml = summarizedEquipment
+        .map((g) => {
+          const rawTags = Array.isArray(g.tags)
+            ? g.tags.filter((t) => t && String(t).trim() !== '' && String(t).trim() !== '-').join(', ')
+            : String(g.tagsLabel || '').trim();
+          const hasValidTags = rawTags !== '' && rawTags !== '-' && rawTags.toLowerCase() !== 'sin tag';
+          const displayTags = hasValidTags ? rawTags : 'SIN INFORMACION';
 
-        <div class="plan-box">${svgString}</div>
-
-        <table class="title-block">
+          return `
           <tr>
-            <td style="width:36%;"><span class="tb-label">Proyecto</span><span class="tb-val">${companyInfo.projectName || '-'}</span></td>
-            <td style="width:32%;"><span class="tb-label">Cliente / Mandante</span><span class="tb-val">${companyInfo.clientName || '-'}</span></td>
-            <td style="width:32%;"><span class="tb-label">Centro / Pontón</span><span class="tb-val">${companyInfo.centerName || '-'}</span></td>
-          </tr>
+            <td style="text-align:center; font-weight:800;">${g.count}</td>
+            <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
+            <td>${g.modulesLabel || '-'}</td>
+            <td>${g.spec || '-'}</td>
+            <td>${PHASE_CONFIG[g.phase]?.label || g.phase || '-'}</td>
+            <td style="text-align:right;">${g.unitPower || 0} W</td>
+            <td style="text-align:right; font-weight:700;">${g.totalPower || 0} W</td>
+            <td>${g.summaryStatus || '-'}</td>
+          </tr>`;
+        })
+        .join('');
+
+      const conduitRowsHtml = conduits
+        .map((c) => {
+          const phaseInfo = CONDUIT_PHASE_CONFIG[c.phase] || { label: c.phase };
+          const meters = computeConduitMeters(c);
+          return `
           <tr>
-            <td colspan="2"><span class="tb-label">Descripción del Alcance</span><span>${companyInfo.projectDescription || '-'}</span></td>
-            <td><span class="tb-label">Coordenadas Geográficas</span><a href="${mapsLink}" target="_blank" style="color:#0284c7;font-weight:700;">${companyInfo.coordinates || 'Sin coordenadas'}</a></td>
-          </tr>
-        </table>
+            <td style="font-weight:700;">${c.tag}</td>
+            <td>${phaseInfo.label}</td>
+            <td>${c.cableSpec || '-'}</td>
+            <td style="text-align:center;">+${c.slackPercent || 0}%</td>
+            <td style="text-align:right; font-weight:800;">${meters} m</td>
+          </tr>`;
+        })
+        .join('');
 
-        <div class="kpis">
-          <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${cages.length} (${cages[0]?.dimensions || '30m x 30m'})</div></div>
-          <div class="kpi">
-            <div class="kpi-label">Checklist Sistemas Instalados</div>
-            <div class="checklist-wrap">${checklistItemsHtml}</div>
-          </div>
-          <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(totalWatts / 1000).toFixed(2)} kW</div></div>
-          <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${totalCableMetersByPhase.grandTotal} m</div></div>
-        </div>
+      const htmlDoc = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>${companyInfo.centerName || 'Plano Técnico'}</title>
+          <style>
+            @page { margin: 8mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
+            .logo-bar { margin-bottom: 8px; }
+            .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
+            .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
+            .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
+            .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
+            .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
+            .tb-label { font-size: 8.5px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
+            .tb-val { font-size: 11.5px; font-weight: 700; color: #0f172a; }
+            .kpis { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+            .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; background: #f1f5f9; }
+            .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 3px; }
+            .kpi-val { font-size: 13px; font-weight: 800; color: #0f172a; }
+            .checklist-wrap { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+            table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
+            table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
+            table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
+            .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
+            .company-footer { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
+            .sign-box { width: 250px; text-align: center; border-top: 1px solid #334155; padding-top: 5px; font-size: 10.5px; }
+            .sign-img { max-height: 46px; margin: 0 auto 4px auto; display: block; }
+          </style>
+        </head>
+        <body>
+          ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
 
-        <h4>1. Resumen de Equipos Instalados por Componente Genérico y Marca</h4>
-        <table class="inv">
-          <thead>
+          <div class="plan-box">${svgString}</div>
+
+          <table class="title-block">
             <tr>
-              <th style="text-align:center;">Cant.</th>
-              <th>Componente Genérico</th>
-              <th>Marca</th>
-              <th>TAGs Agrupados</th>
-              <th>Módulo</th>
-              <th>Características Técnicas</th>
-              <th>Circuito / Fase</th>
-              <th style="text-align:right;">Pot. Unit.</th>
-              <th style="text-align:right;">Pot. Total</th>
-              <th>Estado</th>
+              <td style="width:36%;"><span class="tb-label">Proyecto</span><span class="tb-val">${companyInfo.projectName || '-'}</span></td>
+              <td style="width:32%;"><span class="tb-label">Cliente / Mandante</span><span class="tb-val">${companyInfo.clientName || '-'}</span></td>
+              <td style="width:32%;"><span class="tb-label">Centro / Pontón</span><span class="tb-val">${companyInfo.centerName || '-'}</span></td>
             </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-
-        ${
-          conduits.length > 0
-            ? `
-        <h4>2. Cubicación de Canalizaciones y Tramos de Cable por Fase</h4>
-        <table class="inv">
-          <thead>
             <tr>
-              <th>TAG Tramo</th>
-              <th>Fase Eléctrica</th>
-              <th>Conductor / Canalización</th>
-              <th style="text-align:right;">Tramo Pasillo</th>
-              <th style="text-align:right;">Bajada / Holgura</th>
-              <th style="text-align:right;">Total Cable</th>
+              <td colspan="2"><span class="tb-label">Descripción del Alcance</span><span>${companyInfo.projectDescription || '-'}</span></td>
+              <td><span class="tb-label">Coordenadas Geográficas</span><a href="${mapsLink}" target="_blank" style="color:#0284c7;font-weight:700;">${companyInfo.coordinates || 'Sin coordenadas'}</a></td>
             </tr>
-          </thead>
-          <tbody>
-            ${conduitRowsHtml}
-            <tr style="background:#f1f5f9; font-weight:800;">
-              <td colspan="5" style="text-align:right;">TOTAL GENERAL DE CABLE UTILIZADO:</td>
-              <td style="text-align:right;">${totalCableMeters} m</td>
-            </tr>
-          </tbody>
-        </table>`
-            : ''
-        }
+          </table>
 
-        <div class="footer-bottom">
-          <div class="company-footer">${companyInfo.companyName || 'SERVICIOS BEQA SPA'}</div>
-          <div class="sign-box">
-            ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : '<div style="height:28px;"></div>'}
-            <strong>${companyInfo.responsibleName}</strong><br/>
-            <span>${companyInfo.responsibleRole}</span><br/>
-            <span style="color:#64748b;">${companyInfo.responsibleLicense}</span>
+          <div class="kpis">
+            <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${cages.length} (${cages[0]?.dimensions || '30m x 30m'})</div></div>
+            <div class="kpi">
+              <div class="kpi-label">Checklist Sistemas Instalados</div>
+              <div class="checklist-wrap">${checklistItemsHtml}</div>
+            </div>
+            <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(totalWatts / 1000).toFixed(2)} kW</div></div>
+            <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${totalCableMetersByPhase.grandTotal} m</div></div>
           </div>
-        </div>
-        <script>window.onload = function() { window.print(); };</script>
-      </body>
-      </html>
-    `;
-    printWin.document.open();
-    printWin.document.write(htmlDoc);
-    printWin.document.close();
+
+          <table class="inv">
+            <thead>
+              <tr>
+                <th style="text-align:center;">Cant.</th>
+                <th>TAGs Agrupados</th>
+                <th>Módulo</th>
+                <th>Especificación Técnica</th>
+                <th>Circuito / Fase</th>
+                <th style="text-align:right;">Pot. Unit.</th>
+                <th style="text-align:right;">Pot. Total</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+
+          ${
+            conduits.length > 0
+              ? `<table class="inv">
+                  <thead>
+                    <tr>
+                      <th>Tramo Canalización</th>
+                      <th>Fase / Circuito</th>
+                      <th>Conductor / Cable</th>
+                      <th style="text-align:center;">Holgura</th>
+                      <th style="text-align:right;">Longitud Calculada</th>
+                    </tr>
+                  </thead>
+                  <tbody>${conduitRowsHtml}</tbody>
+                </table>`
+              : ''
+          }
+
+          <div class="footer-bottom">
+            <div class="company-footer">${companyInfo.companyName || 'SERVICIOS BEQA SPA'}</div>
+            <div class="sign-box">
+              ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : ''}
+              <strong>${companyInfo.responsibleName || 'Responsable Técnico'}</strong><br/>
+              <span>${companyInfo.responsibleRole || ''}</span>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() { setTimeout(function() { window.print(); }, 350); };
+          </script>
+        </body>
+        </html>
+      `;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        notify('Activa las ventanas emergentes (pop-ups) en tu navegador para exportar PDF', 'warn');
+        return;
+      }
+      printWindow.document.open();
+      printWindow.document.write(htmlDoc);
+      printWindow.document.close();
+    } catch (err) {
+      console.error('Error al generar PDF:', err);
+      notify(`Error al generar PDF: ${err?.message || 'Revisa la consola'}`, 'warn');
+    }
   };
 
   const filteredObjects = useMemo(() => {
