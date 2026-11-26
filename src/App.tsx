@@ -3125,6 +3125,18 @@ export default function App() {
             : String(g.tagsLabel || '').trim();
           const hasValidTags = rawTags !== '' && rawTags !== '-' && rawTags.toLowerCase() !== 'sin tag';
           const displayTags = hasValidTags ? rawTags : 'SIN INFORMACION';
+          const localPhaseLabels = {
+            fotoperiodo: 'Fotoperiodo LED',
+            fuerza_aux: 'Fuerza 220V Auxiliar',
+            control: 'Fuerza y Control',
+            monitoreo: 'Sensores / Cámaras',
+            alimentacion: 'Alimentación',
+          };
+          const phaseLabel =
+            (typeof PHASES !== 'undefined' && PHASES[g.phase]?.label) ||
+            localPhaseLabels[g.phase] ||
+            g.phase ||
+            '-';
 
           return `
           <tr>
@@ -3132,7 +3144,7 @@ export default function App() {
             <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
             <td>${g.modulesLabel || '-'}</td>
             <td>${g.spec || '-'}</td>
-            <td>${PHASE_CONFIG[g.phase]?.label || g.phase || '-'}</td>
+            <td>${phaseLabel}</td>
             <td style="text-align:right;">${g.unitPower || 0} W</td>
             <td style="text-align:right; font-weight:700;">${g.totalPower || 0} W</td>
             <td>${g.summaryStatus || '-'}</td>
