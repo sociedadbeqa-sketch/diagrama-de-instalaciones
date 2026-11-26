@@ -7,7 +7,7 @@ import {
   Magnet, Eye, EyeOff, Info, Layers, Grid, ArrowRightLeft, Building2, Printer,
   Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus,
-  Route, Square
+  Route, Square, Scissors, ClipboardPaste
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -92,18 +92,24 @@ const INITIAL_MODULES = [
   },
 ];
 
-const generateInitialCages = () => {
+const generateCagesFromModules = (modsList) => {
   const cages = [];
   const speciesList = ['Salmón del Atlántico (Salmo salar)', 'Salmón Coho (Oncorhynchus kisutch)'];
-  INITIAL_MODULES.forEach((mod, mIdx) => {
-    let counter = mod.startNumber;
-    for (let r = 0; r < mod.rows; r++) {
-      for (let c = 0; c < mod.cols; c++) {
+  modsList.forEach((mod, mIdx) => {
+    let counter = Number(mod.startNumber) || 101;
+    const rows = Math.max(1, Number(mod.rows) || 1);
+    const cols = Math.max(1, Number(mod.cols) || 1);
+    const sizePx = Number(mod.cageSize) || BASE_CAGE_PX;
+    const sizeMeters = Number(mod.cageSizeMeters) || BASE_CAGE_METERS;
+    const walkway = Number(mod.walkwayWidth) || 16;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
         const num = counter++;
-        const x = mod.originX + c * (mod.cageSize + mod.walkwayWidth);
-        const y = mod.originY + r * (mod.cageSize + mod.walkwayWidth);
+        const x = mod.originX + c * (sizePx + walkway);
+        const y = mod.originY + r * (sizePx + walkway);
         cages.push({
-          id: `JAULA-${num}`,
+          id: `JAULA-${mod.id}-${num}-${r}-${c}`,
           number: num,
           label: String(num),
           showLabel: true,
@@ -112,9 +118,9 @@ const generateInitialCages = () => {
           col: c,
           x,
           y,
-          size: mod.cageSize,
-          sizeMeters: mod.cageSizeMeters || 30,
-          dimensions: '30m x 30m',
+          size: sizePx,
+          sizeMeters,
+          dimensions: `${sizeMeters}m x ${sizeMeters}m`,
           depth: '22m',
           species: speciesList[mIdx % 2],
           biomassTons: Number((145 + ((num * 7) % 55)).toFixed(1)),
@@ -127,6 +133,8 @@ const generateInitialCages = () => {
   });
   return cages;
 };
+
+const generateInitialCages = () => generateCagesFromModules(INITIAL_MODULES);
 
 const INITIAL_OBJECTS = [
   {
@@ -585,7 +593,7 @@ export default function App() {
   const [showTrunkLabel, setShowTrunkLabel] = useState(true);
   const [selectedModuleId, setSelectedModuleId] = useState(null);
 
-  // Modal Nuevo Proyecto
+  // Modal Nuevo Proyecto con Configuración de Distribución de Jaulas
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectForm, setNewProjectForm] = useState({
     projectName: '',
@@ -594,7 +602,19 @@ export default function App() {
     centerName: '',
     coordinates: '',
     googleMapsUrl: '',
-    clearExistingObjects: false,
+    clearExistingObjects: true,
+    // Configuración de distribución de jaulas
+    mod1Name: 'MÓDULO 200',
+    mod1Rows: 2,
+    mod1Cols: 6,
+    mod1StartNumber: 201,
+    mod1CageMeters: 30,
+    hasMod2: true,
+    mod2Name: 'MÓDULO 100',
+    mod2Rows: 2,
+    mod2Cols: 5,
+    mod2StartNumber: 101,
+    mod2CageMeters: 30,
   });
 
   // Estado de vista del plano (Pan & Zoom)
@@ -653,12 +673,14 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
-  // Interacción de arrastre y soporte táctil (móvil / tablet)
+  // Interacción de arrastre y portapapeles unificado (equipos, jaulas, canalizaciones)
   const [draggingObjId, setDraggingObjId] = useState(null);
+  const [draggingCageId, setDraggingCageId] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [hoveredObj, setHoveredObj] = useState(null);
-  const [clipboardObj, setClipboardObj] = useState(null);
+  const [clipboardItem, setClipboardItem] = useState(null); // { kind: 'object' | 'cage' | 'conduit', data: any }
   const pinchRef = useRef({ active: false, initialDist: 0, initialZoom: 0.84 });
 
   const svgRef = useRef(null);
@@ -670,6 +692,74 @@ export default function App() {
   const notify = (message, type = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3400);
+  };
+
+  // ============================================================================
+  // LÍMITES DINÁMICOS DE MÓDULOS (ZONA GRIS AUTOAJUSTABLE A LAS JAULAS ACTIVAS)
+  // ============================================================================
+  const moduleBoundsMap = useMemo(() => {
+    const map = {};
+    modules.forEach((mod) => {
+      const modCages = cages.filter((c) => c.moduleId === mod.id);
+      const walkway = Number(mod.walkwayWidth) || 16;
+
+      if (modCages.length === 0) {
+        map[mod.id] = {
+          hasCages: false,
+          count: 0,
+          boxX: mod.originX - walkway,
+          boxY: mod.originY - walkway,
+          totalW: 0,
+          totalH: 0,
+          midY: mod.originY + 80,
+          rightEdge: mod.originX - walkway,
+          leftEdge: mod.originX - walkway,
+        };
+        return;
+      }
+
+      const minX = Math.min(...modCages.map((c) => c.x));
+      const minY = Math.min(...modCages.map((c) => c.y));
+      const maxX = Math.max(...modCages.map((c) => c.x + (Number(c.size) || BASE_CAGE_PX)));
+      const maxY = Math.max(...modCages.map((c) => c.y + (Number(c.size) || BASE_CAGE_PX)));
+
+      const boxX = minX - walkway;
+      const boxY = minY - walkway;
+      const totalW = maxX - minX + walkway * 2;
+      const totalH = maxY - minY + walkway * 2;
+
+      map[mod.id] = {
+        hasCages: true,
+        count: modCages.length,
+        boxX,
+        boxY,
+        totalW,
+        totalH,
+        midY: boxY + totalH / 2,
+        rightEdge: boxX + totalW,
+        leftEdge: boxX,
+      };
+    });
+    return map;
+  }, [modules, cages]);
+
+  // Detectar a qué módulo pertenece una coordenada X según los límites actuales
+  const detectModuleId = (x) => {
+    if (modules.length === 0) return 'MOD-200';
+    if (modules.length === 1) return modules[0].id;
+
+    let bestModId = modules[0].id;
+    let bestDist = Infinity;
+    modules.forEach((mod) => {
+      const b = moduleBoundsMap[mod.id];
+      const centerX = b && b.hasCages ? b.boxX + b.totalW / 2 : mod.originX + 200;
+      const d = Math.abs(x - centerX);
+      if (d < bestDist) {
+        bestDist = d;
+        bestModId = mod.id;
+      }
+    });
+    return bestModId;
   };
 
   // ============================================================================
@@ -1041,7 +1131,7 @@ export default function App() {
   };
 
   // ============================================================================
-  // CREAR NUEVO PROYECTO
+  // CREAR NUEVO PROYECTO CON CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS
   // ============================================================================
   const handleCreateNewProject = async (e) => {
     e.preventDefault();
@@ -1069,18 +1159,70 @@ export default function App() {
       code: newCode,
     };
 
+    // Generar módulos y jaulas personalizados según la configuración del formulario
+    const m1Rows = Math.max(1, Number(newProjectForm.mod1Rows) || 2);
+    const m1Cols = Math.max(1, Number(newProjectForm.mod1Cols) || 5);
+    const m1Start = Number(newProjectForm.mod1StartNumber) || 201;
+    const m1Meters = Math.max(5, Number(newProjectForm.mod1CageMeters) || 30);
+    const m1SizePx = Math.round((m1Meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
+    const walkway = 16;
+    const m1TotalCount = m1Rows * m1Cols;
+
+    const generatedModules = [
+      {
+        id: 'MOD-200',
+        name: newProjectForm.mod1Name.trim() || 'MÓDULO 200',
+        subtitle: `Tren 1 - ${m1TotalCount} Jaulas (${m1Start} - ${m1Start + m1TotalCount - 1}) · ${m1Meters}m×${m1Meters}m`,
+        originX: 120,
+        originY: 160,
+        rows: m1Rows,
+        cols: m1Cols,
+        cageSize: m1SizePx,
+        cageSizeMeters: m1Meters,
+        walkwayWidth: walkway,
+        startNumber: m1Start,
+      },
+    ];
+
+    if (newProjectForm.hasMod2) {
+      const m2Rows = Math.max(1, Number(newProjectForm.mod2Rows) || 2);
+      const m2Cols = Math.max(1, Number(newProjectForm.mod2Cols) || 5);
+      const m2Start = Number(newProjectForm.mod2StartNumber) || 101;
+      const m2Meters = Math.max(5, Number(newProjectForm.mod2CageMeters) || 30);
+      const m2SizePx = Math.round((m2Meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
+      const m2TotalCount = m2Rows * m2Cols;
+
+      const m1WidthPx = m1Cols * (m1SizePx + walkway) + walkway;
+      const m2OriginX = 120 + m1WidthPx + 216;
+
+      generatedModules.push({
+        id: 'MOD-100',
+        name: newProjectForm.mod2Name.trim() || 'MÓDULO 100',
+        subtitle: `Tren 2 - ${m2TotalCount} Jaulas (${m2Start} - ${m2Start + m2TotalCount - 1}) · ${m2Meters}m×${m2Meters}m`,
+        originX: m2OriginX,
+        originY: 160,
+        rows: m2Rows,
+        cols: m2Cols,
+        cageSize: m2SizePx,
+        cageSizeMeters: m2Meters,
+        walkwayWidth: walkway,
+        startNumber: m2Start,
+      });
+    }
+
+    const nextCages = generateCagesFromModules(generatedModules);
     const nextObjects = newProjectForm.clearExistingObjects ? [] : objects;
     const nextConduits = newProjectForm.clearExistingObjects ? [] : conduits;
-    const nextCages = newProjectForm.clearExistingObjects ? generateInitialCages() : cages;
-    const nextModules = newProjectForm.clearExistingObjects ? INITIAL_MODULES : modules;
 
     setCompanyInfo(updatedInfo);
+    setModules(generatedModules);
+    setCages(nextCages);
     if (newProjectForm.clearExistingObjects) {
       setObjects([]);
       setConduits([]);
-      setCages(nextCages);
-      setModules(nextModules);
     }
+    setSelectedId(null);
+    setSelectedKind(null);
 
     const slugId = `${cName}-${pName}`
       .normalize('NFD')
@@ -1092,17 +1234,11 @@ export default function App() {
     setCurrentBlueprintId(slugId);
     setBlueprintNameInput(cName);
     setShowNewProjectModal(false);
-    setNewProjectForm({
-      projectName: '',
-      projectDescription: '',
-      clientName: '',
-      centerName: '',
-      coordinates: '',
-      googleMapsUrl: '',
-      clearExistingObjects: false,
-    });
 
-    notify(`Nuevo proyecto "${pName}" creado para ${cName}`, 'success');
+    notify(
+      `Proyecto "${pName}" creado con ${nextCages.length} jaulas configuradas`,
+      'success'
+    );
 
     if (db && fbUser) {
       await handleSaveToCloud(slugId, cName, {
@@ -1110,7 +1246,7 @@ export default function App() {
         objects: nextObjects,
         conduits: nextConduits,
         cages: nextCages,
-        modules: nextModules,
+        modules: generatedModules,
         symbolCatalog,
       });
     }
@@ -1154,6 +1290,165 @@ export default function App() {
     );
   };
 
+  // ============================================================================
+  // FUNCIONES DE COPIAR, CORTAR, PEGAR Y DUPLICAR (EQUIPOS, JAULAS Y CANALIZACIONES)
+  // ============================================================================
+  const copySelectedToClipboard = () => {
+    if (selectedObject) {
+      setClipboardItem({ kind: 'object', data: { ...selectedObject } });
+      notify(`Equipo "${selectedObject.tag}" copiado (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    if (selectedCage) {
+      setClipboardItem({ kind: 'cage', data: { ...selectedCage } });
+      notify(`Jaula "${selectedCage.label || selectedCage.number}" copiada (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    if (selectedConduit) {
+      setClipboardItem({
+        kind: 'conduit',
+        data: { ...selectedConduit, points: selectedConduit.points.map((p) => ({ ...p })) },
+      });
+      notify(`Canalización "${selectedConduit.tag}" copiada (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    return false;
+  };
+
+  const cutSelectedToClipboard = () => {
+    if (selectedObject) {
+      setClipboardItem({ kind: 'object', data: { ...selectedObject } });
+      deleteObject(selectedObject.id, true);
+      notify(`Equipo "${selectedObject.tag}" cortado (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    if (selectedCage) {
+      setClipboardItem({ kind: 'cage', data: { ...selectedCage } });
+      deleteCage(selectedCage.id, true);
+      notify(`Jaula "${selectedCage.label || selectedCage.number}" cortada (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    if (selectedConduit) {
+      setClipboardItem({
+        kind: 'conduit',
+        data: { ...selectedConduit, points: selectedConduit.points.map((p) => ({ ...p })) },
+      });
+      deleteConduit(selectedConduit.id, true);
+      notify(`Canalización "${selectedConduit.tag}" cortada (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    return false;
+  };
+
+  const duplicateObject = (sourceObj, offsetX = 32, offsetY = 32) => {
+    if (!sourceObj) return;
+    const newX = Math.round(sourceObj.x + offsetX);
+    const newY = Math.round(sourceObj.y + offsetY);
+    const modId = detectModuleId(newX);
+    const count = objects.filter((o) => o.type === sourceObj.type).length + 1;
+
+    const baseTag = sourceObj.tag.replace(/-\d+$/, '');
+    const newTag = `${baseTag}-${String(count).padStart(2, '0')}`;
+
+    const clonedObj = {
+      ...sourceObj,
+      id: `OBJ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      tag: newTag,
+      x: newX,
+      y: newY,
+      moduleId: modId,
+      locationLabel: `${sourceObj.locationLabel || ''} (Copia)`.trim(),
+    };
+
+    setObjects((prev) => [...prev, clonedObj]);
+    setSelectedId(clonedObj.id);
+    setSelectedKind('object');
+    setShowRightSidebar(true);
+    notify(`Equipo pegado como "${clonedObj.tag}"`, 'success');
+  };
+
+  const duplicateCage = (sourceCage, offsetX = null, offsetY = 0) => {
+    if (!sourceCage) return;
+    const stepX =
+      offsetX !== null
+        ? offsetX
+        : (Number(sourceCage.size) || BASE_CAGE_PX) + 16;
+    const newX = Math.round(sourceCage.x + stepX);
+    const newY = Math.round(sourceCage.y + offsetY);
+    const targetModId = sourceCage.moduleId || detectModuleId(newX);
+
+    const maxNum = cages.reduce((mx, c) => Math.max(mx, Number(c.number) || 0), 100);
+    const nextNum = maxNum + 1;
+    const newLabel = String(nextNum);
+
+    const clonedCage = {
+      ...sourceCage,
+      id: `JAULA-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      number: nextNum,
+      label: newLabel,
+      showLabel: true,
+      moduleId: targetModId,
+      x: newX,
+      y: newY,
+    };
+
+    setCages((prev) => [...prev, clonedCage]);
+    setSelectedId(clonedCage.id);
+    setSelectedKind('cage');
+    setShowRightSidebar(true);
+    notify(`Jaula pegada como "${newLabel}" (zona gris autoajustada)`, 'success');
+  };
+
+  const duplicateConduit = (sourceConduit, offsetX = 24, offsetY = 24) => {
+    if (!sourceConduit) return;
+    const clonedConduit = {
+      ...sourceConduit,
+      id: `CAN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      tag: `${sourceConduit.tag}-CP`,
+      points: (sourceConduit.points || []).map((p) => ({
+        x: Math.round(p.x + offsetX),
+        y: Math.round(p.y + offsetY),
+      })),
+    };
+    setConduits((prev) => [...prev, clonedConduit]);
+    setSelectedId(clonedConduit.id);
+    setSelectedKind('conduit');
+    setShowRightSidebar(true);
+    notify(`Canalización pegada como "${clonedConduit.tag}"`, 'success');
+  };
+
+  const pasteFromClipboard = () => {
+    if (!clipboardItem) return;
+    if (clipboardItem.kind === 'object') {
+      duplicateObject(clipboardItem.data, 36, 36);
+      setClipboardItem((prev) =>
+        prev ? { ...prev, data: { ...prev.data, x: prev.data.x + 36, y: prev.data.y + 36 } } : null
+      );
+    } else if (clipboardItem.kind === 'cage') {
+      const step = (Number(clipboardItem.data.size) || BASE_CAGE_PX) + 16;
+      duplicateCage(clipboardItem.data, step, 0);
+      setClipboardItem((prev) =>
+        prev ? { ...prev, data: { ...prev.data, x: prev.data.x + step } } : null
+      );
+    } else if (clipboardItem.kind === 'conduit') {
+      duplicateConduit(clipboardItem.data, 24, 24);
+      setClipboardItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              data: {
+                ...prev.data,
+                points: prev.data.points.map((p) => ({ x: p.x + 24, y: p.y + 24 })),
+              },
+            }
+          : null
+      );
+    }
+  };
+
+  // ============================================================================
+  // ATAJOS DE TECLADO (SUPR / DELETE, CTRL+C, CTRL+X, CTRL+V, CTRL+D)
+  // ============================================================================
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = e.target?.tagName?.toLowerCase();
@@ -1166,35 +1461,53 @@ export default function App() {
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-        if (selectedObject) {
+        if (copySelectedToClipboard()) {
           e.preventDefault();
-          setClipboardObj({ ...selectedObject });
-          notify(`Equipo "${selectedObject.tag}" copiado. Presiona Ctrl+V para duplicar`, 'info');
         }
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+        if (cutSelectedToClipboard()) {
+          e.preventDefault();
+        }
+        return;
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        if (clipboardObj) {
+        if (clipboardItem) {
           e.preventDefault();
-          duplicateObject(clipboardObj, 36, 36);
+          pasteFromClipboard();
         }
+        return;
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         if (selectedObject) {
           e.preventDefault();
           duplicateObject(selectedObject, 36, 36);
+        } else if (selectedCage) {
+          e.preventDefault();
+          duplicateCage(selectedCage);
+        } else if (selectedConduit) {
+          e.preventDefault();
+          duplicateConduit(selectedConduit);
         }
+        return;
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedObject) {
           e.preventDefault();
           deleteObject(selectedObject.id);
+        } else if (selectedCage) {
+          e.preventDefault();
+          deleteCage(selectedCage.id);
         } else if (selectedConduit) {
           e.preventDefault();
           deleteConduit(selectedConduit.id);
         }
+        return;
       }
 
       if (e.key === 'Escape') {
@@ -1218,21 +1531,41 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObject, selectedConduit, clipboardObj, objects, showPreviewModal, isFullscreen, activeTool, drawingPoints]);
+  }, [
+    selectedObject,
+    selectedCage,
+    selectedConduit,
+    clipboardItem,
+    objects,
+    cages,
+    conduits,
+    showPreviewModal,
+    isFullscreen,
+    activeTool,
+    drawingPoints,
+  ]);
 
+  // Líneas magnéticas dinámicas calculadas a partir de los bordes reales de cada jaula y pasillo
   const walkwayLines = useMemo(() => {
-    const xs = [];
-    const ys = [];
-    modules.forEach((mod) => {
-      for (let c = 0; c <= mod.cols; c++) {
-        xs.push(mod.originX + c * (mod.cageSize + mod.walkwayWidth) - mod.walkwayWidth / 2);
-      }
-      for (let r = 0; r <= mod.rows; r++) {
-        ys.push(mod.originY + r * (mod.cageSize + mod.walkwayWidth) - mod.walkwayWidth / 2);
-      }
+    const xsSet = new Set();
+    const ysSet = new Set();
+
+    cages.forEach((c) => {
+      const mod = modules.find((m) => m.id === c.moduleId);
+      const halfW = (Number(mod?.walkwayWidth) || 16) / 2;
+      const size = Number(c.size) || BASE_CAGE_PX;
+
+      xsSet.add(c.x - halfW);
+      xsSet.add(c.x + size + halfW);
+      ysSet.add(c.y - halfW);
+      ysSet.add(c.y + size + halfW);
     });
-    return { xs, ys };
-  }, [modules]);
+
+    return {
+      xs: Array.from(xsSet),
+      ys: Array.from(ysSet),
+    };
+  }, [cages, modules]);
 
   const applySnap = (rawX, rawY) => {
     if (!snapToWalkway) return { x: Math.round(rawX), y: Math.round(rawY) };
@@ -1261,8 +1594,6 @@ export default function App() {
     return { x: Math.round(snappedX), y: Math.round(snappedY) };
   };
 
-  const detectModuleId = (x) => (x < 980 ? 'MOD-200' : 'MOD-100');
-
   const clientToSvgCoords = (clientX, clientY) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
@@ -1270,33 +1601,6 @@ export default function App() {
     const x = (clientX - rect.left - pan.x) / zoom;
     const y = (clientY - rect.top - pan.y) / zoom;
     return { x, y };
-  };
-
-  const duplicateObject = (sourceObj, offsetX = 32, offsetY = 32) => {
-    if (!sourceObj) return;
-    const newX = Math.round(sourceObj.x + offsetX);
-    const newY = Math.round(sourceObj.y + offsetY);
-    const modId = detectModuleId(newX);
-    const count = objects.filter((o) => o.type === sourceObj.type).length + 1;
-
-    const baseTag = sourceObj.tag.replace(/-\d+$/, '');
-    const newTag = `${baseTag}-${String(count).padStart(2, '0')}`;
-
-    const clonedObj = {
-      ...sourceObj,
-      id: `OBJ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      tag: newTag,
-      x: newX,
-      y: newY,
-      moduleId: modId,
-      locationLabel: `${sourceObj.locationLabel} (Copia)`,
-    };
-
-    setObjects((prev) => [...prev, clonedObj]);
-    setSelectedId(clonedObj.id);
-    setSelectedKind('object');
-    setShowRightSidebar(true);
-    notify(`Elemento duplicado como "${clonedObj.tag}"`, 'success');
   };
 
   const placeSymbolAtCoords = (rawX, rawY) => {
@@ -1339,8 +1643,8 @@ export default function App() {
       x: snapped.x,
       y: snapped.y,
       moduleId: modId,
-      locationLabel: `Pasillo ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}`,
-      description: `${defaultSpec} incorporado en pasillo del ${modId === 'MOD-200' ? 'Módulo 200' : 'Módulo 100'}.`,
+      locationLabel: `Pasillo ${modId}`,
+      description: `${defaultSpec} incorporado en pasillo.`,
       lastInspection: new Date().toISOString().slice(0, 10),
     };
     setObjects((prev) => [...prev, newObj]);
@@ -1358,7 +1662,7 @@ export default function App() {
     const meters = Math.max(5, Number(newCageSizeMeters) || 30);
     const visualPx = Math.round((meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
     const nextNum =
-      cages.reduce((maxN, c) => Math.max(maxN, Number(c.number) || 0), 300) + 1;
+      cages.reduce((maxN, c) => Math.max(maxN, Number(c.number) || 0), 100) + 1;
     const customLabel = newCageLabelInput.trim() || String(nextNum);
     const modId = detectModuleId(rawX);
 
@@ -1448,6 +1752,15 @@ export default function App() {
       return;
     }
 
+    if (draggingCageId) {
+      const nextX = Math.round((coords.x - dragOffset.x) / 8) * 8;
+      const nextY = Math.round((coords.y - dragOffset.y) / 8) * 8;
+      setCages((prev) =>
+        prev.map((c) => (c.id === draggingCageId ? { ...c, x: nextX, y: nextY } : c))
+      );
+      return;
+    }
+
     if (isPanning) {
       setPan({
         x: e.clientX - panStart.x,
@@ -1458,6 +1771,7 @@ export default function App() {
 
   const handleCanvasMouseUp = () => {
     setDraggingObjId(null);
+    setDraggingCageId(null);
     setIsPanning(false);
   };
 
@@ -1475,6 +1789,7 @@ export default function App() {
       pinchRef.current = { active: true, initialDist: dist, initialZoom: zoom };
       setIsPanning(false);
       setDraggingObjId(null);
+      setDraggingCageId(null);
       return;
     }
 
@@ -1550,6 +1865,7 @@ export default function App() {
   const handleCanvasTouchEnd = () => {
     pinchRef.current.active = false;
     setDraggingObjId(null);
+    setDraggingCageId(null);
     setIsPanning(false);
   };
 
@@ -1594,31 +1910,31 @@ export default function App() {
     );
   };
 
-  const deleteObject = (id) => {
+  const deleteObject = (id, silent = false) => {
     setObjects((prev) => prev.filter((o) => o.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
       setSelectedKind(null);
     }
-    notify('Equipo eliminado del plano', 'warn');
+    if (!silent) notify('Equipo eliminado del plano', 'warn');
   };
 
-  const deleteConduit = (id) => {
+  const deleteConduit = (id, silent = false) => {
     setConduits((prev) => prev.filter((c) => c.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
       setSelectedKind(null);
     }
-    notify('Canalización eliminada del plano', 'warn');
+    if (!silent) notify('Canalización eliminada del plano', 'warn');
   };
 
-  const deleteCage = (id) => {
+  const deleteCage = (id, silent = false) => {
     setCages((prev) => prev.filter((c) => c.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
       setSelectedKind(null);
     }
-    notify('Jaula eliminada del plano', 'warn');
+    if (!silent) notify('Jaula eliminada · Zona gris autoajustada', 'warn');
   };
 
   const handleImageUpload = (e, targetField) => {
@@ -1689,15 +2005,30 @@ export default function App() {
     e.target.value = '';
   };
 
+  // Exportación SVG adaptativa al encuadre real del proyecto
   const generateSvgStringForExport = () => {
     const svgEl = svgRef.current;
     if (!svgEl) return null;
 
+    let minX = 40;
+    let minY = 65;
+    let maxX = 1860;
+    let maxY = 535;
+
+    const activeBounds = Object.values(moduleBoundsMap).filter((b) => b.hasCages);
+    if (activeBounds.length > 0) {
+      minX = Math.min(...activeBounds.map((b) => b.boxX)) - 50;
+      minY = Math.min(...activeBounds.map((b) => b.boxY - 75)) - 20;
+      maxX = Math.max(...activeBounds.map((b) => b.boxX + b.totalW)) + 50;
+      maxY = Math.max(...activeBounds.map((b) => b.boxY + b.totalH)) + 60;
+    }
+
+    const exportWidth = Math.max(800, Math.round(maxX - minX));
+    const exportHeight = Math.max(380, Math.round(maxY - minY));
+
     const clone = svgEl.cloneNode(true);
-    const exportWidth = 1820;
-    const exportHeight = 470;
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clone.setAttribute('viewBox', `40 65 ${exportWidth} ${exportHeight}`);
+    clone.setAttribute('viewBox', `${minX} ${minY} ${exportWidth} ${exportHeight}`);
     clone.setAttribute('width', String(exportWidth));
     clone.setAttribute('height', String(exportHeight));
 
@@ -1707,8 +2038,8 @@ export default function App() {
     }
 
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', '40');
-    bgRect.setAttribute('y', '65');
+    bgRect.setAttribute('x', String(minX));
+    bgRect.setAttribute('y', String(minY));
     bgRect.setAttribute('width', String(exportWidth));
     bgRect.setAttribute('height', String(exportHeight));
     bgRect.setAttribute('fill', '#f0f9ff');
@@ -1727,7 +2058,7 @@ export default function App() {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = 2400;
-      canvas.height = 620;
+      canvas.height = 680;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2239,6 +2570,23 @@ export default function App() {
 
   const mapsHref = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
 
+  // Cálculo dinámico de línea troncal entre módulos activos
+  const trunkCoords = useMemo(() => {
+    if (modules.length < 2) return null;
+    const b1 = moduleBoundsMap[modules[0].id];
+    const b2 = moduleBoundsMap[modules[1].id];
+    if (!b1?.hasCages || !b2?.hasCages) return null;
+    if (b2.leftEdge <= b1.rightEdge) return null;
+    return {
+      x1: b1.rightEdge,
+      y1: b1.midY,
+      x2: b2.leftEdge,
+      y2: b2.midY,
+      midX: (b1.rightEdge + b2.leftEdge) / 2,
+      midY: (b1.midY + b2.midY) / 2,
+    };
+  }, [modules, moduleBoundsMap]);
+
   return (
     <div
       ref={appContainerRef}
@@ -2287,7 +2635,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Acciones Principales (Sin botón JSON) */}
+        {/* Acciones Principales */}
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => {
@@ -2298,7 +2646,18 @@ export default function App() {
                 centerName: '',
                 coordinates: '',
                 googleMapsUrl: '',
-                clearExistingObjects: false,
+                clearExistingObjects: true,
+                mod1Name: 'MÓDULO 200',
+                mod1Rows: 2,
+                mod1Cols: 6,
+                mod1StartNumber: 201,
+                mod1CageMeters: 30,
+                hasMod2: true,
+                mod2Name: 'MÓDULO 100',
+                mod2Rows: 2,
+                mod2Cols: 5,
+                mod2StartNumber: 101,
+                mod2CageMeters: 30,
               });
               setShowNewProjectModal(true);
             }}
@@ -2648,7 +3007,7 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
-                  Dimensión: <strong>{newCageSizeMeters}m × {newCageSizeMeters}m</strong>. Define la escala métrica de los cables cercanos.
+                  Atajos: <strong>Supr</strong> elimina · <strong>Ctrl+C / X / V</strong> copia, corta o pega.
                 </p>
               </div>
             </div>
@@ -3003,6 +3362,16 @@ export default function App() {
               <span className="flex items-center gap-1 text-rose-500">
                 <Route className="w-3.5 h-3.5" /> {totalCableMeters} m Cable
               </span>
+              {clipboardItem && (
+                <button
+                  onClick={pasteFromClipboard}
+                  className="px-2 py-0.5 rounded-md bg-sky-600 text-white text-[11px] font-extrabold flex items-center gap-1 hover:bg-sky-700"
+                  title="Pegar elemento del portapapeles (Ctrl+V)"
+                >
+                  <ClipboardPaste className="w-3 h-3" />
+                  <span>Pegar</span>
+                </button>
+              )}
               {metrics.alertCount > 0 && (
                 <span className="flex items-center gap-1 text-rose-500">
                   <AlertTriangle className="w-3.5 h-3.5" /> {metrics.alertCount} Alerta(s)
@@ -3124,17 +3493,15 @@ export default function App() {
             <rect width="100%" height="100%" fill="url(#seaGrid)" />
 
             <g id="plan-viewport" transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              {/* Estructuras de Módulos y Pasillos */}
+              {/* Estructuras de Módulos y Pasillos (Zona Gris Autoajustada a las Jaulas) */}
               {modules.map((mod) => {
-                const totalW = mod.cols * (mod.cageSize + mod.walkwayWidth) + mod.walkwayWidth;
-                const totalH = mod.rows * (mod.cageSize + mod.walkwayWidth) + mod.walkwayWidth;
-                const boxX = mod.originX - mod.walkwayWidth;
-                const boxY = mod.originY - mod.walkwayWidth;
+                const bounds = moduleBoundsMap[mod.id];
+                if (!bounds || !bounds.hasCages) return null;
 
                 return (
                   <g key={mod.id}>
                     <g
-                      transform={`translate(${boxX}, ${boxY - 54})`}
+                      transform={`translate(${bounds.boxX}, ${bounds.boxY - 54})`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedModuleId(mod.id);
@@ -3145,11 +3512,15 @@ export default function App() {
                       className="cursor-pointer"
                     >
                       <rect
-                        width="320"
+                        width="330"
                         height="44"
                         rx="10"
                         fill={darkMode ? '#0f172a' : '#ffffff'}
-                        stroke={selectedModuleId === mod.id && selectedKind === 'module' ? '#0284c7' : '#94a3b8'}
+                        stroke={
+                          selectedModuleId === mod.id && selectedKind === 'module'
+                            ? '#0284c7'
+                            : '#94a3b8'
+                        }
                         strokeWidth="1.8"
                       />
                       <text
@@ -3159,7 +3530,7 @@ export default function App() {
                         fontWeight="800"
                         fill={darkMode ? '#f8fafc' : '#0f172a'}
                       >
-                        {mod.name}
+                        {mod.name} ({bounds.count} jaulas)
                       </text>
                       <text
                         x="14"
@@ -3172,11 +3543,12 @@ export default function App() {
                       </text>
                     </g>
 
+                    {/* Zona gris que se adapta automáticamente a la cantidad y posición de jaulas */}
                     <rect
-                      x={boxX}
-                      y={boxY}
-                      width={totalW}
-                      height={totalH}
+                      x={bounds.boxX}
+                      y={bounds.boxY}
+                      width={bounds.totalW}
+                      height={bounds.totalH}
                       rx="12"
                       fill={darkMode ? '#334155' : '#64748b'}
                       stroke={darkMode ? '#475569' : '#334155'}
@@ -3186,52 +3558,54 @@ export default function App() {
                 );
               })}
 
-              {/* Línea Troncal Submarina entre Módulos */}
-              <g>
-                <line
-                  x1="888"
-                  y1="280"
-                  x2="1104"
-                  y2="280"
-                  stroke="#0284c7"
-                  strokeWidth="4"
-                  strokeDasharray="10 6"
-                />
-                {showTrunkLabel && (
-                  <g
-                    transform="translate(996, 266)"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedId('TRUNK');
-                      setSelectedKind('trunk');
-                      setShowRightSidebar(true);
-                    }}
-                    className="cursor-pointer"
-                  >
-                    <rect
-                      x="-74"
-                      y="-13"
-                      width="148"
-                      height="22"
-                      rx="8"
-                      fill={darkMode ? '#0f172a' : '#ffffff'}
-                      stroke="#0284c7"
-                      strokeWidth="1.5"
-                    />
-                    <text
-                      textAnchor="middle"
-                      y="2"
-                      fontSize="10.5"
-                      fontWeight="800"
-                      fill={darkMode ? '#38bdf8' : '#0369a1'}
+              {/* Línea Troncal Submarina Dinámica entre Módulos */}
+              {trunkCoords && (
+                <g>
+                  <line
+                    x1={trunkCoords.x1}
+                    y1={trunkCoords.y1}
+                    x2={trunkCoords.x2}
+                    y2={trunkCoords.y2}
+                    stroke="#0284c7"
+                    strokeWidth="4"
+                    strokeDasharray="10 6"
+                  />
+                  {showTrunkLabel && (
+                    <g
+                      transform={`translate(${trunkCoords.midX}, ${trunkCoords.midY - 14})`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId('TRUNK');
+                        setSelectedKind('trunk');
+                        setShowRightSidebar(true);
+                      }}
+                      className="cursor-pointer"
                     >
-                      {trunkLabel}
-                    </text>
-                  </g>
-                )}
-              </g>
+                      <rect
+                        x="-74"
+                        y="-13"
+                        width="148"
+                        height="22"
+                        rx="8"
+                        fill={darkMode ? '#0f172a' : '#ffffff'}
+                        stroke="#0284c7"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        textAnchor="middle"
+                        y="2"
+                        fontSize="10.5"
+                        fontWeight="800"
+                        fill={darkMode ? '#38bdf8' : '#0369a1'}
+                      >
+                        {trunkLabel}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              )}
 
-              {/* Jaulas de Cultivo */}
+              {/* Jaulas de Cultivo (Seleccionables y Arrastrables) */}
               {cages.map((cage) => {
                 const isSel = selectedKind === 'cage' && selectedId === cage.id;
                 const displayText = cage.label !== undefined ? cage.label : String(cage.number);
@@ -3241,11 +3615,14 @@ export default function App() {
                   <g
                     key={cage.id}
                     transform={`translate(${cage.x}, ${cage.y})`}
-                    onClick={(e) => {
-                      if (activeTool !== 'select') return;
+                    onMouseDown={(e) => {
+                      if (activeTool !== 'select' || e.button !== 0) return;
                       e.stopPropagation();
+                      const coords = clientToSvgCoords(e.clientX, e.clientY);
                       setSelectedId(cage.id);
                       setSelectedKind('cage');
+                      setDraggingCageId(cage.id);
+                      setDragOffset({ x: coords.x - cage.x, y: coords.y - cage.y });
                       setShowRightSidebar(true);
                     }}
                     className="cursor-pointer"
@@ -3256,7 +3633,7 @@ export default function App() {
                       rx="6"
                       fill={darkMode ? '#0c4a6e' : '#bae6fd'}
                       stroke={isSel ? '#f59e0b' : darkMode ? '#38bdf8' : '#0284c7'}
-                      strokeWidth={isSel ? '3' : '1.8'}
+                      strokeWidth={isSel ? '3.5' : '1.8'}
                     />
 
                     {/* Halo de Fotoperiodo Activo */}
@@ -3317,7 +3694,6 @@ export default function App() {
                 const metrics = calculateConduitMetrics(conduit);
                 const pointsStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
 
-                // Punto medio del tramo más largo para ubicar la etiqueta de metraje
                 let labelPt = pts[0];
                 let maxSegLen = -1;
                 for (let i = 0; i < pts.length - 1; i++) {
@@ -3343,14 +3719,12 @@ export default function App() {
                     }}
                     className="cursor-pointer"
                   >
-                    {/* Área invisible ancha para facilitar selección con clic */}
                     <polyline
                       points={pointsStr}
                       fill="none"
                       stroke="transparent"
                       strokeWidth="14"
                     />
-                    {/* Halo de selección */}
                     {isSel && (
                       <polyline
                         points={pointsStr}
@@ -3362,7 +3736,6 @@ export default function App() {
                         opacity="0.8"
                       />
                     )}
-                    {/* Trazo principal por fase */}
                     <polyline
                       points={pointsStr}
                       fill="none"
@@ -3372,7 +3745,6 @@ export default function App() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    {/* Nodos de vértices */}
                     {pts.map((pt, idx) => (
                       <circle
                         key={idx}
@@ -3384,7 +3756,6 @@ export default function App() {
                         strokeWidth="1.2"
                       />
                     ))}
-                    {/* Etiqueta de fase y metros calculados */}
                     {showLabels && (
                       <g transform={`translate(${labelPt.x}, ${labelPt.y - 12})`}>
                         <rect
@@ -3667,18 +4038,25 @@ export default function App() {
                     </span>
                     <h2 className="text-lg font-extrabold">{selectedObject.tag}</h2>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => duplicateObject(selectedObject)}
-                      className="p-2 rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25"
-                      title="Duplicar equipo"
+                      onClick={copySelectedToClipboard}
+                      className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
+                      title="Copiar (Ctrl+C)"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={cutSelectedToClipboard}
+                      className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                      title="Cortar (Ctrl+X)"
+                    >
+                      <Scissors className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => deleteObject(selectedObject.id)}
                       className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                      title="Eliminar equipo"
+                      title="Eliminar equipo (Supr)"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -3831,13 +4209,29 @@ export default function App() {
                     </span>
                     <h2 className="text-lg font-extrabold">{selectedConduit.tag}</h2>
                   </div>
-                  <button
-                    onClick={() => deleteConduit(selectedConduit.id)}
-                    className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                    title="Eliminar canalización"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={copySelectedToClipboard}
+                      className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
+                      title="Copiar (Ctrl+C)"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={cutSelectedToClipboard}
+                      className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                      title="Cortar (Ctrl+X)"
+                    >
+                      <Scissors className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteConduit(selectedConduit.id)}
+                      className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                      title="Eliminar canalización (Supr)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -3944,13 +4338,29 @@ export default function App() {
                       Jaula {selectedCage.label || selectedCage.number}
                     </h2>
                   </div>
-                  <button
-                    onClick={() => deleteCage(selectedCage.id)}
-                    className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                    title="Eliminar jaula"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={copySelectedToClipboard}
+                      className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
+                      title="Copiar jaula (Ctrl+C)"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={cutSelectedToClipboard}
+                      className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                      title="Cortar jaula (Ctrl+X)"
+                    >
+                      <Scissors className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteCage(selectedCage.id)}
+                      className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                      title="Eliminar jaula (Supr)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -4001,7 +4411,7 @@ export default function App() {
                     }`}
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Dimensiones: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (recalcula automáticamente los tramos de cable).
+                    Dimensiones: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (autoajusta la zona gris y recalcula cables).
                   </p>
                 </div>
 
@@ -4106,7 +4516,7 @@ export default function App() {
                 <div className="text-xs text-slate-500 text-center py-2">
                   <Info className="w-6 h-6 mx-auto text-sky-500 opacity-80 mb-1" />
                   <p>
-                    Haz clic sobre cualquier <strong>equipo, canalización, jaula o módulo</strong> para editarlo.
+                    Haz clic sobre cualquier <strong>equipo, canalización, jaula o módulo</strong> para editarlo, o usa <strong>Supr / Ctrl+C / Ctrl+X / Ctrl+V</strong>.
                   </p>
                 </div>
 
@@ -4147,22 +4557,22 @@ export default function App() {
       </div>
 
       {/* ====================================================================
-          MODAL: NUEVO PROYECTO (CON COORDENADAS Y GOOGLE MAPS)
+          MODAL: NUEVO PROYECTO (CON CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS)
       ==================================================================== */}
       {showNewProjectModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${
               darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <FolderPlus className="w-5 h-5" />
                 <div>
                   <h3 className="text-base font-extrabold">Nuevo Proyecto de Instalación</h3>
                   <p className="text-xs text-emerald-100">
-                    Configura la viñeta técnica, ubicación geográfica y datos del centro
+                    Define los datos del centro y la distribución inicial de trenes y jaulas
                   </p>
                 </div>
               </div>
@@ -4174,7 +4584,7 @@ export default function App() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewProject} className="p-5 space-y-3.5 text-xs">
+            <form onSubmit={handleCreateNewProject} className="p-5 space-y-3.5 text-xs overflow-y-auto">
               <div>
                 <label className="block font-bold mb-1">Nombre del Proyecto *</label>
                 <input
@@ -4186,23 +4596,6 @@ export default function App() {
                     setNewProjectForm((prev) => ({ ...prev, projectName: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border text-sm font-semibold ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-300 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Descripción del Proyecto</label>
-                <textarea
-                  rows={2}
-                  placeholder="Breve resumen técnico del alcance, potencia o equipamiento..."
-                  value={newProjectForm.projectDescription}
-                  onChange={(e) =>
-                    setNewProjectForm((prev) => ({ ...prev, projectDescription: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border text-xs ${
                     darkMode
                       ? 'bg-slate-800 border-slate-700 text-white'
                       : 'bg-slate-50 border-slate-300 text-slate-900'
@@ -4248,6 +4641,23 @@ export default function App() {
                 </div>
               </div>
 
+              <div>
+                <label className="block font-bold mb-1">Descripción del Proyecto</label>
+                <input
+                  type="text"
+                  placeholder="Breve resumen técnico del alcance, potencia o equipamiento..."
+                  value={newProjectForm.projectDescription}
+                  onChange={(e) =>
+                    setNewProjectForm((prev) => ({ ...prev, projectDescription: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
@@ -4284,6 +4694,239 @@ export default function App() {
                 </div>
               </div>
 
+              {/* CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS */}
+              <div
+                className={`p-3.5 rounded-2xl border space-y-3 ${
+                  darkMode
+                    ? 'bg-slate-800/70 border-slate-700'
+                    : 'bg-sky-50/70 border-sky-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
+                    <Grid className="w-4 h-4" />
+                    <span>Configuración y Distribución de Jaulas</span>
+                  </span>
+                  <span className="text-[11px] font-extrabold text-slate-500">
+                    Total:{' '}
+                    {(Number(newProjectForm.mod1Rows) || 1) *
+                      (Number(newProjectForm.mod1Cols) || 1) +
+                      (newProjectForm.hasMod2
+                        ? (Number(newProjectForm.mod2Rows) || 1) *
+                          (Number(newProjectForm.mod2Cols) || 1)
+                        : 0)}{' '}
+                    jaulas
+                  </span>
+                </div>
+
+                {/* Tren / Módulo 1 */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-extrabold text-slate-500">
+                    Tren / Módulo Principal
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Nombre
+                      </label>
+                      <input
+                        type="text"
+                        value={newProjectForm.mod1Name}
+                        onChange={(e) =>
+                          setNewProjectForm((p) => ({ ...p, mod1Name: e.target.value }))
+                        }
+                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
+                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Filas
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={newProjectForm.mod1Rows}
+                        onChange={(e) =>
+                          setNewProjectForm((p) => ({ ...p, mod1Rows: Number(e.target.value) }))
+                        }
+                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
+                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Columnas
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={newProjectForm.mod1Cols}
+                        onChange={(e) =>
+                          setNewProjectForm((p) => ({ ...p, mod1Cols: Number(e.target.value) }))
+                        }
+                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
+                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        N° Inicial
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newProjectForm.mod1StartNumber}
+                        onChange={(e) =>
+                          setNewProjectForm((p) => ({
+                            ...p,
+                            mod1StartNumber: Number(e.target.value),
+                          }))
+                        }
+                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
+                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Tamaño (m)
+                      </label>
+                      <input
+                        type="number"
+                        min="5"
+                        max="150"
+                        value={newProjectForm.mod1CageMeters}
+                        onChange={(e) =>
+                          setNewProjectForm((p) => ({
+                            ...p,
+                            mod1CageMeters: Number(e.target.value),
+                          }))
+                        }
+                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
+                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tren / Módulo 2 (Opcional) */}
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newProjectForm.hasMod2}
+                      onChange={(e) =>
+                        setNewProjectForm((p) => ({ ...p, hasMod2: e.target.checked }))
+                      }
+                      className="w-4 h-4 accent-sky-600"
+                    />
+                    <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
+                      Incluir Segundo Tren / Módulo de Jaulas
+                    </span>
+                  </label>
+
+                  {newProjectForm.hasMod2 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          Nombre
+                        </label>
+                        <input
+                          type="text"
+                          value={newProjectForm.mod2Name}
+                          onChange={(e) =>
+                            setNewProjectForm((p) => ({ ...p, mod2Name: e.target.value }))
+                          }
+                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
+                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          Filas
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={newProjectForm.mod2Rows}
+                          onChange={(e) =>
+                            setNewProjectForm((p) => ({ ...p, mod2Rows: Number(e.target.value) }))
+                          }
+                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
+                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          Columnas
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={newProjectForm.mod2Cols}
+                          onChange={(e) =>
+                            setNewProjectForm((p) => ({ ...p, mod2Cols: Number(e.target.value) }))
+                          }
+                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
+                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          N° Inicial
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newProjectForm.mod2StartNumber}
+                          onChange={(e) =>
+                            setNewProjectForm((p) => ({
+                              ...p,
+                              mod2StartNumber: Number(e.target.value),
+                            }))
+                          }
+                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
+                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          Tamaño (m)
+                        </label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="150"
+                          value={newProjectForm.mod2CageMeters}
+                          onChange={(e) =>
+                            setNewProjectForm((p) => ({
+                              ...p,
+                              mod2CageMeters: Number(e.target.value),
+                            }))
+                          }
+                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
+                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <label className="flex items-center gap-2 pt-1 cursor-pointer">
                 <input
                   type="checkbox"
@@ -4314,7 +4957,7 @@ export default function App() {
                   className="px-5 py-2 rounded-xl font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Crear Nuevo</span>
+                  <span>Crear Proyecto</span>
                 </button>
               </div>
             </form>
