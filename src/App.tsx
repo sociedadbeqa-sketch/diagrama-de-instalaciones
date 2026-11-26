@@ -6,7 +6,8 @@ import {
   Wrench, Zap, Camera, Radio, Cpu, Compass, Sliders, Edit3, Save, Copy,
   Magnet, Eye, EyeOff, Info, Layers, Grid, ArrowRightLeft, Building2, Printer,
   Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus
+  MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus,
+  Route, Square
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -54,6 +55,10 @@ const auth = firebaseApp ? getAuth(firebaseApp) : null;
 const db = firebaseApp ? getFirestore(firebaseApp) : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'plano-centro-engorda-beqa';
 
+// Escala base de referencia: 112 px visuales equivalen a 30 metros reales
+const BASE_CAGE_PX = 112;
+const BASE_CAGE_METERS = 30;
+
 // ============================================================================
 // MODELO DE DATOS INICIAL: CENTRO DE ENGORDA DE SALMONES (MÓDULOS 200 Y 100)
 // ============================================================================
@@ -68,6 +73,7 @@ const INITIAL_MODULES = [
     rows: 2,
     cols: 6,
     cageSize: 112,
+    cageSizeMeters: 30,
     walkwayWidth: 16,
     startNumber: 201,
   },
@@ -80,6 +86,7 @@ const INITIAL_MODULES = [
     rows: 2,
     cols: 5,
     cageSize: 112,
+    cageSizeMeters: 30,
     walkwayWidth: 16,
     startNumber: 101,
   },
@@ -106,6 +113,7 @@ const generateInitialCages = () => {
           x,
           y,
           size: mod.cageSize,
+          sizeMeters: mod.cageSizeMeters || 30,
           dimensions: '30m x 30m',
           depth: '22m',
           species: speciesList[mIdx % 2],
@@ -403,6 +411,49 @@ const INITIAL_OBJECTS = [
   },
 ];
 
+const INITIAL_CONDUITS = [
+  {
+    id: 'CAN-01',
+    tag: 'CAN-200-R',
+    phase: 'fase_r',
+    cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
+    conduitSpec: 'Ducto HDPE 32mm PN10',
+    dropMeters: 6,
+    points: [
+      { x: 112, y: 280 },
+      { x: 176, y: 280 },
+    ],
+  },
+  {
+    id: 'CAN-02',
+    tag: 'CAN-200-S',
+    phase: 'fase_s',
+    cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
+    conduitSpec: 'Ducto HDPE 32mm PN10',
+    dropMeters: 6,
+    points: [
+      { x: 112, y: 280 },
+      { x: 112, y: 152 },
+      { x: 432, y: 152 },
+      { x: 432, y: 280 },
+    ],
+  },
+  {
+    id: 'CAN-03',
+    tag: 'CAN-200-T',
+    phase: 'fase_t',
+    cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
+    conduitSpec: 'Ducto HDPE 32mm PN10',
+    dropMeters: 6,
+    points: [
+      { x: 112, y: 280 },
+      { x: 112, y: 408 },
+      { x: 688, y: 408 },
+      { x: 688, y: 280 },
+    ],
+  },
+];
+
 const INITIAL_COMPANY_INFO = {
   companyName: 'SERVICIOS BEQA SPA',
   projectName: 'Instalación Sistema Fotoperiodo e Infraestructura Eléctrica',
@@ -425,6 +476,39 @@ const PHASE_CONFIG = {
   control: { label: 'Fuerza y Control', color: '#ef4444', badgeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
   monitoreo: { label: 'Sensores / Cámaras', color: '#06b6d4', badgeBg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' },
   alimentacion: { label: 'Alimentación', color: '#10b981', badgeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+};
+
+const CONDUIT_PHASE_CONFIG = {
+  fase_r: {
+    label: 'Fase R (L1)',
+    short: 'R / L1',
+    color: '#dc2626',
+    dashArray: 'none',
+  },
+  fase_s: {
+    label: 'Fase S (L2)',
+    short: 'S / L2',
+    color: '#2563eb',
+    dashArray: '10 5',
+  },
+  fase_t: {
+    label: 'Fase T (L3)',
+    short: 'T / L3',
+    color: '#16a34a',
+    dashArray: '4 4',
+  },
+  trifasico: {
+    label: 'Trifásico (3F+N+T)',
+    short: '3F+N+T',
+    color: '#9333ea',
+    dashArray: '14 4 3 4',
+  },
+  control: {
+    label: 'Control / Fotoperiodo',
+    short: 'CTRL',
+    color: '#f59e0b',
+    dashArray: '7 4',
+  },
 };
 
 const STATUS_CONFIG = {
@@ -485,6 +569,7 @@ export default function App() {
   const [modules, setModules] = useState(INITIAL_MODULES);
   const [cages, setCages] = useState(generateInitialCages);
   const [objects, setObjects] = useState(INITIAL_OBJECTS);
+  const [conduits, setConduits] = useState(INITIAL_CONDUITS);
   const [symbolCatalog, setSymbolCatalog] = useState(SYMBOL_CATALOG);
   const [isEditingCatalog, setIsEditingCatalog] = useState(false);
   const [catalogForm, setCatalogForm] = useState({
@@ -519,10 +604,22 @@ export default function App() {
   const [showLabels, setShowLabels] = useState(true);
 
   // Herramientas y selección
+  // activeTool: 'select' | 'place' | 'draw_conduit' | 'draw_cage'
   const [activeTool, setActiveTool] = useState('select');
   const [placeTemplate, setPlaceTemplate] = useState(SYMBOL_CATALOG[0]);
   const [selectedId, setSelectedId] = useState('OBJ-02');
-  const [selectedKind, setSelectedKind] = useState('object');
+  const [selectedKind, setSelectedKind] = useState('object'); // 'object' | 'cage' | 'module' | 'trunk' | 'conduit'
+
+  // Estado de dibujo de canalización por fase
+  const [conduitPhase, setConduitPhase] = useState('fase_r');
+  const [conduitCableSpec, setConduitCableSpec] = useState('Cable Submarino H07RN-F 3G4 mm²');
+  const [conduitDropMeters, setConduitDropMeters] = useState(6);
+  const [drawingPoints, setDrawingPoints] = useState([]);
+  const [cursorSvgPos, setCursorSvgPos] = useState(null);
+
+  // Estado de dibujo de jaula con ingreso de tamaño (m)
+  const [newCageSizeMeters, setNewCageSizeMeters] = useState(30);
+  const [newCageLabelInput, setNewCageLabelInput] = useState('');
 
   // Filtros
   const [filterPhase, setFilterPhase] = useState('all');
@@ -574,6 +671,90 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3400);
   };
+
+  // ============================================================================
+  // CÁLCULO AUTOMÁTICO DE TRAMOS DE CABLE EN BASE AL TAMAÑO DE LA JAULA
+  // ============================================================================
+  const getScaleMetersPerPixelAtPoint = (pt) => {
+    if (!cages || cages.length === 0) return BASE_CAGE_METERS / BASE_CAGE_PX;
+    let nearestCage = cages[0];
+    let minDist = Infinity;
+    cages.forEach((c) => {
+      const cx = c.x + (c.size || BASE_CAGE_PX) / 2;
+      const cy = c.y + (c.size || BASE_CAGE_PX) / 2;
+      const d = Math.hypot(pt.x - cx, pt.y - cy);
+      if (d < minDist) {
+        minDist = d;
+        nearestCage = c;
+      }
+    });
+    const cagePx = Number(nearestCage.size) || BASE_CAGE_PX;
+    const cageMeters = Number(nearestCage.sizeMeters) || BASE_CAGE_METERS;
+    return cageMeters / cagePx;
+  };
+
+  const calculateConduitMetrics = (conduit) => {
+    const pts = conduit?.points || [];
+    if (pts.length < 2) {
+      const drop = Number(conduit?.dropMeters) || 0;
+      return {
+        horizontalMeters: 0,
+        dropMeters: drop,
+        totalMeters: Number(drop.toFixed(1)),
+      };
+    }
+
+    let horizontalMeters = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const segPx = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const midPt = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      const metersPerPx = getScaleMetersPerPixelAtPoint(midPt);
+      horizontalMeters += segPx * metersPerPx;
+    }
+
+    const dropMeters = Number(conduit?.dropMeters) || 0;
+    const totalMeters = horizontalMeters + dropMeters;
+
+    return {
+      horizontalMeters: Number(horizontalMeters.toFixed(1)),
+      dropMeters: Number(dropMeters.toFixed(1)),
+      totalMeters: Number(totalMeters.toFixed(1)),
+    };
+  };
+
+  const cableSummaryByPhase = useMemo(() => {
+    const summary = {};
+    Object.keys(CONDUIT_PHASE_CONFIG).forEach((k) => {
+      summary[k] = {
+        phase: k,
+        label: CONDUIT_PHASE_CONFIG[k].label,
+        color: CONDUIT_PHASE_CONFIG[k].color,
+        count: 0,
+        horizontalMeters: 0,
+        dropMeters: 0,
+        totalMeters: 0,
+      };
+    });
+
+    conduits.forEach((conduit) => {
+      const key = CONDUIT_PHASE_CONFIG[conduit.phase] ? conduit.phase : 'fase_r';
+      const m = calculateConduitMetrics(conduit);
+      summary[key].count += 1;
+      summary[key].horizontalMeters = Number((summary[key].horizontalMeters + m.horizontalMeters).toFixed(1));
+      summary[key].dropMeters = Number((summary[key].dropMeters + m.dropMeters).toFixed(1));
+      summary[key].totalMeters = Number((summary[key].totalMeters + m.totalMeters).toFixed(1));
+    });
+
+    return Object.values(summary);
+  }, [conduits, cages]);
+
+  const totalCableMeters = useMemo(() => {
+    return Number(
+      cableSummaryByPhase.reduce((acc, item) => acc + item.totalMeters, 0).toFixed(1)
+    );
+  }, [cableSummaryByPhase]);
 
   // ============================================================================
   // CONEXIÓN AUTOMÁTICA A FIREBASE AUTH Y CLOUD FIRESTORE
@@ -636,6 +817,7 @@ export default function App() {
       const objectsToUse = overrideData?.objects || objects;
       const cagesToUse = overrideData?.cages || cages;
       const modulesToUse = overrideData?.modules || modules;
+      const conduitsToUse = overrideData?.conduits || conduits;
       const catalogToUse = overrideData?.symbolCatalog || symbolCatalog;
 
       const targetId = (customId || currentBlueprintId || `plano-${Date.now()}`)
@@ -666,6 +848,7 @@ export default function App() {
         modules: modulesToUse,
         cages: cagesToUse,
         objects: objectsToUse,
+        conduits: conduitsToUse,
         symbolCatalog: catalogToUse,
         trunkLabel,
         showTrunkLabel,
@@ -689,6 +872,7 @@ export default function App() {
     if (Array.isArray(bp.modules)) setModules(bp.modules);
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
+    if (Array.isArray(bp.conduits)) setConduits(bp.conduits);
     if (Array.isArray(bp.symbolCatalog) && bp.symbolCatalog.length > 0) {
       setSymbolCatalog(bp.symbolCatalog);
       setPlaceTemplate(bp.symbolCatalog[0]);
@@ -757,6 +941,11 @@ export default function App() {
     [modules, selectedModuleId, selectedKind]
   );
 
+  const selectedConduit = useMemo(
+    () => (selectedKind === 'conduit' ? conduits.find((c) => c.id === selectedId) : null),
+    [conduits, selectedId, selectedKind]
+  );
+
   const filteredBlueprints = useMemo(() => {
     const q = cloudSearchQuery.trim().toLowerCase();
     if (!q) return savedBlueprints;
@@ -770,22 +959,6 @@ export default function App() {
         (bp.id || '').toLowerCase().includes(q)
     );
   }, [savedBlueprints, cloudSearchQuery]);
-
-  const slugifyCenterFileName = (fallbackPrefix) => {
-    const rawName = (
-      companyInfo.centerName ||
-      companyInfo.projectName ||
-      companyInfo.companyName ||
-      fallbackPrefix ||
-      'plano_centro'
-    )
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    return rawName || fallbackPrefix;
-  };
 
   // ============================================================================
   // EDICIÓN Y CREACIÓN EN LA PALETA DE SIMBOLOGÍA
@@ -897,12 +1070,14 @@ export default function App() {
     };
 
     const nextObjects = newProjectForm.clearExistingObjects ? [] : objects;
+    const nextConduits = newProjectForm.clearExistingObjects ? [] : conduits;
     const nextCages = newProjectForm.clearExistingObjects ? generateInitialCages() : cages;
     const nextModules = newProjectForm.clearExistingObjects ? INITIAL_MODULES : modules;
 
     setCompanyInfo(updatedInfo);
     if (newProjectForm.clearExistingObjects) {
       setObjects([]);
+      setConduits([]);
       setCages(nextCages);
       setModules(nextModules);
     }
@@ -933,6 +1108,7 @@ export default function App() {
       await handleSaveToCloud(slugId, cName, {
         companyInfo: updatedInfo,
         objects: nextObjects,
+        conduits: nextConduits,
         cages: nextCages,
         modules: nextModules,
         symbolCatalog,
@@ -940,10 +1116,54 @@ export default function App() {
     }
   };
 
+  // ============================================================================
+  // FINALIZAR TRAZO DE CANALIZACIÓN
+  // ============================================================================
+  const finishDrawingConduit = (ptsOverride = null) => {
+    const pts = ptsOverride || drawingPoints;
+    if (pts.length < 2) {
+      setDrawingPoints([]);
+      setCursorSvgPos(null);
+      setActiveTool('select');
+      return;
+    }
+
+    const phaseCfg = CONDUIT_PHASE_CONFIG[conduitPhase] || CONDUIT_PHASE_CONFIG.fase_r;
+    const nextNum = conduits.length + 1;
+    const newConduit = {
+      id: `CAN-${Date.now()}`,
+      tag: `CAN-${phaseCfg.short.replace(/[^A-Z0-9]/g, '')}-${String(nextNum).padStart(2, '0')}`,
+      phase: conduitPhase,
+      cableSpec: conduitCableSpec || 'Cable Submarino H07RN-F 3G4 mm²',
+      conduitSpec: 'Ducto HDPE 32mm PN10',
+      dropMeters: Number(conduitDropMeters) || 0,
+      points: pts,
+    };
+
+    const metrics = calculateConduitMetrics(newConduit);
+    setConduits((prev) => [...prev, newConduit]);
+    setDrawingPoints([]);
+    setCursorSvgPos(null);
+    setActiveTool('select');
+    setSelectedId(newConduit.id);
+    setSelectedKind('conduit');
+    setShowRightSidebar(true);
+    notify(
+      `Canalización "${newConduit.tag}" (${phaseCfg.label}) creada: ${metrics.totalMeters} m totales`,
+      'success'
+    );
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = e.target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if (e.key === 'Enter' && activeTool === 'draw_conduit' && drawingPoints.length >= 2) {
+        e.preventDefault();
+        finishDrawingConduit();
+        return;
+      }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         if (selectedObject) {
@@ -967,21 +1187,38 @@ export default function App() {
         }
       }
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedObject) {
-        e.preventDefault();
-        deleteObject(selectedObject.id);
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObject) {
+          e.preventDefault();
+          deleteObject(selectedObject.id);
+        } else if (selectedConduit) {
+          e.preventDefault();
+          deleteConduit(selectedConduit.id);
+        }
       }
 
       if (e.key === 'Escape') {
-        if (showPreviewModal) setShowPreviewModal(false);
-        else if (isFullscreen) toggleFullscreen();
-        else setSelectedId(null);
+        if (activeTool === 'draw_conduit') {
+          setDrawingPoints([]);
+          setCursorSvgPos(null);
+          setActiveTool('select');
+          notify('Trazo de canalización cancelado', 'info');
+        } else if (activeTool !== 'select') {
+          setActiveTool('select');
+        } else if (showPreviewModal) {
+          setShowPreviewModal(false);
+        } else if (isFullscreen) {
+          toggleFullscreen();
+        } else {
+          setSelectedId(null);
+          setSelectedKind(null);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObject, clipboardObj, objects, showPreviewModal, isFullscreen]);
+  }, [selectedObject, selectedConduit, clipboardObj, objects, showPreviewModal, isFullscreen, activeTool, drawingPoints]);
 
   const walkwayLines = useMemo(() => {
     const xs = [];
@@ -1114,12 +1351,62 @@ export default function App() {
     notify(`Equipo "${newObj.tag}" añadido al plano`, 'success');
   };
 
+  // ============================================================================
+  // CREAR JAULA EN EL PLANO CON TAMAÑO EN METROS
+  // ============================================================================
+  const placeCageAtCoords = (rawX, rawY) => {
+    const meters = Math.max(5, Number(newCageSizeMeters) || 30);
+    const visualPx = Math.round((meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
+    const nextNum =
+      cages.reduce((maxN, c) => Math.max(maxN, Number(c.number) || 0), 300) + 1;
+    const customLabel = newCageLabelInput.trim() || String(nextNum);
+    const modId = detectModuleId(rawX);
+
+    const newCage = {
+      id: `JAULA-${Date.now()}`,
+      number: nextNum,
+      label: customLabel,
+      showLabel: true,
+      moduleId: modId,
+      x: Math.round(rawX),
+      y: Math.round(rawY),
+      size: visualPx,
+      sizeMeters: meters,
+      dimensions: `${meters}m x ${meters}m`,
+      depth: '22m',
+      species: 'Salmón del Atlántico (Salmo salar)',
+      biomassTons: 150,
+      photoperiodActive: true,
+      targetLux: 180,
+      notes: `Jaula ${customLabel} (${meters}m x ${meters}m) agregada manualmente.`,
+    };
+
+    setCages((prev) => [...prev, newCage]);
+    setSelectedId(newCage.id);
+    setSelectedKind('cage');
+    setShowRightSidebar(true);
+    setActiveTool('select');
+    notify(`Jaula "${customLabel}" (${meters}m x ${meters}m) dibujada en el plano`, 'success');
+  };
+
   const handleCanvasMouseDown = (e) => {
     if (e.button !== 0) return;
     const coords = clientToSvgCoords(e.clientX, e.clientY);
 
     if (activeTool === 'place') {
       placeSymbolAtCoords(coords.x, coords.y);
+      return;
+    }
+
+    if (activeTool === 'draw_cage') {
+      placeCageAtCoords(coords.x, coords.y);
+      return;
+    }
+
+    if (activeTool === 'draw_conduit') {
+      const snapped = applySnap(coords.x, coords.y);
+      setDrawingPoints((prev) => [...prev, snapped]);
+      setCursorSvgPos(snapped);
       return;
     }
 
@@ -1132,9 +1419,23 @@ export default function App() {
     }
   };
 
+  const handleCanvasDoubleClick = (e) => {
+    if (activeTool === 'draw_conduit' && drawingPoints.length >= 2) {
+      e.preventDefault();
+      finishDrawingConduit();
+    }
+  };
+
   const handleCanvasMouseMove = (e) => {
+    const coords = clientToSvgCoords(e.clientX, e.clientY);
+
+    if (activeTool === 'draw_conduit') {
+      const snapped = applySnap(coords.x, coords.y);
+      setCursorSvgPos(snapped);
+      return;
+    }
+
     if (draggingObjId) {
-      const coords = clientToSvgCoords(e.clientX, e.clientY);
       const snapped = applySnap(coords.x, coords.y);
       const modId = detectModuleId(snapped.x);
       setObjects((prev) =>
@@ -1183,6 +1484,18 @@ export default function App() {
 
       if (activeTool === 'place') {
         placeSymbolAtCoords(coords.x, coords.y);
+        return;
+      }
+
+      if (activeTool === 'draw_cage') {
+        placeCageAtCoords(coords.x, coords.y);
+        return;
+      }
+
+      if (activeTool === 'draw_conduit') {
+        const snapped = applySnap(coords.x, coords.y);
+        setDrawingPoints((prev) => [...prev, snapped]);
+        setCursorSvgPos(snapped);
         return;
       }
 
@@ -1250,7 +1563,20 @@ export default function App() {
   const updateSelectedCage = (field, value) => {
     if (!selectedCage) return;
     setCages((prev) =>
-      prev.map((c) => (c.id === selectedCage.id ? { ...c, [field]: value } : c))
+      prev.map((c) => {
+        if (c.id !== selectedCage.id) return c;
+        if (field === 'sizeMeters') {
+          const meters = Math.max(5, Number(value) || 30);
+          const visualPx = Math.round((meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
+          return {
+            ...c,
+            sizeMeters: meters,
+            size: visualPx,
+            dimensions: `${meters}m x ${meters}m`,
+          };
+        }
+        return { ...c, [field]: value };
+      })
     );
   };
 
@@ -1261,6 +1587,13 @@ export default function App() {
     );
   };
 
+  const updateSelectedConduit = (field, value) => {
+    if (!selectedConduit) return;
+    setConduits((prev) =>
+      prev.map((c) => (c.id === selectedConduit.id ? { ...c, [field]: value } : c))
+    );
+  };
+
   const deleteObject = (id) => {
     setObjects((prev) => prev.filter((o) => o.id !== id));
     if (selectedId === id) {
@@ -1268,6 +1601,24 @@ export default function App() {
       setSelectedKind(null);
     }
     notify('Equipo eliminado del plano', 'warn');
+  };
+
+  const deleteConduit = (id) => {
+    setConduits((prev) => prev.filter((c) => c.id !== id));
+    if (selectedId === id) {
+      setSelectedId(null);
+      setSelectedKind(null);
+    }
+    notify('Canalización eliminada del plano', 'warn');
+  };
+
+  const deleteCage = (id) => {
+    setCages((prev) => prev.filter((c) => c.id !== id));
+    if (selectedId === id) {
+      setSelectedId(null);
+      setSelectedKind(null);
+    }
+    notify('Jaula eliminada del plano', 'warn');
   };
 
   const handleImageUpload = (e, targetField) => {
@@ -1287,26 +1638,20 @@ export default function App() {
     e.target.value = '';
   };
 
-  const handleExportJSON = () => {
-    const payload = {
-      version: '3.0',
-      exportedAt: new Date().toISOString(),
-      companyInfo,
-      trunkLabel,
-      showTrunkLabel,
-      modules,
-      cages,
-      objects,
-      symbolCatalog,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${slugifyCenterFileName('plano_centro')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    notify(`Archivo "${slugifyCenterFileName('plano_centro')}.json" guardado`, 'success');
+  const slugifyCenterFileName = (fallbackPrefix) => {
+    const rawName = (
+      companyInfo.centerName ||
+      companyInfo.projectName ||
+      companyInfo.companyName ||
+      fallbackPrefix ||
+      'plano_centro'
+    )
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return rawName || fallbackPrefix;
   };
 
   const handleImportJSON = (e) => {
@@ -1320,6 +1665,7 @@ export default function App() {
           setModules(data.modules);
           setCages(data.cages);
           setObjects(data.objects);
+          if (Array.isArray(data.conduits)) setConduits(data.conduits);
           if (Array.isArray(data.symbolCatalog) && data.symbolCatalog.length > 0) {
             setSymbolCatalog(data.symbolCatalog);
             setPlaceTemplate(data.symbolCatalog[0]);
@@ -1331,12 +1677,12 @@ export default function App() {
             if (data.companyInfo.centerName) setBlueprintNameInput(data.companyInfo.centerName);
           }
           setSelectedId(null);
-          notify('Plano cargado exitosamente desde JSON', 'success');
+          notify('Plano cargado exitosamente desde archivo', 'success');
         } else {
-          notify('Formato de archivo JSON inválido', 'warn');
+          notify('Formato de archivo inválido', 'warn');
         }
       } catch {
-        notify('No se pudo leer el archivo JSON', 'warn');
+        notify('No se pudo leer el archivo', 'warn');
       }
     };
     reader.readAsText(file);
@@ -1398,7 +1744,7 @@ export default function App() {
     img.src = url;
   };
 
-  // Agrupación resumida de equipos iguales (por especificación, circuito y potencia)
+  // Agrupación resumida de equipos iguales
   const summarizedEquipment = useMemo(() => {
     const map = new Map();
     objects.forEach((o) => {
@@ -1471,6 +1817,22 @@ export default function App() {
       )
       .join('');
 
+    const conduitRowsHtml = conduits
+      .map((c) => {
+        const m = calculateConduitMetrics(c);
+        const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+        return `
+        <tr>
+          <td style="font-weight:700;">${c.tag}</td>
+          <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${pCfg.color};margin-right:5px;"></span>${pCfg.label}</td>
+          <td>${c.cableSpec || '-'}</td>
+          <td style="text-align:right;">${m.horizontalMeters} m</td>
+          <td style="text-align:right;">${m.dropMeters} m</td>
+          <td style="text-align:right; font-weight:800;">${m.totalMeters} m</td>
+        </tr>`;
+      })
+      .join('');
+
     const htmlDoc = `
       <!DOCTYPE html>
       <html lang="es">
@@ -1488,11 +1850,12 @@ export default function App() {
           .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
           .tb-label { font-size: 8.5px; font-weight: 800; text-transform: uppercase; color: #475569; display: block; }
           .tb-val { font-size: 11.5px; font-weight: 700; color: #0f172a; }
-          .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+          .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
           .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; background: #f1f5f9; }
           .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700; }
-          .kpi-val { font-size: 14px; font-weight: 800; color: #0f172a; }
-          table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 14px; }
+          .kpi-val { font-size: 13px; font-weight: 800; color: #0f172a; }
+          h4 { font-size: 11px; text-transform: uppercase; margin: 10px 0 4px 0; color: #0f172a; }
+          table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
           table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
           table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
           .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
@@ -1523,8 +1886,10 @@ export default function App() {
           <div class="kpi"><div class="kpi-label">Con Fotoperiodo</div><div class="kpi-val">${activePhotoperiodCages} Jaulas</div></div>
           <div class="kpi"><div class="kpi-label">Equipos Instalados</div><div class="kpi-val">${objects.length} Equipos</div></div>
           <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(totalWatts / 1000).toFixed(2)} kW</div></div>
+          <div class="kpi"><div class="kpi-label">Cableado Total</div><div class="kpi-val">${totalCableMeters} m</div></div>
         </div>
 
+        <h4>1. Resumen de Equipos Instalados</h4>
         <table class="inv">
           <thead>
             <tr>
@@ -1540,6 +1905,32 @@ export default function App() {
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>
+
+        ${
+          conduits.length > 0
+            ? `
+        <h4>2. Cubicación de Canalizaciones y Tramos de Cable por Fase</h4>
+        <table class="inv">
+          <thead>
+            <tr>
+              <th>TAG Tramo</th>
+              <th>Fase Eléctrica</th>
+              <th>Conductor / Canalización</th>
+              <th style="text-align:right;">Tramo Pasillo</th>
+              <th style="text-align:right;">Bajada / Holgura</th>
+              <th style="text-align:right;">Total Cable</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${conduitRowsHtml}
+            <tr style="background:#f1f5f9; font-weight:800;">
+              <td colspan="5" style="text-align:right;">TOTAL GENERAL DE CABLE UTILIZADO:</td>
+              <td style="text-align:right;">${totalCableMeters} m</td>
+            </tr>
+          </tbody>
+        </table>`
+            : ''
+        }
 
         <div class="footer-bottom">
           <div class="company-footer">${companyInfo.companyName || 'SERVICIOS BEQA SPA'}</div>
@@ -1604,18 +1995,16 @@ export default function App() {
           />
         )}
 
-        {/* Diseño Especial Realista de Proyector LED Industrial (Estilo Técnico CAD) */}
+        {/* Diseño Especial Realista de Proyector LED Industrial */}
         {obj.type === 'luminaria' ? (
           <g>
             <g transform={`rotate(${rot})`}>
-              {/* Cono de proyección luminosa */}
               <polygon
                 points="10,-12 46,-26 46,26 10,12"
                 fill="url(#ledBeamGrad)"
                 opacity="0.72"
                 pointerEvents="none"
               />
-              {/* 3 Rayos punteados interiores del haz */}
               <line
                 x1="13"
                 y1="-8"
@@ -1647,7 +2036,6 @@ export default function App() {
                 strokeLinecap="round"
               />
 
-              {/* Perno / Pivote posterior de sujeción */}
               <rect
                 x="-16"
                 y="-2.4"
@@ -1657,7 +2045,6 @@ export default function App() {
                 fill="#1d4ed8"
               />
 
-              {/* Horquilla de montaje en U */}
               <path
                 d="M -3,-14.5 L -11.5,-14.5 L -11.5,14.5 L -3,14.5"
                 fill="none"
@@ -1667,7 +2054,6 @@ export default function App() {
                 strokeLinejoin="round"
               />
 
-              {/* Base posterior con aletas disipadoras */}
               <rect
                 x="-8.5"
                 y="-11.5"
@@ -1684,7 +2070,6 @@ export default function App() {
               <line x1="-8.5" y1="3.8" x2="-4" y2="3.8" stroke="#1d4ed8" strokeWidth="1.4" />
               <line x1="-8.5" y1="7.5" x2="-4" y2="7.5" stroke="#1d4ed8" strokeWidth="1.4" />
 
-              {/* Carcasa frontal del panel LED */}
               <rect
                 x="-4"
                 y="-12.5"
@@ -1696,7 +2081,6 @@ export default function App() {
                 strokeWidth="2.2"
               />
 
-              {/* Matriz 3x4 de diodos LED */}
               {[-7.5, -2.5, 2.5, 7.5].map((cy, rIdx) =>
                 [-0.5, 2.8, 6.1].map((cx, cIdx) => (
                   <circle
@@ -1903,9 +2287,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Acciones Principales */}
+        {/* Acciones Principales (Sin botón JSON) */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* BOTÓN NUEVO PROYECTO */}
           <button
             onClick={() => {
               setNewProjectForm({
@@ -1925,7 +2308,6 @@ export default function App() {
             <span>Nuevo Proyecto</span>
           </button>
 
-          {/* BOTÓN BUSCAR PROYECTOS EN BASE DE DATOS */}
           <button
             onClick={() => {
               setCloudSearchQuery('');
@@ -1941,7 +2323,6 @@ export default function App() {
             <span>Buscar Proyectos ({savedBlueprints.length})</span>
           </button>
 
-          {/* BOTÓN GUARDAR EN NUBE */}
           <button
             onClick={() => handleSaveToCloud()}
             disabled={isSavingCloud}
@@ -2033,18 +2414,6 @@ export default function App() {
           </button>
 
           <button
-            onClick={handleExportJSON}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${
-              darkMode
-                ? 'bg-slate-800 border-slate-700 text-slate-200'
-                : 'bg-white border-slate-200 text-slate-700'
-            }`}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">JSON</span>
-          </button>
-
-          <button
             onClick={() => jsonInputRef.current?.click()}
             className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${
               darkMode
@@ -2081,15 +2450,211 @@ export default function App() {
           CUERPO PRINCIPAL: PANEL IZQUIERDO + LIENZO CENTRAL + PANEL DERECHO SUPERPUESTO
       ==================================================================== */}
       <div className="relative flex-1 flex overflow-hidden">
-        {/* PANEL IZQUIERDO: IDENTIDAD, PALETA EDITABLE DE SIMBOLOGÍA Y FILTROS */}
+        {/* PANEL IZQUIERDO */}
         {showLeftSidebar && (
           <aside
             className={`w-72 shrink-0 border-r overflow-y-auto p-3.5 space-y-4 z-20 ${
               darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
             }`}
           >
+            {/* HERRAMIENTAS DE DIBUJO: CANALIZACIÓN POR FASE Y JAULAS */}
+            <div className="space-y-2.5">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                Herramientas de Trazado
+              </span>
+
+              {/* 1. Dibujar Canalización por Fase */}
+              <div
+                className={`p-2.5 rounded-xl border space-y-2 ${
+                  activeTool === 'draw_conduit'
+                    ? 'border-rose-500 bg-rose-500/10'
+                    : darkMode
+                    ? 'border-slate-800 bg-slate-800/50'
+                    : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold flex items-center gap-1.5">
+                    <Route className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Canalización por Fase</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTool === 'draw_conduit') {
+                        setDrawingPoints([]);
+                        setCursorSvgPos(null);
+                        setActiveTool('select');
+                      } else {
+                        setDrawingPoints([]);
+                        setActiveTool('draw_conduit');
+                        notify(
+                          `Haz clic en el plano para trazar canalización (${CONDUIT_PHASE_CONFIG[conduitPhase]?.label}). Doble clic o Enter para finalizar.`,
+                          'info'
+                        );
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-colors ${
+                      activeTool === 'draw_conduit'
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-sky-600 hover:bg-sky-700 text-white'
+                    }`}
+                  >
+                    {activeTool === 'draw_conduit' ? 'Cancelar' : 'Dibujar'}
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    Fase Eléctrica del Tramo
+                  </label>
+                  <select
+                    value={conduitPhase}
+                    onChange={(e) => setConduitPhase(e.target.value)}
+                    className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-700 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  >
+                    {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
+                      <option key={key} value={key}>
+                        {cfg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      Bajada / Holgura (m)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={conduitDropMeters}
+                      onChange={(e) => setConduitDropMeters(Number(e.target.value))}
+                      className={`w-full px-2 py-1 rounded-lg text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <div className="px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 text-[10px] font-extrabold flex items-center justify-between">
+                      <span>Total:</span>
+                      <span className="text-sky-600 dark:text-sky-400">{totalCableMeters} m</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Leyenda compacta de colores por fase */}
+                <div className="grid grid-cols-2 gap-1 pt-1">
+                  {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setConduitPhase(key)}
+                      className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[10px] font-bold border text-left ${
+                        conduitPhase === key
+                          ? 'border-sky-500 bg-sky-500/10'
+                          : 'border-transparent hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: cfg.color }}
+                      />
+                      <span className="truncate">{cfg.short}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Dibujar Jaula con Tamaño en Metros */}
+              <div
+                className={`p-2.5 rounded-xl border space-y-2 ${
+                  activeTool === 'draw_cage'
+                    ? 'border-amber-500 bg-amber-500/10'
+                    : darkMode
+                    ? 'border-slate-800 bg-slate-800/50'
+                    : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold flex items-center gap-1.5">
+                    <Square className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Dibujar Jaula</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTool === 'draw_cage') {
+                        setActiveTool('select');
+                      } else {
+                        setActiveTool('draw_cage');
+                        notify(
+                          `Haz clic en el plano para ubicar la jaula de ${newCageSizeMeters}m x ${newCageSizeMeters}m`,
+                          'info'
+                        );
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-colors ${
+                      activeTool === 'draw_cage'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    {activeTool === 'draw_cage' ? 'Cancelar' : 'Ubicar'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      Tamaño Jaula (m)
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="150"
+                      value={newCageSizeMeters}
+                      onChange={(e) => setNewCageSizeMeters(Number(e.target.value))}
+                      className={`w-full px-2 py-1 rounded-lg text-xs font-extrabold border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      N° / Etiqueta
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Auto"
+                      value={newCageLabelInput}
+                      onChange={(e) => setNewCageLabelInput(e.target.value)}
+                      className={`w-full px-2 py-1 rounded-lg text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Dimensión: <strong>{newCageSizeMeters}m × {newCageSizeMeters}m</strong>. Define la escala métrica de los cables cercanos.
+                </p>
+              </div>
+            </div>
+
             {/* Identidad y Firma PDF */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
                   Identidad y Firma PDF
@@ -2166,11 +2731,6 @@ export default function App() {
                 </button>
               </div>
 
-              <p className="text-[11px] text-slate-500 leading-snug">
-                Selecciona un símbolo y haz clic en el plano para insertarlo, o edita/agrega nuevos.
-              </p>
-
-              {/* Formulario para Agregar o Editar Elemento en la Paleta */}
               {isEditingCatalog && (
                 <form
                   onSubmit={handleSaveCatalogSymbol}
@@ -2404,7 +2964,7 @@ export default function App() {
           </aside>
         )}
 
-        {/* LIENZO CENTRAL INTERACTIVO (SVG + VIÑETA TÉCNICA INFERIOR) */}
+        {/* LIENZO CENTRAL INTERACTIVO */}
         <main className="relative flex-1 overflow-hidden flex flex-col">
           {/* Botones flotantes superiores del lienzo */}
           <div className="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2">
@@ -2440,6 +3000,9 @@ export default function App() {
               <span className="flex items-center gap-1 text-emerald-500">
                 <Zap className="w-3.5 h-3.5" /> {metrics.totalPowerKw} kW
               </span>
+              <span className="flex items-center gap-1 text-rose-500">
+                <Route className="w-3.5 h-3.5" /> {totalCableMeters} m Cable
+              </span>
               {metrics.alertCount > 0 && (
                 <span className="flex items-center gap-1 text-rose-500">
                   <AlertTriangle className="w-3.5 h-3.5" /> {metrics.alertCount} Alerta(s)
@@ -2452,6 +3015,46 @@ export default function App() {
                 <span>Haz clic en el plano para insertar: {placeTemplate?.label}</span>
                 <button
                   onClick={() => setActiveTool('select')}
+                  className="px-1.5 py-0.5 bg-white/20 rounded-md hover:bg-white/30"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
+            {activeTool === 'draw_cage' && (
+              <div className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
+                <span>
+                  Haz clic en el plano para ubicar Jaula ({newCageSizeMeters}m × {newCageSizeMeters}m)
+                </span>
+                <button
+                  onClick={() => setActiveTool('select')}
+                  className="px-1.5 py-0.5 bg-white/20 rounded-md hover:bg-white/30"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
+            {activeTool === 'draw_conduit' && (
+              <div className="px-3 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
+                <span>
+                  Trazando {CONDUIT_PHASE_CONFIG[conduitPhase]?.label} ({drawingPoints.length} ptos)
+                </span>
+                {drawingPoints.length >= 2 && (
+                  <button
+                    onClick={() => finishDrawingConduit()}
+                    className="px-2 py-0.5 bg-emerald-500 text-slate-950 rounded-md hover:bg-emerald-400 font-extrabold"
+                  >
+                    Finalizar Tramo
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setDrawingPoints([]);
+                    setCursorSvgPos(null);
+                    setActiveTool('select');
+                  }}
                   className="px-1.5 py-0.5 bg-white/20 rounded-md hover:bg-white/30"
                 >
                   Cancelar
@@ -2479,6 +3082,7 @@ export default function App() {
           <svg
             ref={svgRef}
             onMouseDown={handleCanvasMouseDown}
+            onDoubleClick={handleCanvasDoubleClick}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
@@ -2487,7 +3091,7 @@ export default function App() {
             onTouchMove={handleCanvasTouchMove}
             onTouchEnd={handleCanvasTouchEnd}
             className={`w-full flex-1 touch-none ${
-              activeTool === 'place'
+              activeTool !== 'select'
                 ? 'cursor-crosshair'
                 : isPanning
                 ? 'cursor-grabbing'
@@ -2529,7 +3133,6 @@ export default function App() {
 
                 return (
                   <g key={mod.id}>
-                    {/* Encabezado Editable del Módulo */}
                     <g
                       transform={`translate(${boxX}, ${boxY - 54})`}
                       onClick={(e) => {
@@ -2569,7 +3172,6 @@ export default function App() {
                       </text>
                     </g>
 
-                    {/* Plataforma / Pasillos Perimetrales */}
                     <rect
                       x={boxX}
                       y={boxY}
@@ -2633,12 +3235,14 @@ export default function App() {
               {cages.map((cage) => {
                 const isSel = selectedKind === 'cage' && selectedId === cage.id;
                 const displayText = cage.label !== undefined ? cage.label : String(cage.number);
+                const cMeters = Number(cage.sizeMeters) || BASE_CAGE_METERS;
 
                 return (
                   <g
                     key={cage.id}
                     transform={`translate(${cage.x}, ${cage.y})`}
                     onClick={(e) => {
+                      if (activeTool !== 'select') return;
                       e.stopPropagation();
                       setSelectedId(cage.id);
                       setSelectedKind('cage');
@@ -2675,11 +3279,11 @@ export default function App() {
                       </>
                     )}
 
-                    {/* Etiqueta única editable / eliminable de la jaula */}
+                    {/* Etiqueta de la jaula */}
                     {cage.showLabel !== false && displayText !== '' && (
                       <text
                         x={cage.size / 2}
-                        y={cage.size / 2 + 5}
+                        y={cage.size / 2 + 2}
                         textAnchor="middle"
                         fontSize="15"
                         fontWeight="800"
@@ -2688,9 +3292,192 @@ export default function App() {
                         {displayText}
                       </text>
                     )}
+
+                    {/* Cota de dimensión real en metros */}
+                    <text
+                      x={cage.size / 2}
+                      y={cage.size - 8}
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontWeight="700"
+                      fill={darkMode ? '#7dd3fc' : '#0369a1'}
+                    >
+                      {cMeters}×{cMeters}m
+                    </text>
                   </g>
                 );
               })}
+
+              {/* Canalizaciones Eléctricas Diferenciadas por Fase */}
+              {conduits.map((conduit) => {
+                const pts = conduit.points || [];
+                if (pts.length < 2) return null;
+                const isSel = selectedKind === 'conduit' && selectedId === conduit.id;
+                const pCfg = CONDUIT_PHASE_CONFIG[conduit.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                const metrics = calculateConduitMetrics(conduit);
+                const pointsStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
+
+                // Punto medio del tramo más largo para ubicar la etiqueta de metraje
+                let labelPt = pts[0];
+                let maxSegLen = -1;
+                for (let i = 0; i < pts.length - 1; i++) {
+                  const d = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+                  if (d > maxSegLen) {
+                    maxSegLen = d;
+                    labelPt = {
+                      x: (pts[i].x + pts[i + 1].x) / 2,
+                      y: (pts[i].y + pts[i + 1].y) / 2,
+                    };
+                  }
+                }
+
+                return (
+                  <g
+                    key={conduit.id}
+                    onClick={(e) => {
+                      if (activeTool !== 'select') return;
+                      e.stopPropagation();
+                      setSelectedId(conduit.id);
+                      setSelectedKind('conduit');
+                      setShowRightSidebar(true);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {/* Área invisible ancha para facilitar selección con clic */}
+                    <polyline
+                      points={pointsStr}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth="14"
+                    />
+                    {/* Halo de selección */}
+                    {isSel && (
+                      <polyline
+                        points={pointsStr}
+                        fill="none"
+                        stroke="#fde047"
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity="0.8"
+                      />
+                    )}
+                    {/* Trazo principal por fase */}
+                    <polyline
+                      points={pointsStr}
+                      fill="none"
+                      stroke={pCfg.color}
+                      strokeWidth={isSel ? '4.5' : '3.5'}
+                      strokeDasharray={pCfg.dashArray === 'none' ? undefined : pCfg.dashArray}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* Nodos de vértices */}
+                    {pts.map((pt, idx) => (
+                      <circle
+                        key={idx}
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={isSel ? '4.5' : '3'}
+                        fill={pCfg.color}
+                        stroke="#ffffff"
+                        strokeWidth="1.2"
+                      />
+                    ))}
+                    {/* Etiqueta de fase y metros calculados */}
+                    {showLabels && (
+                      <g transform={`translate(${labelPt.x}, ${labelPt.y - 12})`}>
+                        <rect
+                          x="-44"
+                          y="-9"
+                          width="88"
+                          height="16"
+                          rx="5"
+                          fill={darkMode ? 'rgba(15,23,42,0.94)' : 'rgba(255,255,255,0.96)'}
+                          stroke={pCfg.color}
+                          strokeWidth="1.3"
+                        />
+                        <text
+                          textAnchor="middle"
+                          y="2"
+                          fontSize="8.5"
+                          fontWeight="800"
+                          fill={pCfg.color}
+                        >
+                          {pCfg.short} · {metrics.totalMeters}m
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Previsualización en vivo mientras se dibuja una canalización */}
+              {activeTool === 'draw_conduit' && drawingPoints.length > 0 && (
+                <g pointerEvents="none">
+                  {(() => {
+                    const pCfg = CONDUIT_PHASE_CONFIG[conduitPhase] || CONDUIT_PHASE_CONFIG.fase_r;
+                    const previewPts = cursorSvgPos
+                      ? [...drawingPoints, cursorSvgPos]
+                      : drawingPoints;
+                    const ptsStr = previewPts.map((p) => `${p.x},${p.y}`).join(' ');
+                    const tempMetrics = calculateConduitMetrics({
+                      points: previewPts,
+                      dropMeters: conduitDropMeters,
+                    });
+                    const lastPt = previewPts[previewPts.length - 1];
+
+                    return (
+                      <>
+                        <polyline
+                          points={ptsStr}
+                          fill="none"
+                          stroke={pCfg.color}
+                          strokeWidth="3.5"
+                          strokeDasharray="6 4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        {drawingPoints.map((pt, idx) => (
+                          <circle
+                            key={idx}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r="4.5"
+                            fill={pCfg.color}
+                            stroke="#ffffff"
+                            strokeWidth="1.5"
+                          />
+                        ))}
+                        {lastPt && (
+                          <g transform={`translate(${lastPt.x + 14}, ${lastPt.y - 14})`}>
+                            <rect
+                              x="0"
+                              y="-11"
+                              width="92"
+                              height="19"
+                              rx="5"
+                              fill="#0f172a"
+                              stroke={pCfg.color}
+                              strokeWidth="1.5"
+                            />
+                            <text
+                              x="46"
+                              y="1.5"
+                              textAnchor="middle"
+                              fontSize="9.5"
+                              fontWeight="800"
+                              fill="#ffffff"
+                            >
+                              {tempMetrics.totalMeters} m ({pCfg.short})
+                            </text>
+                          </g>
+                        )}
+                      </>
+                    );
+                  })()}
+                </g>
+              )}
 
               {/* Equipos Eléctricos y Luminarias */}
               {filteredObjects.map((obj) => {
@@ -2700,6 +3487,7 @@ export default function App() {
                     key={obj.id}
                     transform={`translate(${obj.x}, ${obj.y})`}
                     onMouseDown={(e) => {
+                      if (activeTool !== 'select') return;
                       e.stopPropagation();
                       setSelectedId(obj.id);
                       setSelectedKind('object');
@@ -2707,6 +3495,7 @@ export default function App() {
                       setShowRightSidebar(true);
                     }}
                     onTouchStart={(e) => {
+                      if (activeTool !== 'select') return;
                       e.stopPropagation();
                       setSelectedId(obj.id);
                       setSelectedKind('object');
@@ -2724,7 +3513,7 @@ export default function App() {
             </g>
           </svg>
 
-          {/* Controles inferiores de Zoom + Leyenda rápida */}
+          {/* Controles inferiores de Zoom */}
           <div className="absolute bottom-24 left-3 z-20 flex items-center gap-1.5">
             <div
               className={`px-2 py-1 rounded-xl border shadow-sm flex items-center gap-1 text-xs font-bold ${
@@ -2959,17 +3748,39 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* ORIENTACIÓN / ÁNGULO DIGITANDO EL NÚMERO + SLIDER */}
                 <div>
-                  <div className="flex justify-between text-xs font-bold mb-1">
-                    <span>Orientación / Ángulo del Haz</span>
-                    <span className="text-sky-500">{selectedObject.rotation || 0}°</span>
+                  <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+                    <span>Orientación / Ángulo del Haz (°)</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="360"
+                        step="1"
+                        value={selectedObject.rotation ?? 0}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const clamped = Number.isNaN(val)
+                            ? 0
+                            : ((val % 360) + 360) % 360;
+                          updateSelectedObject('rotation', val === 360 ? 360 : clamped);
+                        }}
+                        className={`w-20 px-2 py-1 rounded-lg text-right text-xs font-extrabold border ${
+                          darkMode
+                            ? 'bg-slate-800 border-slate-600 text-sky-400'
+                            : 'bg-slate-50 border-slate-300 text-sky-700'
+                        }`}
+                      />
+                      <span className="text-sky-500 font-extrabold">°</span>
+                    </div>
                   </div>
                   <input
                     type="range"
                     min="0"
                     max="360"
-                    step="15"
-                    value={selectedObject.rotation || 0}
+                    step="1"
+                    value={selectedObject.rotation ?? 0}
                     onChange={(e) => updateSelectedObject('rotation', Number(e.target.value))}
                     className="w-full accent-sky-600"
                   />
@@ -3010,14 +3821,136 @@ export default function App() {
                   />
                 </div>
               </div>
-            ) : selectedCage ? (
-              /* EDITOR DE JAULA SELECCIONADA (TEXTO EDITABLE / ELIMINABLE) */
+            ) : selectedConduit ? (
+              /* EDITOR DE CANALIZACIÓN SELECCIONADA */
               <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-rose-500">
+                      Canalización / Tramo Eléctrico
+                    </span>
+                    <h2 className="text-lg font-extrabold">{selectedConduit.tag}</h2>
+                  </div>
+                  <button
+                    onClick={() => deleteConduit(selectedConduit.id)}
+                    className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                    title="Eliminar canalización"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                    Jaula Seleccionada
-                  </span>
-                  <h2 className="text-lg font-extrabold">Jaula {selectedCage.label || selectedCage.number}</h2>
+                  <label className="block text-xs font-bold mb-1">Identificador de Tramo (TAG)</label>
+                  <input
+                    type="text"
+                    value={selectedConduit.tag}
+                    onChange={(e) => updateSelectedConduit('tag', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Fase Eléctrica</label>
+                  <select
+                    value={selectedConduit.phase}
+                    onChange={(e) => updateSelectedConduit('phase', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  >
+                    {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
+                      <option key={key} value={key}>
+                        {cfg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Tipo de Conductor / Cable</label>
+                  <input
+                    type="text"
+                    value={selectedConduit.cableSpec || ''}
+                    onChange={(e) => updateSelectedConduit('cableSpec', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Bajada a Equipo / Holgura (m)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={selectedConduit.dropMeters ?? 0}
+                    onChange={(e) => updateSelectedConduit('dropMeters', Number(e.target.value))}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                {(() => {
+                  const m = calculateConduitMetrics(selectedConduit);
+                  return (
+                    <div
+                      className={`p-3 rounded-xl border space-y-1.5 ${
+                        darkMode
+                          ? 'bg-slate-800/80 border-slate-700'
+                          : 'bg-sky-50 border-sky-200'
+                      }`}
+                    >
+                      <div className="text-[10px] font-extrabold uppercase text-sky-600 dark:text-sky-400">
+                        Cálculo Automático (Escala Jaula)
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span>Recorrido en pasillo:</span>
+                        <span className="font-bold">{m.horizontalMeters} m</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span>Bajada / holgura:</span>
+                        <span className="font-bold">{m.dropMeters} m</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-extrabold border-t border-slate-300 dark:border-slate-700 pt-1.5 text-sky-600 dark:text-sky-400">
+                        <span>Total Cable Tramo:</span>
+                        <span>{m.totalMeters} m</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : selectedCage ? (
+              /* EDITOR DE JAULA SELECCIONADA */
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                      Jaula Seleccionada
+                    </span>
+                    <h2 className="text-lg font-extrabold">
+                      Jaula {selectedCage.label || selectedCage.number}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => deleteCage(selectedCage.id)}
+                    className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                    title="Eliminar jaula"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div>
@@ -3049,6 +3982,27 @@ export default function App() {
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Tamaño Real de la Jaula (metros por lado)
+                  </label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="150"
+                    value={selectedCage.sizeMeters || BASE_CAGE_METERS}
+                    onChange={(e) => updateSelectedCage('sizeMeters', Number(e.target.value))}
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-extrabold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-sky-400'
+                        : 'bg-slate-50 border-slate-200 text-sky-700'
+                    }`}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Dimensiones: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (recalcula automáticamente los tramos de cable).
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -3147,11 +4101,45 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-slate-500 py-8 text-center space-y-2">
-                <Info className="w-7 h-7 mx-auto text-sky-500 opacity-80" />
-                <p>
-                  Haz clic sobre cualquier <strong>equipo, jaula, módulo o troncal</strong> en el plano para editar sus propiedades o eliminar textos.
-                </p>
+              /* RESUMEN DE CABLEADO POR FASE CUANDO NO HAY ELEMENTO SELECCIONADO */
+              <div className="space-y-3">
+                <div className="text-xs text-slate-500 text-center py-2">
+                  <Info className="w-6 h-6 mx-auto text-sky-500 opacity-80 mb-1" />
+                  <p>
+                    Haz clic sobre cualquier <strong>equipo, canalización, jaula o módulo</strong> para editarlo.
+                  </p>
+                </div>
+
+                <div
+                  className={`p-3 rounded-xl border space-y-2 ${
+                    darkMode
+                      ? 'bg-slate-800/60 border-slate-700'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Cubicación de Cable por Fase
+                  </div>
+                  {cableSummaryByPhase.map((item) => (
+                    <div
+                      key={item.phase}
+                      className="flex items-center justify-between text-xs py-1 border-b last:border-b-0 border-slate-200/60 dark:border-slate-700/60"
+                    >
+                      <span className="flex items-center gap-1.5 font-bold">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span>{item.label}</span>
+                      </span>
+                      <span className="font-extrabold">{item.totalMeters} m</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between text-xs font-extrabold pt-1 text-sky-600 dark:text-sky-400">
+                    <span>Total Cableado:</span>
+                    <span>{totalCableMeters} m</span>
+                  </div>
+                </div>
               </div>
             )}
           </aside>
@@ -3296,26 +4284,6 @@ export default function App() {
                 </div>
               </div>
 
-              {newProjectForm.coordinates.trim() && (
-                <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400">
-                    Vista previa enlace Google Maps generada automáticamente
-                  </span>
-                  <a
-                    href={buildGoogleMapsLink(
-                      newProjectForm.coordinates,
-                      newProjectForm.googleMapsUrl
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-extrabold text-sky-600 underline flex items-center gap-1"
-                  >
-                    <span>Probar Mapa</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
-
               <label className="flex items-center gap-2 pt-1 cursor-pointer">
                 <input
                   type="checkbox"
@@ -3329,7 +4297,7 @@ export default function App() {
                   className="w-4 h-4 accent-emerald-600"
                 />
                 <span className="text-xs font-semibold">
-                  Iniciar con el plano limpio (sin equipos previos instalados)
+                  Iniciar con el plano limpio (sin equipos ni canalizaciones previas)
                 </span>
               </label>
 
@@ -3385,7 +4353,6 @@ export default function App() {
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto">
-              {/* Buscador en vivo */}
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
@@ -3408,7 +4375,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Resultados */}
               {filteredBlueprints.length === 0 ? (
                 <div className="p-8 text-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-xs text-slate-500">
                   No se encontraron proyectos con ese criterio en la nube.
@@ -3587,7 +4553,7 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: INVENTARIO TÉCNICO RESUMIDO Y DETALLADO
+          MODAL: INVENTARIO TÉCNICO RESUMIDO Y CUBICACIÓN DE CABLE
       ==================================================================== */}
       {showInventoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
@@ -3599,55 +4565,107 @@ export default function App() {
             <div className="px-5 py-4 bg-violet-700 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-extrabold">
-                  Resumen de Equipos Instalados ({objects.length} unidades en {summarizedEquipment.length} tipos)
+                  Inventario Técnico y Cubicación de Cable ({totalCableMeters} m totales)
                 </h3>
                 <p className="text-xs text-violet-200">
-                  Los equipos idénticos se agrupan automáticamente en una misma fila
+                  Equipos agrupados y cálculo automático de canalizaciones por fase
                 </p>
               </div>
               <button onClick={() => setShowInventoryModal(false)} className="p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 overflow-auto space-y-5">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
-                    <th className="py-2 px-2 text-center">Cant.</th>
-                    <th className="py-2 px-2">TAGs Agrupados</th>
-                    <th className="py-2 px-2">Módulo</th>
-                    <th className="py-2 px-2">Especificación</th>
-                    <th className="py-2 px-2 text-right">Pot. Total</th>
-                    <th className="py-2 px-2">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {summarizedEquipment.map((g) => (
-                    <tr
-                      key={g.key}
-                      onClick={() => {
-                        const firstObj = objects.find((o) => o.tag === g.tags[0]);
-                        if (firstObj) {
-                          setSelectedId(firstObj.id);
-                          setSelectedKind('object');
-                          setShowInventoryModal(false);
-                          setShowRightSidebar(true);
-                        }
-                      }}
-                      className="cursor-pointer hover:bg-sky-500/10"
-                    >
-                      <td className="py-2.5 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
-                        {g.count}
-                      </td>
-                      <td className="py-2.5 px-2 font-bold">{g.tagsLabel}</td>
-                      <td className="py-2.5 px-2">{g.modulesLabel}</td>
-                      <td className="py-2.5 px-2">{g.spec}</td>
-                      <td className="py-2.5 px-2 text-right font-extrabold">{g.totalPower} W</td>
-                      <td className="py-2.5 px-2">{g.summaryStatus}</td>
+            <div className="p-4 overflow-auto space-y-6">
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                  Equipos Instalados ({objects.length} unidades)
+                </h4>
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
+                      <th className="py-2 px-2 text-center">Cant.</th>
+                      <th className="py-2 px-2">TAGs Agrupados</th>
+                      <th className="py-2 px-2">Módulo</th>
+                      <th className="py-2 px-2">Especificación</th>
+                      <th className="py-2 px-2 text-right">Pot. Total</th>
+                      <th className="py-2 px-2">Estado</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {summarizedEquipment.map((g) => (
+                      <tr
+                        key={g.key}
+                        onClick={() => {
+                          const firstObj = objects.find((o) => o.tag === g.tags[0]);
+                          if (firstObj) {
+                            setSelectedId(firstObj.id);
+                            setSelectedKind('object');
+                            setShowInventoryModal(false);
+                            setShowRightSidebar(true);
+                          }
+                        }}
+                        className="cursor-pointer hover:bg-sky-500/10"
+                      >
+                        <td className="py-2.5 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
+                          {g.count}
+                        </td>
+                        <td className="py-2.5 px-2 font-bold">{g.tagsLabel}</td>
+                        <td className="py-2.5 px-2">{g.modulesLabel}</td>
+                        <td className="py-2.5 px-2">{g.spec}</td>
+                        <td className="py-2.5 px-2 text-right font-extrabold">{g.totalPower} W</td>
+                        <td className="py-2.5 px-2">{g.summaryStatus}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                  Tramos de Canalización y Cable por Fase ({conduits.length} tramos · {totalCableMeters} m)
+                </h4>
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase">
+                      <th className="py-2 px-2">TAG Tramo</th>
+                      <th className="py-2 px-2">Fase</th>
+                      <th className="py-2 px-2">Conductor</th>
+                      <th className="py-2 px-2 text-right">Pasillo</th>
+                      <th className="py-2 px-2 text-right">Bajada</th>
+                      <th className="py-2 px-2 text-right">Total Cable</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {conduits.map((c) => {
+                      const m = calculateConduitMetrics(c);
+                      const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedId(c.id);
+                            setSelectedKind('conduit');
+                            setShowInventoryModal(false);
+                            setShowRightSidebar(true);
+                          }}
+                          className="cursor-pointer hover:bg-sky-500/10"
+                        >
+                          <td className="py-2 px-2 font-bold">{c.tag}</td>
+                          <td className="py-2 px-2 font-bold" style={{ color: pCfg.color }}>
+                            {pCfg.label}
+                          </td>
+                          <td className="py-2 px-2">{c.cableSpec}</td>
+                          <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
+                          <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
+                          <td className="py-2 px-2 text-right font-extrabold text-sky-600 dark:text-sky-400">
+                            {m.totalMeters} m
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
