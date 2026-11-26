@@ -1078,12 +1078,10 @@ export default function App() {
         flipX: false,
         flipY: false,
         customColor: batchSymbolForm.customColor || '',
-        amperage: symType === 'enchufe_220v' ? { amperage: '16A', ipGrade: 'IP67' } : {}),
-        ipGrade: symType === 'enchufe_220v' ? 'IP67' : undefined,
-        luxThreshold: symType === 'fotocelda'
-        ? { luxThreshold: '15 Lux', controlledCircuit: `Contactor Módulo ${modShort}` }
-       : {}),
-        controlledCircuit: symType === 'fotocelda' ? `Contactor Módulo ${modShort}` : undefined,
+        ...(symType === 'enchufe_220v' ? { amperage: '16A', ipGrade: 'IP67' } : {}),
+        ...(symType === 'fotocelda'
+          ? { luxThreshold: '15 Lux', controlledCircuit: `Contactor Módulo ${modShort}` }
+          : {}),
         spec: cleanSpec,
         status: 'operativo',
         x: posX,
@@ -1394,8 +1392,8 @@ export default function App() {
         showTrunkLabel,
         companyInfo: infoToUse,
       };
-
-      await setDoc(docRef, payload);
+      const cleanPayload = JSON.parse(JSON.stringify(payload));
+      await setDoc(docRef, cleanPayload);
       setCurrentBlueprintId(targetId);
       setBlueprintNameInput(targetTitle);
       notify(`Proyecto "${targetTitle}" guardado en la nube correctamente`, 'success');
@@ -1584,9 +1582,8 @@ export default function App() {
       power: Number(catalogForm.power) || 0,
       rotation: Number(catalogForm.rotation) || 0,
       customColor: catalogForm.customColor || '',
-      amperage: mappedType === 'enchufe_220v' ? '16A' : undefined,
-      ipGrade: mappedType === 'enchufe_220v' ? 'IP67' : undefined,
-      luxThreshold: mappedType === 'fotocelda' ? '15 Lux' : undefined,
+      ...(mappedType === 'enchufe_220v' ? { amperage: '16A', ipGrade: 'IP67' } : {}),
+      ...(mappedType === 'fotocelda' ? { luxThreshold: '15 Lux' } : {}),
     };
 
     if (catalogForm.editingIndex !== null && symbolCatalog[catalogForm.editingIndex]) {
