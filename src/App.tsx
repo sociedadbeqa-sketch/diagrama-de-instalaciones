@@ -1078,9 +1078,11 @@ export default function App() {
         flipX: false,
         flipY: false,
         customColor: batchSymbolForm.customColor || '',
-        amperage: symType === 'enchufe_220v' ? '16A' : undefined,
+        amperage: symType === 'enchufe_220v' ? { amperage: '16A', ipGrade: 'IP67' } : {}),
         ipGrade: symType === 'enchufe_220v' ? 'IP67' : undefined,
-        luxThreshold: symType === 'fotocelda' ? '15 Lux' : undefined,
+        luxThreshold: symType === 'fotocelda'
+        ? { luxThreshold: '15 Lux', controlledCircuit: `Contactor Módulo ${modShort}` }
+       : {}),
         controlledCircuit: symType === 'fotocelda' ? `Contactor Módulo ${modShort}` : undefined,
         spec: cleanSpec,
         status: 'operativo',
