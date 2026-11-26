@@ -7,7 +7,7 @@ import {
   Magnet, Eye, EyeOff, Info, Layers, Grid, ArrowRightLeft, Building2, Printer,
   Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus,
-  Route, Square, Scissors, ClipboardPaste
+  Route, Square, Scissors, ClipboardPaste, Undo2, Redo2, Lock, Unlock, FlipHorizontal2, FlipVertical2, AlignCenterHorizontal
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -55,9 +55,10 @@ const auth = firebaseApp ? getAuth(firebaseApp) : null;
 const db = firebaseApp ? getFirestore(firebaseApp) : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'plano-centro-engorda-beqa';
 
-// Escala base de referencia: 112 px visuales equivalen a 30 metros reales
+// Escala base de referencia y separación estándar fija entre jaulas
 const BASE_CAGE_PX = 112;
 const BASE_CAGE_METERS = 30;
+const STANDARD_WALKWAY_WIDTH = 16;
 
 // ============================================================================
 // MODELO DE DATOS INICIAL: CENTRO DE ENGORDA DE SALMONES (MÓDULOS 200 Y 100)
@@ -70,11 +71,13 @@ const INITIAL_MODULES = [
     subtitle: 'Tren Norte - 12 Jaulas de Engorda (201 - 212)',
     originX: 120,
     originY: 160,
+    headerOffsetX: 0,
+    headerOffsetY: 0,
     rows: 2,
     cols: 6,
     cageSize: 112,
     cageSizeMeters: 30,
-    walkwayWidth: 16,
+    walkwayWidth: STANDARD_WALKWAY_WIDTH,
     startNumber: 201,
   },
   {
@@ -83,11 +86,13 @@ const INITIAL_MODULES = [
     subtitle: 'Tren Sur - 10 Jaulas de Engorda (101 - 110)',
     originX: 1120,
     originY: 160,
+    headerOffsetX: 0,
+    headerOffsetY: 0,
     rows: 2,
     cols: 5,
     cageSize: 112,
     cageSizeMeters: 30,
-    walkwayWidth: 16,
+    walkwayWidth: STANDARD_WALKWAY_WIDTH,
     startNumber: 101,
   },
 ];
@@ -101,7 +106,7 @@ const generateCagesFromModules = (modsList) => {
     const cols = Math.max(1, Number(mod.cols) || 1);
     const sizePx = Number(mod.cageSize) || BASE_CAGE_PX;
     const sizeMeters = Number(mod.cageSizeMeters) || BASE_CAGE_METERS;
-    const walkway = Number(mod.walkwayWidth) || 16;
+    const walkway = STANDARD_WALKWAY_WIDTH;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -145,6 +150,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1200,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Tablero Distribución Fotoperiodo IP66 400V / 3F',
     status: 'operativo',
     x: 112,
@@ -162,6 +169,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1000,
     rotation: 180,
+    flipX: false,
+    flipY: false,
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
     status: 'operativo',
     x: 176,
@@ -179,6 +188,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1000,
     rotation: 180,
+    flipX: false,
+    flipY: false,
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W 5000K',
     status: 'operativo',
     x: 432,
@@ -196,6 +207,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1000,
     rotation: 180,
+    flipX: false,
+    flipY: false,
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
     status: 'mantencion',
     x: 688,
@@ -213,6 +226,8 @@ const INITIAL_OBJECTS = [
     phase: 'control',
     power: 450,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Unidad Energizadora Cerco Lobero / Telemetría',
     status: 'operativo',
     x: 504,
@@ -230,6 +245,8 @@ const INITIAL_OBJECTS = [
     phase: 'monitoreo',
     power: 60,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Sonda Multiparámetro Oxígeno Disuelto / Temp / Salinidad',
     status: 'operativo',
     x: 560,
@@ -247,6 +264,8 @@ const INITIAL_OBJECTS = [
     phase: 'monitoreo',
     power: 85,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Cámara Submarina Detección Pellets + Superficie PTZ',
     status: 'operativo',
     x: 816,
@@ -264,6 +283,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1200,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Tablero Distribución Fotoperiodo IP66 Módulo 100',
     status: 'operativo',
     x: 1112,
@@ -281,6 +302,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1000,
     rotation: 180,
+    flipX: false,
+    flipY: false,
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
     status: 'operativo',
     x: 1304,
@@ -298,6 +321,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 1000,
     rotation: 180,
+    flipX: false,
+    flipY: false,
     spec: 'Proyector LED Fotoperiodo Sumergible 1000W',
     status: 'falla',
     x: 1560,
@@ -315,6 +340,8 @@ const INITIAL_OBJECTS = [
     phase: 'monitoreo',
     power: 60,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Estación Oceanográfica & Correntómetro Doppler',
     status: 'operativo',
     x: 1432,
@@ -332,6 +359,8 @@ const INITIAL_OBJECTS = [
     phase: 'alimentacion',
     power: 350,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     spec: 'Selector Rotatorio & Esparcidor Neumático',
     status: 'operativo',
     x: 1688,
@@ -349,6 +378,8 @@ const INITIAL_OBJECTS = [
     phase: 'fuerza_aux',
     power: 3520,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     amperage: '16A',
     ipGrade: 'IP67',
     spec: 'Toma Industrial CEE 220V 16A 2P+T IP67',
@@ -368,6 +399,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 15,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     luxThreshold: '15 Lux',
     controlledCircuit: 'Contactor Fotoperiodo Módulo 200',
     spec: 'Fotocelda Crepuscular 220V IP65 (15 Lux)',
@@ -387,6 +420,8 @@ const INITIAL_OBJECTS = [
     phase: 'fuerza_aux',
     power: 3520,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     amperage: '16A',
     ipGrade: 'IP67',
     spec: 'Toma Industrial CEE 220V 16A 2P+T IP67',
@@ -406,6 +441,8 @@ const INITIAL_OBJECTS = [
     phase: 'fotoperiodo',
     power: 15,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     luxThreshold: '15 Lux',
     controlledCircuit: 'Contactor Fotoperiodo Módulo 100',
     spec: 'Fotocelda Crepuscular 220V IP65 (15 Lux)',
@@ -593,6 +630,66 @@ export default function App() {
   const [showTrunkLabel, setShowTrunkLabel] = useState(true);
   const [selectedModuleId, setSelectedModuleId] = useState(null);
 
+  // Bloqueo de jaulas para evitar alterar su distribución al mover simbología
+  const [lockCages, setLockCages] = useState(true);
+
+  // Historial Deshacer (Ctrl+Z) y Rehacer (Ctrl+Y)
+  const [pastHistory, setPastHistory] = useState([]);
+  const [futureHistory, setFutureHistory] = useState([]);
+
+  const cloneStateSnapshot = () => ({
+    modules: JSON.parse(JSON.stringify(modules)),
+    cages: JSON.parse(JSON.stringify(cages)),
+    objects: JSON.parse(JSON.stringify(objects)),
+    conduits: JSON.parse(JSON.stringify(conduits)),
+    trunkLabel,
+    showTrunkLabel,
+  });
+
+  const pushHistory = () => {
+    const snap = cloneStateSnapshot();
+    setPastHistory((prev) => [...prev.slice(-39), snap]);
+    setFutureHistory([]);
+  };
+
+  const handleUndo = () => {
+    if (pastHistory.length === 0) {
+      notify('No hay acciones anteriores para deshacer', 'info');
+      return;
+    }
+    const previous = pastHistory[pastHistory.length - 1];
+    const currentSnap = cloneStateSnapshot();
+    setFutureHistory((prev) => [...prev, currentSnap]);
+    setPastHistory((prev) => prev.slice(0, -1));
+
+    setModules(previous.modules);
+    setCages(previous.cages);
+    setObjects(previous.objects);
+    setConduits(previous.conduits);
+    setTrunkLabel(previous.trunkLabel);
+    setShowTrunkLabel(previous.showTrunkLabel);
+    notify('Última acción deshecha (Ctrl+Z)', 'info');
+  };
+
+  const handleRedo = () => {
+    if (futureHistory.length === 0) {
+      notify('No hay acciones para rehacer', 'info');
+      return;
+    }
+    const next = futureHistory[futureHistory.length - 1];
+    const currentSnap = cloneStateSnapshot();
+    setPastHistory((prev) => [...prev, currentSnap]);
+    setFutureHistory((prev) => prev.slice(0, -1));
+
+    setModules(next.modules);
+    setCages(next.cages);
+    setObjects(next.objects);
+    setConduits(next.conduits);
+    setTrunkLabel(next.trunkLabel);
+    setShowTrunkLabel(next.showTrunkLabel);
+    notify('Acción rehacha (Ctrl+Y)', 'info');
+  };
+
   // Modal Nuevo Proyecto con Configuración de Distribución de Jaulas
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectForm, setNewProjectForm] = useState({
@@ -603,7 +700,6 @@ export default function App() {
     coordinates: '',
     googleMapsUrl: '',
     clearExistingObjects: true,
-    // Configuración de distribución de jaulas
     mod1Name: 'MÓDULO 200',
     mod1Rows: 2,
     mod1Cols: 6,
@@ -624,11 +720,10 @@ export default function App() {
   const [showLabels, setShowLabels] = useState(true);
 
   // Herramientas y selección
-  // activeTool: 'select' | 'place' | 'draw_conduit' | 'draw_cage'
   const [activeTool, setActiveTool] = useState('select');
   const [placeTemplate, setPlaceTemplate] = useState(SYMBOL_CATALOG[0]);
   const [selectedId, setSelectedId] = useState('OBJ-02');
-  const [selectedKind, setSelectedKind] = useState('object'); // 'object' | 'cage' | 'module' | 'trunk' | 'conduit'
+  const [selectedKind, setSelectedKind] = useState('object');
 
   // Estado de dibujo de canalización por fase
   const [conduitPhase, setConduitPhase] = useState('fase_r');
@@ -637,7 +732,7 @@ export default function App() {
   const [drawingPoints, setDrawingPoints] = useState([]);
   const [cursorSvgPos, setCursorSvgPos] = useState(null);
 
-  // Estado de dibujo de jaula con ingreso de tamaño (m)
+  // Estado de dibujo de jaula con separación estándar fija
   const [newCageSizeMeters, setNewCageSizeMeters] = useState(30);
   const [newCageLabelInput, setNewCageLabelInput] = useState('');
 
@@ -666,21 +761,21 @@ export default function App() {
   const [showLeftSidebar, setShowLeftSidebar] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
-  const [showRightSidebar, setShowRightSidebar] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
-  );
+  // Panel derecho inicia cerrado; se abre al hacer doble clic en un elemento o con el botón Inspector
+  const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [autoHideRightPanel, setAutoHideRightPanel] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
-  // Interacción de arrastre y portapapeles unificado (equipos, jaulas, canalizaciones)
+  // Interacción de arrastre y portapapeles unificado
   const [draggingObjId, setDraggingObjId] = useState(null);
   const [draggingCageId, setDraggingCageId] = useState(null);
+  const [draggingModuleId, setDraggingModuleId] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [hoveredObj, setHoveredObj] = useState(null);
-  const [clipboardItem, setClipboardItem] = useState(null); // { kind: 'object' | 'cage' | 'conduit', data: any }
+  const [clipboardItem, setClipboardItem] = useState(null);
   const pinchRef = useRef({ active: false, initialDist: 0, initialZoom: 0.84 });
 
   const svgRef = useRef(null);
@@ -691,7 +786,7 @@ export default function App() {
 
   const notify = (message, type = 'info') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3400);
+    setTimeout(() => setToast(null), 3200);
   };
 
   // ============================================================================
@@ -701,7 +796,7 @@ export default function App() {
     const map = {};
     modules.forEach((mod) => {
       const modCages = cages.filter((c) => c.moduleId === mod.id);
-      const walkway = Number(mod.walkwayWidth) || 16;
+      const walkway = STANDARD_WALKWAY_WIDTH;
 
       if (modCages.length === 0) {
         map[mod.id] = {
@@ -743,7 +838,6 @@ export default function App() {
     return map;
   }, [modules, cages]);
 
-  // Detectar a qué módulo pertenece una coordenada X según los límites actuales
   const detectModuleId = (x) => {
     if (modules.length === 0) return 'MOD-200';
     if (modules.length === 1) return modules[0].id;
@@ -959,6 +1053,7 @@ export default function App() {
 
   const handleLoadFromCloud = (bp) => {
     if (!bp) return;
+    pushHistory();
     if (Array.isArray(bp.modules)) setModules(bp.modules);
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
@@ -1144,6 +1239,8 @@ export default function App() {
       return;
     }
 
+    pushHistory();
+
     const coords = newProjectForm.coordinates.trim();
     const mapsLink = buildGoogleMapsLink(coords, newProjectForm.googleMapsUrl);
     const newCode = `PRJ-${new Date().getFullYear()}-${String(Math.floor(100 + Math.random() * 899))}`;
@@ -1159,13 +1256,12 @@ export default function App() {
       code: newCode,
     };
 
-    // Generar módulos y jaulas personalizados según la configuración del formulario
     const m1Rows = Math.max(1, Number(newProjectForm.mod1Rows) || 2);
     const m1Cols = Math.max(1, Number(newProjectForm.mod1Cols) || 5);
     const m1Start = Number(newProjectForm.mod1StartNumber) || 201;
     const m1Meters = Math.max(5, Number(newProjectForm.mod1CageMeters) || 30);
     const m1SizePx = Math.round((m1Meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
-    const walkway = 16;
+    const walkway = STANDARD_WALKWAY_WIDTH;
     const m1TotalCount = m1Rows * m1Cols;
 
     const generatedModules = [
@@ -1175,6 +1271,8 @@ export default function App() {
         subtitle: `Tren 1 - ${m1TotalCount} Jaulas (${m1Start} - ${m1Start + m1TotalCount - 1}) · ${m1Meters}m×${m1Meters}m`,
         originX: 120,
         originY: 160,
+        headerOffsetX: 0,
+        headerOffsetY: 0,
         rows: m1Rows,
         cols: m1Cols,
         cageSize: m1SizePx,
@@ -1201,6 +1299,8 @@ export default function App() {
         subtitle: `Tren 2 - ${m2TotalCount} Jaulas (${m2Start} - ${m2Start + m2TotalCount - 1}) · ${m2Meters}m×${m2Meters}m`,
         originX: m2OriginX,
         originY: 160,
+        headerOffsetX: 0,
+        headerOffsetY: 0,
         rows: m2Rows,
         cols: m2Cols,
         cageSize: m2SizePx,
@@ -1264,6 +1364,8 @@ export default function App() {
       return;
     }
 
+    pushHistory();
+
     const phaseCfg = CONDUIT_PHASE_CONFIG[conduitPhase] || CONDUIT_PHASE_CONFIG.fase_r;
     const nextNum = conduits.length + 1;
     const newConduit = {
@@ -1283,9 +1385,8 @@ export default function App() {
     setActiveTool('select');
     setSelectedId(newConduit.id);
     setSelectedKind('conduit');
-    setShowRightSidebar(true);
     notify(
-      `Canalización "${newConduit.tag}" (${phaseCfg.label}) creada: ${metrics.totalMeters} m totales`,
+      `Canalización "${newConduit.tag}" (${phaseCfg.label}) creada: ${metrics.totalMeters} m totales (doble clic para editar)`,
       'success'
     );
   };
@@ -1342,6 +1443,7 @@ export default function App() {
 
   const duplicateObject = (sourceObj, offsetX = 32, offsetY = 32) => {
     if (!sourceObj) return;
+    pushHistory();
     const newX = Math.round(sourceObj.x + offsetX);
     const newY = Math.round(sourceObj.y + offsetY);
     const modId = detectModuleId(newX);
@@ -1363,16 +1465,16 @@ export default function App() {
     setObjects((prev) => [...prev, clonedObj]);
     setSelectedId(clonedObj.id);
     setSelectedKind('object');
-    setShowRightSidebar(true);
     notify(`Equipo pegado como "${clonedObj.tag}"`, 'success');
   };
 
   const duplicateCage = (sourceCage, offsetX = null, offsetY = 0) => {
     if (!sourceCage) return;
+    pushHistory();
     const stepX =
       offsetX !== null
         ? offsetX
-        : (Number(sourceCage.size) || BASE_CAGE_PX) + 16;
+        : (Number(sourceCage.size) || BASE_CAGE_PX) + STANDARD_WALKWAY_WIDTH;
     const newX = Math.round(sourceCage.x + stepX);
     const newY = Math.round(sourceCage.y + offsetY);
     const targetModId = sourceCage.moduleId || detectModuleId(newX);
@@ -1395,12 +1497,12 @@ export default function App() {
     setCages((prev) => [...prev, clonedCage]);
     setSelectedId(clonedCage.id);
     setSelectedKind('cage');
-    setShowRightSidebar(true);
-    notify(`Jaula pegada como "${newLabel}" (zona gris autoajustada)`, 'success');
+    notify(`Jaula pegada como "${newLabel}" con separación estándar`, 'success');
   };
 
   const duplicateConduit = (sourceConduit, offsetX = 24, offsetY = 24) => {
     if (!sourceConduit) return;
+    pushHistory();
     const clonedConduit = {
       ...sourceConduit,
       id: `CAN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1413,7 +1515,6 @@ export default function App() {
     setConduits((prev) => [...prev, clonedConduit]);
     setSelectedId(clonedConduit.id);
     setSelectedKind('conduit');
-    setShowRightSidebar(true);
     notify(`Canalización pegada como "${clonedConduit.tag}"`, 'success');
   };
 
@@ -1425,7 +1526,7 @@ export default function App() {
         prev ? { ...prev, data: { ...prev.data, x: prev.data.x + 36, y: prev.data.y + 36 } } : null
       );
     } else if (clipboardItem.kind === 'cage') {
-      const step = (Number(clipboardItem.data.size) || BASE_CAGE_PX) + 16;
+      const step = (Number(clipboardItem.data.size) || BASE_CAGE_PX) + STANDARD_WALKWAY_WIDTH;
       duplicateCage(clipboardItem.data, step, 0);
       setClipboardItem((prev) =>
         prev ? { ...prev, data: { ...prev.data, x: prev.data.x + step } } : null
@@ -1447,12 +1548,95 @@ export default function App() {
   };
 
   // ============================================================================
-  // ATAJOS DE TECLADO (SUPR / DELETE, CTRL+C, CTRL+X, CTRL+V, CTRL+D)
+  // ATAJOS DE TECLADO: CTRL+Z, CTRL+Y, SHIFT+FLECHAS, SUPR, CTRL+C/X/V/D
   // ============================================================================
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = e.target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      // Deshacer: Ctrl + Z (sin Shift)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // Rehacer: Ctrl + Y o Ctrl + Shift + Z
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
+      ) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // Desplazamiento fino con Shift + Flechas (1 px) o Flechas (4 px)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const step = e.shiftKey ? 1 : 4;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+
+        if (selectedObject) {
+          e.preventDefault();
+          if (!e.repeat) pushHistory();
+          setObjects((prev) =>
+            prev.map((o) =>
+              o.id === selectedObject.id ? { ...o, x: o.x + dx, y: o.y + dy } : o
+            )
+          );
+          return;
+        }
+
+        if (selectedConduit) {
+          e.preventDefault();
+          if (!e.repeat) pushHistory();
+          setConduits((prev) =>
+            prev.map((c) =>
+              c.id === selectedConduit.id
+                ? {
+                    ...c,
+                    points: c.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+                  }
+                : c
+            )
+          );
+          return;
+        }
+
+        if (selectedModule) {
+          e.preventDefault();
+          if (!e.repeat) pushHistory();
+          setModules((prev) =>
+            prev.map((m) =>
+              m.id === selectedModule.id
+                ? {
+                    ...m,
+                    headerOffsetX: (m.headerOffsetX || 0) + dx,
+                    headerOffsetY: (m.headerOffsetY || 0) + dy,
+                  }
+                : m
+            )
+          );
+          return;
+        }
+
+        if (selectedCage) {
+          e.preventDefault();
+          if (lockCages) {
+            notify('Las jaulas están fijadas. Desbloquéalas si deseas desplazarlas.', 'warn');
+            return;
+          }
+          if (!e.repeat) pushHistory();
+          setCages((prev) =>
+            prev.map((c) =>
+              c.id === selectedCage.id ? { ...c, x: c.x + dx, y: c.y + dy } : c
+            )
+          );
+          return;
+        }
+      }
 
       if (e.key === 'Enter' && activeTool === 'draw_conduit' && drawingPoints.length >= 2) {
         e.preventDefault();
@@ -1535,24 +1719,28 @@ export default function App() {
     selectedObject,
     selectedCage,
     selectedConduit,
+    selectedModule,
+    lockCages,
     clipboardItem,
     objects,
     cages,
     conduits,
+    modules,
+    pastHistory,
+    futureHistory,
     showPreviewModal,
     isFullscreen,
     activeTool,
     drawingPoints,
   ]);
 
-  // Líneas magnéticas dinámicas calculadas a partir de los bordes reales de cada jaula y pasillo
+  // Líneas magnéticas dinámicas calculadas a partir de los bordes reales de cada jaula y pasillo estándar
   const walkwayLines = useMemo(() => {
     const xsSet = new Set();
     const ysSet = new Set();
 
     cages.forEach((c) => {
-      const mod = modules.find((m) => m.id === c.moduleId);
-      const halfW = (Number(mod?.walkwayWidth) || 16) / 2;
+      const halfW = STANDARD_WALKWAY_WIDTH / 2;
       const size = Number(c.size) || BASE_CAGE_PX;
 
       xsSet.add(c.x - halfW);
@@ -1565,7 +1753,7 @@ export default function App() {
       xs: Array.from(xsSet),
       ys: Array.from(ysSet),
     };
-  }, [cages, modules]);
+  }, [cages]);
 
   const applySnap = (rawX, rawY) => {
     if (!snapToWalkway) return { x: Math.round(rawX), y: Math.round(rawY) };
@@ -1604,6 +1792,7 @@ export default function App() {
   };
 
   const placeSymbolAtCoords = (rawX, rawY) => {
+    pushHistory();
     const snapped = applySnap(rawX, rawY);
     const modId = detectModuleId(snapped.x);
     const modShort = modId === 'MOD-200' ? '200' : '100';
@@ -1634,6 +1823,8 @@ export default function App() {
       phase: placeTemplate.phase,
       power: placeTemplate.power,
       rotation: placeTemplate.rotation ?? 180,
+      flipX: false,
+      flipY: false,
       amperage: placeTemplate.amperage || '16A',
       ipGrade: placeTemplate.ipGrade || 'IP67',
       luxThreshold: placeTemplate.luxThreshold || '15 Lux',
@@ -1650,21 +1841,32 @@ export default function App() {
     setObjects((prev) => [...prev, newObj]);
     setSelectedId(newObj.id);
     setSelectedKind('object');
-    setShowRightSidebar(true);
     setActiveTool('select');
-    notify(`Equipo "${newObj.tag}" añadido al plano`, 'success');
+    notify(`Equipo "${newObj.tag}" añadido (doble clic para editar propiedades)`, 'success');
   };
 
   // ============================================================================
-  // CREAR JAULA EN EL PLANO CON TAMAÑO EN METROS
+  // CREAR JAULA CON SEPARACIÓN ESTÁNDAR FIJA (SIN DESPLAZAMIENTO LIBRE AL DIBUJAR)
   // ============================================================================
   const placeCageAtCoords = (rawX, rawY) => {
+    pushHistory();
     const meters = Math.max(5, Number(newCageSizeMeters) || 30);
     const visualPx = Math.round((meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
     const nextNum =
       cages.reduce((maxN, c) => Math.max(maxN, Number(c.number) || 0), 100) + 1;
     const customLabel = newCageLabelInput.trim() || String(nextNum);
     const modId = detectModuleId(rawX);
+    const targetMod = modules.find((m) => m.id === modId) || modules[0];
+
+    // Encaje estricto a la retícula de separación estándar (visualPx + STANDARD_WALKWAY_WIDTH)
+    const step = visualPx + STANDARD_WALKWAY_WIDTH;
+    const baseOriginX = targetMod ? targetMod.originX : 120;
+    const baseOriginY = targetMod ? targetMod.originY : 160;
+    const colIndex = Math.max(0, Math.round((rawX - baseOriginX) / step));
+    const rowIndex = Math.max(0, Math.round((rawY - baseOriginY) / step));
+
+    const alignedX = baseOriginX + colIndex * step;
+    const alignedY = baseOriginY + rowIndex * step;
 
     const newCage = {
       id: `JAULA-${Date.now()}`,
@@ -1672,8 +1874,10 @@ export default function App() {
       label: customLabel,
       showLabel: true,
       moduleId: modId,
-      x: Math.round(rawX),
-      y: Math.round(rawY),
+      row: rowIndex,
+      col: colIndex,
+      x: alignedX,
+      y: alignedY,
       size: visualPx,
       sizeMeters: meters,
       dimensions: `${meters}m x ${meters}m`,
@@ -1682,15 +1886,17 @@ export default function App() {
       biomassTons: 150,
       photoperiodActive: true,
       targetLux: 180,
-      notes: `Jaula ${customLabel} (${meters}m x ${meters}m) agregada manualmente.`,
+      notes: `Jaula ${customLabel} (${meters}m x ${meters}m) con separación estándar de pasillo.`,
     };
 
     setCages((prev) => [...prev, newCage]);
     setSelectedId(newCage.id);
     setSelectedKind('cage');
-    setShowRightSidebar(true);
     setActiveTool('select');
-    notify(`Jaula "${customLabel}" (${meters}m x ${meters}m) dibujada en el plano`, 'success');
+    notify(
+      `Jaula "${customLabel}" (${meters}m × ${meters}m) insertada con separación estándar`,
+      'success'
+    );
   };
 
   const handleCanvasMouseDown = (e) => {
@@ -1752,9 +1958,35 @@ export default function App() {
       return;
     }
 
-    if (draggingCageId) {
-      const nextX = Math.round((coords.x - dragOffset.x) / 8) * 8;
-      const nextY = Math.round((coords.y - dragOffset.y) / 8) * 8;
+    if (draggingModuleId) {
+      const bounds = moduleBoundsMap[draggingModuleId];
+      const baseX = bounds ? bounds.boxX : 120;
+      const baseY = bounds ? bounds.boxY - 54 : 106;
+      const nextOffsetX = Math.round(coords.x - dragOffset.x - baseX);
+      const nextOffsetY = Math.round(coords.y - dragOffset.y - baseY);
+      setModules((prev) =>
+        prev.map((m) =>
+          m.id === draggingModuleId
+            ? { ...m, headerOffsetX: nextOffsetX, headerOffsetY: nextOffsetY }
+            : m
+        )
+      );
+      return;
+    }
+
+    if (draggingCageId && !lockCages) {
+      const targetCage = cages.find((c) => c.id === draggingCageId);
+      const step = (Number(targetCage?.size) || BASE_CAGE_PX) + STANDARD_WALKWAY_WIDTH;
+      const targetMod = modules.find((m) => m.id === targetCage?.moduleId) || modules[0];
+      const baseOriginX = targetMod ? targetMod.originX : 120;
+      const baseOriginY = targetMod ? targetMod.originY : 160;
+      const rawNextX = coords.x - dragOffset.x;
+      const rawNextY = coords.y - dragOffset.y;
+      const snappedCol = Math.round((rawNextX - baseOriginX) / step);
+      const snappedRow = Math.round((rawNextY - baseOriginY) / step);
+      const nextX = baseOriginX + snappedCol * step;
+      const nextY = baseOriginY + snappedRow * step;
+
       setCages((prev) =>
         prev.map((c) => (c.id === draggingCageId ? { ...c, x: nextX, y: nextY } : c))
       );
@@ -1772,6 +2004,7 @@ export default function App() {
   const handleCanvasMouseUp = () => {
     setDraggingObjId(null);
     setDraggingCageId(null);
+    setDraggingModuleId(null);
     setIsPanning(false);
   };
 
@@ -1790,6 +2023,7 @@ export default function App() {
       setIsPanning(false);
       setDraggingObjId(null);
       setDraggingCageId(null);
+      setDraggingModuleId(null);
       return;
     }
 
@@ -1866,11 +2100,13 @@ export default function App() {
     pinchRef.current.active = false;
     setDraggingObjId(null);
     setDraggingCageId(null);
+    setDraggingModuleId(null);
     setIsPanning(false);
   };
 
   const updateSelectedObject = (field, value) => {
     if (!selectedObject) return;
+    pushHistory();
     setObjects((prev) =>
       prev.map((obj) => (obj.id === selectedObject.id ? { ...obj, [field]: value } : obj))
     );
@@ -1878,6 +2114,7 @@ export default function App() {
 
   const updateSelectedCage = (field, value) => {
     if (!selectedCage) return;
+    pushHistory();
     setCages((prev) =>
       prev.map((c) => {
         if (c.id !== selectedCage.id) return c;
@@ -1898,19 +2135,36 @@ export default function App() {
 
   const updateSelectedModule = (field, value) => {
     if (!selectedModule) return;
+    pushHistory();
     setModules((prev) =>
       prev.map((m) => (m.id === selectedModule.id ? { ...m, [field]: value } : m))
     );
   };
 
+  const centerModuleHeaderOverCages = (modId) => {
+    const bounds = moduleBoundsMap[modId];
+    if (!bounds || !bounds.hasCages) return;
+    pushHistory();
+    const headerWidth = 340;
+    const centeredOffsetX = Math.round((bounds.totalW - headerWidth) / 2);
+    setModules((prev) =>
+      prev.map((m) =>
+        m.id === modId ? { ...m, headerOffsetX: centeredOffsetX, headerOffsetY: 0 } : m
+      )
+    );
+    notify('Encabezado centrado respecto a las jaulas del módulo', 'success');
+  };
+
   const updateSelectedConduit = (field, value) => {
     if (!selectedConduit) return;
+    pushHistory();
     setConduits((prev) =>
       prev.map((c) => (c.id === selectedConduit.id ? { ...c, [field]: value } : c))
     );
   };
 
   const deleteObject = (id, silent = false) => {
+    pushHistory();
     setObjects((prev) => prev.filter((o) => o.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
@@ -1920,6 +2174,7 @@ export default function App() {
   };
 
   const deleteConduit = (id, silent = false) => {
+    pushHistory();
     setConduits((prev) => prev.filter((c) => c.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
@@ -1929,6 +2184,7 @@ export default function App() {
   };
 
   const deleteCage = (id, silent = false) => {
+    pushHistory();
     setCages((prev) => prev.filter((c) => c.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
@@ -1978,6 +2234,7 @@ export default function App() {
       try {
         const data = JSON.parse(reader.result);
         if (data.modules && data.cages && data.objects) {
+          pushHistory();
           setModules(data.modules);
           setCages(data.cages);
           setObjects(data.objects);
@@ -2017,9 +2274,9 @@ export default function App() {
 
     const activeBounds = Object.values(moduleBoundsMap).filter((b) => b.hasCages);
     if (activeBounds.length > 0) {
-      minX = Math.min(...activeBounds.map((b) => b.boxX)) - 50;
-      minY = Math.min(...activeBounds.map((b) => b.boxY - 75)) - 20;
-      maxX = Math.max(...activeBounds.map((b) => b.boxX + b.totalW)) + 50;
+      minX = Math.min(...activeBounds.map((b) => b.boxX)) - 60;
+      minY = Math.min(...activeBounds.map((b) => b.boxY - 90)) - 20;
+      maxX = Math.max(...activeBounds.map((b) => b.boxX + b.totalW)) + 60;
       maxY = Math.max(...activeBounds.map((b) => b.boxY + b.totalH)) + 60;
     }
 
@@ -2173,8 +2430,8 @@ export default function App() {
         <style>
           @page { margin: 8mm; }
           body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
-          .logo-bar { margin-bottom: 8px; }
-          .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
+          .logo-bar { margin-bottom: 10px; display: flex; align-items: center; }
+          .logo { max-height: 76px; max-width: 280px; object-fit: contain; }
           .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
           .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
           .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
@@ -2313,6 +2570,8 @@ export default function App() {
     const phaseColor = PHASE_CONFIG[obj.phase]?.color || '#0284c7';
     const statusColor = STATUS_CONFIG[obj.status]?.color || '#10b981';
     const rot = Number(obj.rotation) || 0;
+    const scaleX = obj.flipX ? -1 : 1;
+    const scaleY = obj.flipY ? -1 : 1;
 
     return (
       <g>
@@ -2326,10 +2585,10 @@ export default function App() {
           />
         )}
 
-        {/* Diseño Especial Realista de Proyector LED Industrial */}
-        {obj.type === 'luminaria' ? (
-          <g>
-            <g transform={`rotate(${rot})`}>
+        {/* Grupo transformado con rotación y volteo asimétrico (tipo espejo) */}
+        <g transform={`scale(${scaleX}, ${scaleY}) rotate(${rot})`}>
+          {obj.type === 'luminaria' ? (
+            <g>
               <polygon
                 points="10,-12 46,-26 46,26 10,12"
                 fill="url(#ledBeamGrad)"
@@ -2424,74 +2683,74 @@ export default function App() {
                 ))
               )}
             </g>
-          </g>
-        ) : (
-          <>
-            <circle
-              r="17"
-              fill={darkMode ? '#0f172a' : '#ffffff'}
-              stroke={phaseColor}
-              strokeWidth="2.6"
-            />
-            {obj.type === 'enchufe_220v' && (
-              <g>
-                <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#2563eb" />
-                <circle cx="-3.5" cy="-1.5" r="1.6" fill="#ffffff" />
-                <circle cx="3.5" cy="-1.5" r="1.6" fill="#ffffff" />
-                <rect x="-1.2" y="2.5" width="2.4" height="3.2" rx="0.6" fill="#fde047" />
-              </g>
-            )}
-            {obj.type === 'fotocelda' && (
-              <g>
-                <path
-                  d="M -10,0 Q 0,-9 10,0 Q 0,9 -10,0 Z"
-                  fill="#fef3c7"
-                  stroke="#d97706"
-                  strokeWidth="1.8"
-                />
-                <circle r="3.8" fill="#0f172a" />
-                <circle cx="-1.2" cy="-1.2" r="1.1" fill="#ffffff" />
-              </g>
-            )}
-            {obj.type === 'tablero' && (
-              <g>
-                <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#ef4444" />
-                <polygon points="1,-5 -3,1 0,1 -1,5 4,-1 1,-1" fill="#ffffff" />
-              </g>
-            )}
-            {obj.type === 'energizador' && (
-              <g>
-                <circle r="6" fill="#ef4444" />
-                <path
-                  d="M -10,-6 A 12,12 0 0,1 -10,6 M 10,-6 A 12,12 0 0,0 10,6"
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="1.8"
-                />
-              </g>
-            )}
-            {obj.type === 'sensor' && (
-              <g>
-                <circle r="6.5" fill="#06b6d4" />
-                <circle r="2.5" fill="#ffffff" />
-              </g>
-            )}
-            {obj.type === 'camara' && (
-              <g>
-                <rect x="-8" y="-5" width="11" height="10" rx="2" fill="#06b6d4" />
-                <polygon points="3,-3 9,-6 9,6 3,3" fill="#0891b2" />
-              </g>
-            )}
-            {obj.type === 'alimentador' && (
-              <g>
-                <polygon points="0,-9 8,6 -8,6" fill="#10b981" />
-                <circle r="2.2" fill="#ffffff" />
-              </g>
-            )}
-          </>
-        )}
+          ) : (
+            <>
+              <circle
+                r="17"
+                fill={darkMode ? '#0f172a' : '#ffffff'}
+                stroke={phaseColor}
+                strokeWidth="2.6"
+              />
+              {obj.type === 'enchufe_220v' && (
+                <g>
+                  <rect x="-8" y="-8" width="16" height="16" rx="4" fill="#2563eb" />
+                  <circle cx="-3.5" cy="-1.5" r="1.6" fill="#ffffff" />
+                  <circle cx="3.5" cy="-1.5" r="1.6" fill="#ffffff" />
+                  <rect x="-1.2" y="2.5" width="2.4" height="3.2" rx="0.6" fill="#fde047" />
+                </g>
+              )}
+              {obj.type === 'fotocelda' && (
+                <g>
+                  <path
+                    d="M -10,0 Q 0,-9 10,0 Q 0,9 -10,0 Z"
+                    fill="#fef3c7"
+                    stroke="#d97706"
+                    strokeWidth="1.8"
+                  />
+                  <circle r="3.8" fill="#0f172a" />
+                  <circle cx="-1.2" cy="-1.2" r="1.1" fill="#ffffff" />
+                </g>
+              )}
+              {obj.type === 'tablero' && (
+                <g>
+                  <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#ef4444" />
+                  <polygon points="1,-5 -3,1 0,1 -1,5 4,-1 1,-1" fill="#ffffff" />
+                </g>
+              )}
+              {obj.type === 'energizador' && (
+                <g>
+                  <circle r="6" fill="#ef4444" />
+                  <path
+                    d="M -10,-6 A 12,12 0 0,1 -10,6 M 10,-6 A 12,12 0 0,0 10,6"
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth="1.8"
+                  />
+                </g>
+              )}
+              {obj.type === 'sensor' && (
+                <g>
+                  <circle r="6.5" fill="#06b6d4" />
+                  <circle r="2.5" fill="#ffffff" />
+                </g>
+              )}
+              {obj.type === 'camara' && (
+                <g>
+                  <rect x="-8" y="-5" width="11" height="10" rx="2" fill="#06b6d4" />
+                  <polygon points="3,-3 9,-6 9,6 3,3" fill="#0891b2" />
+                </g>
+              )}
+              {obj.type === 'alimentador' && (
+                <g>
+                  <polygon points="0,-9 8,6 -8,6" fill="#10b981" />
+                  <circle r="2.2" fill="#ffffff" />
+                </g>
+              )}
+            </>
+          )}
+        </g>
 
-        {/* Indicador de Estado Operativo */}
+        {/* Indicador de Estado Operativo (sin espejar) */}
         <circle
           cx="13"
           cy="-13"
@@ -2602,17 +2861,27 @@ export default function App() {
           darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}
       >
-        {/* Identidad Empresa + Botón Nuevo Proyecto */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        {/* Identidad Empresa con Espacio Ampliado para Logo */}
+        <div className="flex items-center gap-3 min-w-0">
           {companyInfo.logoDataUrl ? (
-            <img
-              src={companyInfo.logoDataUrl}
-              alt="Logo"
-              className="h-9 max-w-[110px] object-contain rounded-lg border border-slate-200/40 bg-white p-1"
-            />
+            <div
+              onClick={() => logoInputRef.current?.click()}
+              title="Haz clic para cambiar logotipo"
+              className="h-12 min-w-[140px] max-w-[240px] rounded-xl border border-slate-200/80 bg-white px-2.5 py-1 flex items-center justify-center cursor-pointer shadow-xs shrink-0"
+            >
+              <img
+                src={companyInfo.logoDataUrl}
+                alt="Logo Empresa"
+                className="max-h-10 w-auto max-w-full object-contain"
+              />
+            </div>
           ) : (
-            <div className="h-9 px-2.5 rounded-xl bg-sky-600 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs">
-              <Building2 className="w-4 h-4" />
+            <div
+              onClick={() => logoInputRef.current?.click()}
+              title="Haz clic para subir tu logotipo"
+              className="h-12 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-sm flex items-center gap-2 shadow-xs cursor-pointer shrink-0 transition-colors"
+            >
+              <Building2 className="w-5 h-5" />
               <span>BEQA</span>
             </div>
           )}
@@ -2637,6 +2906,62 @@ export default function App() {
 
         {/* Acciones Principales */}
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* Botones Deshacer (Ctrl+Z) y Rehacer (Ctrl+Y) */}
+          <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <button
+              onClick={handleUndo}
+              disabled={pastHistory.length === 0}
+              className={`px-2 py-1.5 text-xs font-bold flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                darkMode
+                  ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  : 'bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Deshacer última acción (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Deshacer</span>
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={futureHistory.length === 0}
+              className={`px-2 py-1.5 text-xs font-bold border-l border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors disabled:opacity-40 ${
+                darkMode
+                  ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  : 'bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Rehacer acción (Ctrl+Y)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Botón Fijar / Bloquear Jaulas */}
+          <button
+            onClick={() => {
+              setLockCages((v) => {
+                const next = !v;
+                notify(
+                  next
+                    ? 'Jaulas fijadas: su distribución queda protegida al mover equipos'
+                    : 'Jaulas desbloqueadas: puedes reposicionarlas en la retícula',
+                  'info'
+                );
+                return next;
+              });
+            }}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-extrabold border flex items-center gap-1 transition-colors ${
+              lockCages
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40'
+                : darkMode
+                ? 'bg-slate-800 border-slate-700 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700'
+            }`}
+            title="Fijar jaulas para no modificar su distribución al mover simbología"
+          >
+            {lockCages ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{lockCages ? 'Jaulas Fijas' : 'Jaulas Libres'}</span>
+          </button>
+
           <button
             onClick={() => {
               setNewProjectForm({
@@ -2679,7 +3004,7 @@ export default function App() {
             }`}
           >
             <FolderOpen className="w-3.5 h-3.5 text-sky-500" />
-            <span>Buscar Proyectos ({savedBlueprints.length})</span>
+            <span>Proyectos ({savedBlueprints.length})</span>
           </button>
 
           <button
@@ -2688,7 +3013,7 @@ export default function App() {
             className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-60"
           >
             <CloudUpload className="w-3.5 h-3.5" />
-            <span>{isSavingCloud ? 'Guardando...' : 'Guardar en Nube'}</span>
+            <span>{isSavingCloud ? 'Guardando...' : 'Guardar'}</span>
             <span
               className={`w-2 h-2 rounded-full ${
                 cloudStatus === 'connected'
@@ -2711,7 +3036,7 @@ export default function App() {
             }`}
           >
             <Magnet className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Imán Pasillos</span>
+            <span className="hidden md:inline">Imán</span>
           </button>
 
           <button
@@ -2725,7 +3050,7 @@ export default function App() {
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Etiquetas</span>
+            <span className="hidden lg:inline">Etiquetas</span>
           </button>
 
           <button
@@ -2761,7 +3086,7 @@ export default function App() {
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-700 hover:bg-slate-800 text-white flex items-center gap-1"
           >
             <MonitorPlay className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Vista Previa</span>
+            <span className="hidden xl:inline">Vista Previa</span>
           </button>
 
           <button
@@ -2781,7 +3106,7 @@ export default function App() {
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Cargar</span>
+            <span className="hidden xl:inline">Cargar</span>
           </button>
           <input
             ref={jsonInputRef}
@@ -2816,7 +3141,7 @@ export default function App() {
               darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
             }`}
           >
-            {/* HERRAMIENTAS DE DIBUJO: CANALIZACIÓN POR FASE Y JAULAS */}
+            {/* HERRAMIENTAS DE DIBUJO: CANALIZACIÓN POR FASE Y JAULAS ESTÁNDAR */}
             <div className="space-y-2.5">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
                 Herramientas de Trazado
@@ -2910,7 +3235,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Leyenda compacta de colores por fase */}
                 <div className="grid grid-cols-2 gap-1 pt-1">
                   {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
                     <button
@@ -2933,7 +3257,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 2. Dibujar Jaula con Tamaño en Metros */}
+              {/* 2. Dibujar Jaula con Separación Estándar */}
               <div
                 className={`p-2.5 rounded-xl border space-y-2 ${
                   activeTool === 'draw_cage'
@@ -2946,7 +3270,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold flex items-center gap-1.5">
                     <Square className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Dibujar Jaula</span>
+                    <span>Jaula (Separación Estándar)</span>
                   </span>
                   <button
                     type="button"
@@ -2956,7 +3280,7 @@ export default function App() {
                       } else {
                         setActiveTool('draw_cage');
                         notify(
-                          `Haz clic en el plano para ubicar la jaula de ${newCageSizeMeters}m x ${newCageSizeMeters}m`,
+                          `Haz clic en el plano para insertar jaula de ${newCageSizeMeters}m × ${newCageSizeMeters}m con separación estándar`,
                           'info'
                         );
                       }
@@ -2967,7 +3291,7 @@ export default function App() {
                         : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                     }`}
                   >
-                    {activeTool === 'draw_cage' ? 'Cancelar' : 'Ubicar'}
+                    {activeTool === 'draw_cage' ? 'Cancelar' : 'Insertar'}
                   </button>
                 </div>
 
@@ -3007,7 +3331,7 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
-                  Atajos: <strong>Supr</strong> elimina · <strong>Ctrl+C / X / V</strong> copia, corta o pega.
+                  <strong>Doble clic</strong> abre Inspector · <strong>Shift+Flecha</strong> ajuste fino · <strong>Ctrl+Z/Y</strong> deshace/rehace.
                 </p>
               </div>
             </div>
@@ -3394,7 +3718,7 @@ export default function App() {
             {activeTool === 'draw_cage' && (
               <div className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
                 <span>
-                  Haz clic en el plano para ubicar Jaula ({newCageSizeMeters}m × {newCageSizeMeters}m)
+                  Haz clic en el plano para insertar Jaula ({newCageSizeMeters}m × {newCageSizeMeters}m) con separación estándar
                 </span>
                 <button
                   onClick={() => setActiveTool('select')}
@@ -3441,6 +3765,7 @@ export default function App() {
                   ? 'bg-slate-900 border-slate-700 text-sky-400'
                   : 'bg-white border-slate-200 text-sky-700'
               }`}
+              title="Abrir panel inspector (también con doble clic sobre un objeto)"
             >
               <PanelRightOpen className="w-4 h-4" />
               <span>Inspector</span>
@@ -3498,21 +3823,36 @@ export default function App() {
                 const bounds = moduleBoundsMap[mod.id];
                 if (!bounds || !bounds.hasCages) return null;
 
+                const headerX = bounds.boxX + (Number(mod.headerOffsetX) || 0);
+                const headerY = bounds.boxY - 54 + (Number(mod.headerOffsetY) || 0);
+
                 return (
                   <g key={mod.id}>
+                    {/* Cuadro de texto con el nombre del módulo movible y centrable */}
                     <g
-                      transform={`translate(${bounds.boxX}, ${bounds.boxY - 54})`}
-                      onClick={(e) => {
+                      transform={`translate(${headerX}, ${headerY})`}
+                      onMouseDown={(e) => {
+                        if (activeTool !== 'select' || e.button !== 0) return;
+                        e.stopPropagation();
+                        pushHistory();
+                        const coords = clientToSvgCoords(e.clientX, e.clientY);
+                        setSelectedModuleId(mod.id);
+                        setSelectedId(mod.id);
+                        setSelectedKind('module');
+                        setDraggingModuleId(mod.id);
+                        setDragOffset({ x: coords.x - headerX, y: coords.y - headerY });
+                      }}
+                      onDoubleClick={(e) => {
                         e.stopPropagation();
                         setSelectedModuleId(mod.id);
                         setSelectedId(mod.id);
                         setSelectedKind('module');
                         setShowRightSidebar(true);
                       }}
-                      className="cursor-pointer"
+                      className="cursor-move"
                     >
                       <rect
-                        width="330"
+                        width="340"
                         height="44"
                         rx="10"
                         fill={darkMode ? '#0f172a' : '#ffffff'}
@@ -3521,7 +3861,9 @@ export default function App() {
                             ? '#0284c7'
                             : '#94a3b8'
                         }
-                        strokeWidth="1.8"
+                        strokeWidth={
+                          selectedModuleId === mod.id && selectedKind === 'module' ? '2.5' : '1.8'
+                        }
                       />
                       <text
                         x="14"
@@ -3543,7 +3885,7 @@ export default function App() {
                       </text>
                     </g>
 
-                    {/* Zona gris que se adapta automáticamente a la cantidad y posición de jaulas */}
+                    {/* Zona gris que se adapta automáticamente a la cantidad de jaulas */}
                     <rect
                       x={bounds.boxX}
                       y={bounds.boxY}
@@ -3577,6 +3919,11 @@ export default function App() {
                         e.stopPropagation();
                         setSelectedId('TRUNK');
                         setSelectedKind('trunk');
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId('TRUNK');
+                        setSelectedKind('trunk');
                         setShowRightSidebar(true);
                       }}
                       className="cursor-pointer"
@@ -3605,7 +3952,7 @@ export default function App() {
                 </g>
               )}
 
-              {/* Jaulas de Cultivo (Seleccionables y Arrastrables) */}
+              {/* Jaulas de Cultivo (Fijas por defecto; clic selecciona, doble clic abre inspector) */}
               {cages.map((cage) => {
                 const isSel = selectedKind === 'cage' && selectedId === cage.id;
                 const displayText = cage.label !== undefined ? cage.label : String(cage.number);
@@ -3618,14 +3965,23 @@ export default function App() {
                     onMouseDown={(e) => {
                       if (activeTool !== 'select' || e.button !== 0) return;
                       e.stopPropagation();
-                      const coords = clientToSvgCoords(e.clientX, e.clientY);
                       setSelectedId(cage.id);
                       setSelectedKind('cage');
-                      setDraggingCageId(cage.id);
-                      setDragOffset({ x: coords.x - cage.x, y: coords.y - cage.y });
+                      if (!lockCages) {
+                        pushHistory();
+                        const coords = clientToSvgCoords(e.clientX, e.clientY);
+                        setDraggingCageId(cage.id);
+                        setDragOffset({ x: coords.x - cage.x, y: coords.y - cage.y });
+                      }
+                    }}
+                    onDoubleClick={(e) => {
+                      if (activeTool !== 'select') return;
+                      e.stopPropagation();
+                      setSelectedId(cage.id);
+                      setSelectedKind('cage');
                       setShowRightSidebar(true);
                     }}
-                    className="cursor-pointer"
+                    className={lockCages ? 'cursor-pointer' : 'cursor-move'}
                   >
                     <rect
                       width={cage.size}
@@ -3711,6 +4067,12 @@ export default function App() {
                   <g
                     key={conduit.id}
                     onClick={(e) => {
+                      if (activeTool !== 'select') return;
+                      e.stopPropagation();
+                      setSelectedId(conduit.id);
+                      setSelectedKind('conduit');
+                    }}
+                    onDoubleClick={(e) => {
                       if (activeTool !== 'select') return;
                       e.stopPropagation();
                       setSelectedId(conduit.id);
@@ -3850,7 +4212,7 @@ export default function App() {
                 </g>
               )}
 
-              {/* Equipos Eléctricos y Luminarias */}
+              {/* Equipos Eléctricos y Luminarias (Clic arrastra/selecciona, Doble Clic abre Inspector) */}
               {filteredObjects.map((obj) => {
                 const isSel = selectedKind === 'object' && selectedId === obj.id;
                 return (
@@ -3858,20 +4220,27 @@ export default function App() {
                     key={obj.id}
                     transform={`translate(${obj.x}, ${obj.y})`}
                     onMouseDown={(e) => {
+                      if (activeTool !== 'select' || e.button !== 0) return;
+                      e.stopPropagation();
+                      pushHistory();
+                      setSelectedId(obj.id);
+                      setSelectedKind('object');
+                      setDraggingObjId(obj.id);
+                    }}
+                    onDoubleClick={(e) => {
                       if (activeTool !== 'select') return;
                       e.stopPropagation();
                       setSelectedId(obj.id);
                       setSelectedKind('object');
-                      setDraggingObjId(obj.id);
                       setShowRightSidebar(true);
                     }}
                     onTouchStart={(e) => {
                       if (activeTool !== 'select') return;
                       e.stopPropagation();
+                      pushHistory();
                       setSelectedId(obj.id);
                       setSelectedKind('object');
                       setDraggingObjId(obj.id);
-                      setShowRightSidebar(true);
                     }}
                     onMouseEnter={() => setHoveredObj(obj)}
                     onMouseLeave={() => setHoveredObj(null)}
@@ -3989,7 +4358,7 @@ export default function App() {
         </main>
 
         {/* ====================================================================
-            PANEL DERECHO DESPLEGABLE SUPERPUESTO Y TOTALMENTE OPACO (z-50)
+            PANEL DERECHO DESPLEGABLE SUPERPUESTO (SE ABRE CON DOBLE CLIC EN OBJETO)
         ==================================================================== */}
         {showRightSidebar && (
           <aside
@@ -4123,6 +4492,43 @@ export default function App() {
                           : 'bg-slate-50 border-slate-200 text-slate-900'
                       }`}
                     />
+                  </div>
+                </div>
+
+                {/* Volteo Asimétrico (Tipo Espejo) */}
+                <div>
+                  <label className="block text-xs font-bold mb-1.5">
+                    Volteo Asimétrico (Tipo Espejo)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedObject('flipX', !selectedObject.flipX)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
+                        selectedObject.flipX
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-300'
+                          : darkMode
+                          ? 'border-slate-700 bg-slate-800 text-slate-300'
+                          : 'border-slate-200 bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <FlipHorizontal2 className="w-4 h-4" />
+                      <span>Espejo Horizontal</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedObject('flipY', !selectedObject.flipY)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
+                        selectedObject.flipY
+                          ? 'border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-300'
+                          : darkMode
+                          ? 'border-slate-700 bg-slate-800 text-slate-300'
+                          : 'border-slate-200 bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <FlipVertical2 className="w-4 h-4" />
+                      <span>Espejo Vertical</span>
+                    </button>
                   </div>
                 </div>
 
@@ -4411,7 +4817,7 @@ export default function App() {
                     }`}
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Dimensiones: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (autoajusta la zona gris y recalcula cables).
+                    Dimensiones: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (separación estándar fija).
                   </p>
                 </div>
 
@@ -4440,14 +4846,26 @@ export default function App() {
                 </div>
               </div>
             ) : selectedModule ? (
-              /* EDITOR DE TÍTULO DE MÓDULO */
+              /* EDITOR DE TÍTULO DE MÓDULO (CON CENTRADO AUTOMÁTICO) */
               <div className="space-y-3.5">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                    Encabezado de Módulo
-                  </span>
-                  <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                      Encabezado de Módulo
+                    </span>
+                    <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => centerModuleHeaderOverCages(selectedModule.id)}
+                    className="px-2.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1"
+                    title="Centrar cuadro de nombre respecto a las jaulas"
+                  >
+                    <AlignCenterHorizontal className="w-3.5 h-3.5" />
+                    <span>Centrar</span>
+                  </button>
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold mb-1">Título del Módulo</label>
                   <input
@@ -4474,6 +4892,9 @@ export default function App() {
                     }`}
                   />
                 </div>
+                <p className="text-[11px] text-slate-400">
+                  Puedes arrastrar el cuadro de texto en el plano o usar <strong>Shift + Flechas</strong> para alinearlo con precisión.
+                </p>
               </div>
             ) : selectedKind === 'trunk' ? (
               /* EDITOR DE ETIQUETA TRONCAL */
@@ -4516,7 +4937,7 @@ export default function App() {
                 <div className="text-xs text-slate-500 text-center py-2">
                   <Info className="w-6 h-6 mx-auto text-sky-500 opacity-80 mb-1" />
                   <p>
-                    Haz clic sobre cualquier <strong>equipo, canalización, jaula o módulo</strong> para editarlo, o usa <strong>Supr / Ctrl+C / Ctrl+X / Ctrl+V</strong>.
+                    Haz <strong>doble clic</strong> sobre cualquier equipo, canalización, jaula o encabezado para editar sus propiedades.
                   </p>
                 </div>
 
@@ -4705,7 +5126,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
                     <Grid className="w-4 h-4" />
-                    <span>Configuración y Distribución de Jaulas</span>
+                    <span>Configuración y Distribución de Jaulas (Separación Estándar)</span>
                   </span>
                   <span className="text-[11px] font-extrabold text-slate-500">
                     Total:{' '}
@@ -5300,9 +5721,7 @@ export default function App() {
                           <td className="py-2 px-2">{c.cableSpec}</td>
                           <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
                           <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
-                          <td className="py-2 px-2 text-right font-extrabold text-sky-600 dark:text-sky-400">
-                            {m.totalMeters} m
-                          </td>
+                          <td className="py-2 px-2 text-right font-extrabold">{m.totalMeters} m</td>
                         </tr>
                       );
                     })}
@@ -5315,48 +5734,103 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: VISTA PREVIA FULLSCREEN
+          MODAL: VISTA PREVIA DE IMPRESIÓN / PLANO
       ==================================================================== */}
       {showPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 flex flex-col p-4">
-          <div className="flex items-center justify-between text-white pb-3">
-            <div>
-              <h3 className="text-sm font-extrabold">
-                Vista Previa de Plano · {companyInfo.centerName}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {companyInfo.projectName} · Cliente: {companyInfo.clientName}
-              </p>
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white text-slate-900 rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
+              <span className="text-sm font-extrabold">
+                Vista Previa de Lámina Técnica · {companyInfo.centerName}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportPDF}
+                  className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-extrabold flex items-center gap-1"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Imprimir / Guardar PDF
+                </button>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-1 hover:bg-white/15 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportPDF}
-                className="px-3.5 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-extrabold flex items-center gap-1"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Imprimir / PDF</span>
-              </button>
-              <button
-                onClick={() => setShowPreviewModal(false)}
-                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            <div className="p-6 overflow-auto space-y-4">
+              {companyInfo.logoDataUrl && (
+                <div className="flex items-center">
+                  <img
+                    src={companyInfo.logoDataUrl}
+                    alt="Logo Empresa"
+                    className="max-h-20 max-w-[280px] object-contain"
+                  />
+                </div>
+              )}
+
+              <div
+                className="border border-slate-300 rounded-xl p-2 bg-sky-50"
+                dangerouslySetInnerHTML={{ __html: generateSvgStringForExport() || '' }}
+              />
+
+              <div className="border-2 border-slate-900 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-slate-500 block">
+                    Proyecto
+                  </span>
+                  <strong className="text-sm">{companyInfo.projectName}</strong>
+                  <p className="text-slate-600 mt-0.5">{companyInfo.projectDescription}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-slate-500 block">
+                    Cliente y Centro
+                  </span>
+                  <strong>{companyInfo.clientName}</strong>
+                  <div className="text-slate-700">{companyInfo.centerName}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-slate-500 block">
+                    Ubicación Geográfica y Cableado
+                  </span>
+                  <a
+                    href={mapsHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-700 font-bold underline flex items-center gap-1 mt-0.5"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{companyInfo.coordinates || 'Ver en Google Maps'}</span>
+                  </a>
+                  <div className="mt-1 font-extrabold text-slate-800">
+                    Total Cableado: {totalCableMeters} m
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
+                <strong className="text-sm">{companyInfo.companyName}</strong>
+                <span className="text-slate-600">
+                  Responsable: <strong>{companyInfo.responsibleName}</strong>
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="flex-1 bg-white rounded-2xl overflow-hidden flex items-center justify-center p-4">
-            <div
-              className="w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full"
-              dangerouslySetInnerHTML={{ __html: generateSvgStringForExport() || '' }}
-            />
           </div>
         </div>
       )}
 
       {/* NOTIFICACIÓN FLOTANTE (TOAST) */}
       {toast && (
-        <div className="fixed bottom-16 right-4 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xl border border-slate-700 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div
+          className={`fixed bottom-24 right-5 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-extrabold text-white flex items-center gap-2 ${
+            toast.type === 'success'
+              ? 'bg-emerald-600'
+              : toast.type === 'warn'
+              ? 'bg-amber-600'
+              : 'bg-slate-800'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4" />
           <span>{toast.message}</span>
         </div>
       )}
