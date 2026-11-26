@@ -99,7 +99,7 @@ const BASIC_SHAPES_CATALOG = [
 const INITIAL_MODULES = [
   {
     id: 'MOD-200',
-    name: 'MÓDULO 200',
+    name: 'MÓDULO 200 (12 jaulas)',
     subtitle: 'Tren Norte - 12 Jaulas de Engorda (201 - 212)',
     originX: 120,
     originY: 160,
@@ -114,7 +114,7 @@ const INITIAL_MODULES = [
   },
   {
     id: 'MOD-100',
-    name: 'MÓDULO 100',
+    name: 'MÓDULO 100 (10 jaulas)',
     subtitle: 'Tren Sur - 10 Jaulas de Engorda (101 - 110)',
     originX: 1120,
     originY: 160,
@@ -644,9 +644,20 @@ const STATUS_CONFIG = {
   falla: { label: 'Falla / Alerta', color: '#ef4444', dot: 'bg-rose-500' },
 };
 
+const PROYECTOR_LED_TEMPLATE = {
+  type: 'proyector_led',
+  label: 'Proyector LED',
+  brand: 'Signify / Philips',
+  icon: 'sun',
+  phase: 'luces_perimetrales',
+  power: 400,
+  rotation: 180,
+  customColor: '',
+};
+
 const SYMBOL_CATALOG = [
   { type: 'luminaria', label: 'Luz Fotoperiodo', brand: 'Aqualed', icon: 'submersible', phase: 'fotoperiodo', power: 1000, rotation: 0, customColor: '' },
-  { type: 'proyector_led', label: 'Proyector LED', brand: 'Signify / Philips', icon: 'sun', phase: 'luces_perimetrales', power: 400, rotation: 180, customColor: '' },
+  PROYECTOR_LED_TEMPLATE,
   { type: 'enchufe_220v', label: 'Enchufe Industrial 220V', brand: 'Mennekes', icon: 'plug', phase: 'fuerza_aux', power: 3520, rotation: 0, amperage: '16A', ipGrade: 'IP67', customColor: '' },
   { type: 'fotocelda', label: 'Fotocelda Crepuscular', brand: 'Finder', icon: 'eye', phase: 'fotoperiodo', power: 15, rotation: 0, luxThreshold: '15 Lux', controlledCircuit: 'Contactor Fotoperiodo', customColor: '' },
   { type: 'tablero', label: 'Tablero Eléctrico IP66', brand: 'Schneider Electric', icon: 'zap', phase: 'control', power: 1200, rotation: 0, customColor: '' },
@@ -675,8 +686,8 @@ const buildGoogleMapsLink = (coordsText, customUrl = '') => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clean)}`;
 };
 
-const getModuleHeaderDimensions = (mod, cageCount = 0) => {
-  const titleText = `${mod?.name || ''} (${cageCount} jaulas)`;
+const getModuleHeaderDimensions = (mod) => {
+  const titleText = mod?.name || '';
   const subtitleText = mod?.subtitle || '';
   const estTitleWidth = titleText.length * 8.6 + 34;
   const estSubtitleWidth = subtitleText.length * 6.0 + 34;
@@ -723,6 +734,9 @@ export default function App() {
     rotation: 0,
     customColor: '',
   });
+
+  // Registro de la última acción realizada para repetir con tecla Enter
+  const [lastAction, setLastAction] = useState(null);
 
   // Modal dedicado "Agregar Símbolo" (con selección de tipo, descripción, circuito, potencia, marca y cantidad)
   const [showAddSymbolModal, setShowAddSymbolModal] = useState(false);
@@ -785,6 +799,7 @@ export default function App() {
     setFutureHistory((prev) => [...prev, currentSnap]);
     setPastHistory((prev) => prev.slice(0, -1));
 
+    setHoveredObj(null);
     setModules(previous.modules);
     setCages(previous.cages);
     setObjects(previous.objects);
@@ -806,6 +821,7 @@ export default function App() {
     setPastHistory((prev) => [...prev, currentSnap]);
     setFutureHistory((prev) => prev.slice(0, -1));
 
+    setHoveredObj(null);
     setModules(next.modules);
     setCages(next.cages);
     setObjects(next.objects);
@@ -916,6 +932,12 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3400);
   };
+
+  // Garantiza que el tooltip nunca quede pegado si el objeto fue eliminado del plano
+  const activeHoveredObj = useMemo(() => {
+    if (!hoveredObj) return null;
+    return objects.find((o) => o.id === hoveredObj.id) || null;
+  }, [hoveredObj, objects]);
 
   // ============================================================================
   // ABRIR MENÚ "AGREGAR SÍMBOLO" Y PROCESAR INSERCIÓN MÚLTIPLE
@@ -1073,16 +1095,23 @@ export default function App() {
 
     setObjects((prev) => [...prev, ...newItems]);
 
+    const createdTemplate = {
+      type: symType,
+      label: cleanGeneric,
+      brand: cleanBrand,
+      icon: iconName,
+      phase: batchSymbolForm.phase,
+      power: Number(batchSymbolForm.power) || 0,
+      rotation: Number(batchSymbolForm.rotation) || 0,
+      customColor: batchSymbolForm.customColor || '',
+    };
+    setPlaceTemplate(createdTemplate);
+    setLastAction({ kind: 'place_object', template: createdTemplate });
+
     if (batchSymbolForm.saveInPalette) {
       const paletteEntry = {
-        type: symType,
+        ...createdTemplate,
         label: cleanSpec,
-        brand: cleanBrand,
-        icon: iconName,
-        phase: batchSymbolForm.phase,
-        power: Number(batchSymbolForm.power) || 0,
-        rotation: Number(batchSymbolForm.rotation) || 0,
-        customColor: batchSymbolForm.customColor || '',
       };
       setSymbolCatalog((prev) => [...prev, paletteEntry]);
     }
@@ -1095,8 +1124,8 @@ export default function App() {
     setShowAddSymbolModal(false);
     notify(
       qty === 1
-        ? `1 símbolo "${newItems[0].tag}" insertado en el plano`
-        : `${qty} símbolos "${cleanGeneric}" (${cleanBrand}) insertados en ${targetMod?.name || modId}`,
+        ? `1 símbolo "${newItems[0].tag}" insertado (Enter para repetir)`
+        : `${qty} símbolos "${cleanGeneric}" (${cleanBrand}) insertados (Enter para agregar más)`,
       'success'
     );
   };
@@ -1302,6 +1331,15 @@ export default function App() {
     return () => unsub();
   }, [fbUser]);
 
+  const ensureProyectorInCatalog = (list) => {
+    if (!Array.isArray(list) || list.length === 0) return SYMBOL_CATALOG;
+    const hasProyector = list.some((item) => item.type === 'proyector_led');
+    if (hasProyector) return list;
+    const copy = [...list];
+    copy.splice(1, 0, PROYECTOR_LED_TEMPLATE);
+    return copy;
+  };
+
   const handleSaveToCloud = async (customId = null, customTitle = null, overrideData = null) => {
     if (!db || !fbUser) {
       notify('Base de datos en la nube no disponible en este entorno', 'warn');
@@ -1370,6 +1408,7 @@ export default function App() {
   const handleLoadFromCloud = (bp) => {
     if (!bp) return;
     pushHistory();
+    setHoveredObj(null);
     if (Array.isArray(bp.modules)) setModules(bp.modules);
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
@@ -1380,8 +1419,9 @@ export default function App() {
       setPhaseConfigs((prev) => ({ ...prev, ...bp.phaseConfigs }));
     }
     if (Array.isArray(bp.symbolCatalog) && bp.symbolCatalog.length > 0) {
-      setSymbolCatalog(bp.symbolCatalog);
-      setPlaceTemplate(bp.symbolCatalog[0]);
+      const normalizedCatalog = ensureProyectorInCatalog(bp.symbolCatalog);
+      setSymbolCatalog(normalizedCatalog);
+      setPlaceTemplate(normalizedCatalog[0]);
     }
     if (typeof bp.trunkLabel === 'string') setTrunkLabel(bp.trunkLabel);
     if (typeof bp.showTrunkLabel === 'boolean') setShowTrunkLabel(bp.showTrunkLabel);
@@ -1622,6 +1662,7 @@ export default function App() {
     }
 
     pushHistory();
+    setHoveredObj(null);
 
     const coords = newProjectForm.coordinates.trim();
     const mapsLink = buildGoogleMapsLink(coords, newProjectForm.googleMapsUrl);
@@ -1645,11 +1686,12 @@ export default function App() {
     const m1SizePx = Math.round((m1Meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
     const walkway = STANDARD_WALKWAY_WIDTH;
     const m1TotalCount = m1Rows * m1Cols;
+    const m1BaseLabel = newProjectForm.mod1Name.trim() || 'MÓDULO 200';
 
     const generatedModules = [
       {
         id: 'MOD-200',
-        name: newProjectForm.mod1Name.trim() || 'MÓDULO 200',
+        name: `${m1BaseLabel} (${m1TotalCount} jaulas)`,
         subtitle: `Tren 1 - ${m1TotalCount} Jaulas (${m1Start} - ${m1Start + m1TotalCount - 1}) · ${m1Meters}m×${m1Meters}m`,
         originX: 120,
         originY: 160,
@@ -1671,13 +1713,14 @@ export default function App() {
       const m2Meters = Math.max(5, Number(newProjectForm.mod2CageMeters) || 30);
       const m2SizePx = Math.round((m2Meters / BASE_CAGE_METERS) * BASE_CAGE_PX);
       const m2TotalCount = m2Rows * m2Cols;
+      const m2BaseLabel = newProjectForm.mod2Name.trim() || 'MÓDULO 100';
 
       const m1WidthPx = m1Cols * (m1SizePx + walkway) + walkway;
       const m2OriginX = 120 + m1WidthPx + 216;
 
       generatedModules.push({
         id: 'MOD-100',
-        name: newProjectForm.mod2Name.trim() || 'MÓDULO 100',
+        name: `${m2BaseLabel} (${m2TotalCount} jaulas)`,
         subtitle: `Tren 2 - ${m2TotalCount} Jaulas (${m2Start} - ${m2Start + m2TotalCount - 1}) · ${m2Meters}m×${m2Meters}m`,
         originX: m2OriginX,
         originY: 160,
@@ -1766,13 +1809,19 @@ export default function App() {
 
     const metrics = calculateConduitMetrics(newConduit);
     setConduits((prev) => [...prev, newConduit]);
+    setLastAction({
+      kind: 'draw_conduit',
+      phase: conduitPhase,
+      cableSpec: conduitCableSpec,
+      dropMeters: conduitDropMeters,
+    });
     setDrawingPoints([]);
     setCursorSvgPos(null);
     setActiveTool('select');
     setSelectedId(newConduit.id);
     setSelectedKind('conduit');
     notify(
-      `Canalización "${newConduit.tag}" (${phaseCfg.label}) creada: ${metrics.totalMeters} m totales (doble clic para editar)`,
+      `Canalización "${newConduit.tag}" (${phaseCfg.label}) creada: ${metrics.totalMeters} m · Presiona Enter para trazar otro tramo`,
       'success'
     );
   };
@@ -1965,12 +2014,68 @@ export default function App() {
   };
 
   // ============================================================================
-  // ATAJOS DE TECLADO: CTRL+Z, CTRL+Y, SHIFT+FLECHAS, SUPR, CTRL+C/X/V/D
+  // REPETIR ÚLTIMA ACCIÓN AL PRESIONAR TECLA ENTER
+  // ============================================================================
+  const repeatLastAction = () => {
+    if (!lastAction) {
+      notify('Aún no hay una acción previa de dibujo o inserción para repetir', 'info');
+      return;
+    }
+
+    if (lastAction.kind === 'draw_conduit') {
+      const targetPhase = lastAction.phase || conduitPhase;
+      setConduitPhase(targetPhase);
+      if (lastAction.cableSpec) setConduitCableSpec(lastAction.cableSpec);
+      if (lastAction.dropMeters !== undefined) setConduitDropMeters(lastAction.dropMeters);
+      setDrawingPoints([]);
+      setCursorSvgPos(null);
+      setActiveTool('draw_conduit');
+      notify(
+        `Repitiendo canalización (${CONDUIT_PHASE_CONFIG[targetPhase]?.label || targetPhase}): Haz clic en el plano`,
+        'info'
+      );
+      return;
+    }
+
+    if (lastAction.kind === 'place_object' && lastAction.template) {
+      setPlaceTemplate(lastAction.template);
+      setActiveTool('place');
+      notify(
+        `Repitiendo inserción: Haz clic en el plano para ubicar "${lastAction.template.label}"`,
+        'info'
+      );
+      return;
+    }
+
+    if (lastAction.kind === 'place_shape' && lastAction.shapeTemplate) {
+      setPlaceShapeTemplate(lastAction.shapeTemplate);
+      setActiveTool('place_shape');
+      notify(
+        `Repitiendo figura: Haz clic en el plano para insertar "${lastAction.shapeTemplate.label}"`,
+        'info'
+      );
+      return;
+    }
+
+    if (lastAction.kind === 'draw_cage') {
+      setActiveTool('draw_cage');
+      notify(
+        `Repitiendo inserción de jaula (${newCageSizeMeters}m × ${newCageSizeMeters}m): Haz clic en el plano`,
+        'info'
+      );
+    }
+  };
+
+  // ============================================================================
+  // ATAJOS DE TECLADO: CTRL+Z, CTRL+Y, ENTER (FINALIZAR / REPETIR), FLECHAS, SUPR
   // ============================================================================
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = e.target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (showAddSymbolModal || showNewProjectModal || showCompanyModal || showCloudModal || showInventoryModal) {
+        return;
+      }
 
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -2063,9 +2168,13 @@ export default function App() {
         }
       }
 
-      if (e.key === 'Enter' && activeTool === 'draw_conduit' && drawingPoints.length >= 2) {
+      if (e.key === 'Enter') {
         e.preventDefault();
-        finishDrawingConduit();
+        if (activeTool === 'draw_conduit' && drawingPoints.length >= 2) {
+          finishDrawingConduit();
+        } else if (activeTool === 'select') {
+          repeatLastAction();
+        }
         return;
       }
 
@@ -2126,9 +2235,7 @@ export default function App() {
       }
 
       if (e.key === 'Escape') {
-        if (showAddSymbolModal) {
-          setShowAddSymbolModal(false);
-        } else if (activeTool === 'draw_conduit') {
+        if (activeTool === 'draw_conduit') {
           setDrawingPoints([]);
           setCursorSvgPos(null);
           setActiveTool('select');
@@ -2165,9 +2272,18 @@ export default function App() {
     futureHistory,
     showPreviewModal,
     showAddSymbolModal,
+    showNewProjectModal,
+    showCompanyModal,
+    showCloudModal,
+    showInventoryModal,
     isFullscreen,
     activeTool,
     drawingPoints,
+    lastAction,
+    conduitPhase,
+    conduitCableSpec,
+    conduitDropMeters,
+    newCageSizeMeters,
   ]);
 
   const walkwayLines = useMemo(() => {
@@ -2290,10 +2406,11 @@ export default function App() {
       lastInspection: new Date().toISOString().slice(0, 10),
     };
     setObjects((prev) => [...prev, newObj]);
+    setLastAction({ kind: 'place_object', template: { ...placeTemplate } });
     setSelectedId(newObj.id);
     setSelectedKind('object');
     setActiveTool('select');
-    notify(`Equipo "${newObj.tag}" añadido (doble clic para editar propiedades)`, 'success');
+    notify(`Equipo "${newObj.tag}" añadido · Presiona Enter para insertar otro igual`, 'success');
   };
 
   // ============================================================================
@@ -2323,6 +2440,7 @@ export default function App() {
     };
 
     setAnnotations((prev) => [...prev, newAnnotation]);
+    setLastAction({ kind: 'place_shape', shapeTemplate: { ...placeShapeTemplate } });
     setSelectedId(newAnnotation.id);
     setSelectedKind('annotation');
     setActiveTool('select');
@@ -2330,7 +2448,7 @@ export default function App() {
       setShowRightSidebar(true);
     }
     notify(
-      `${placeShapeTemplate?.label || 'Elemento'} insertado (doble clic para editar propiedades)`,
+      `${placeShapeTemplate?.label || 'Elemento'} insertado · Presiona Enter para repetir`,
       'success'
     );
   };
@@ -2376,11 +2494,12 @@ export default function App() {
     };
 
     setCages((prev) => [...prev, newCage]);
+    setLastAction({ kind: 'draw_cage', sizeMeters: meters });
     setSelectedId(newCage.id);
     setSelectedKind('cage');
     setActiveTool('select');
     notify(
-      `Jaula "${customLabel}" (${meters}m × ${meters}m) insertada con separación estándar`,
+      `Jaula "${customLabel}" insertada · Presiona Enter para insertar otra jaula`,
       'success'
     );
   };
@@ -2509,6 +2628,11 @@ export default function App() {
     setDraggingModuleId(null);
     setDraggingAnnotationId(null);
     setIsPanning(false);
+  };
+
+  const handleCanvasMouseLeave = () => {
+    handleCanvasMouseUp();
+    setHoveredObj(null);
   };
 
   const handleWheel = (e) => {
@@ -2664,7 +2788,7 @@ export default function App() {
     const targetMod = modules.find((m) => m.id === modId);
     if (!bounds || !bounds.hasCages || !targetMod) return;
     pushHistory();
-    const { width: headerWidth } = getModuleHeaderDimensions(targetMod, bounds.count);
+    const { width: headerWidth } = getModuleHeaderDimensions(targetMod);
     const centeredOffsetX = Math.round((bounds.totalW - headerWidth) / 2);
     setModules((prev) =>
       prev.map((m) =>
@@ -2685,6 +2809,7 @@ export default function App() {
   const deleteObject = (id, silent = false) => {
     pushHistory();
     setObjects((prev) => prev.filter((o) => o.id !== id));
+    setHoveredObj((prev) => (prev?.id === id ? null : prev));
     if (selectedId === id) {
       setSelectedId(null);
       setSelectedKind(null);
@@ -2764,6 +2889,7 @@ export default function App() {
         const data = JSON.parse(reader.result);
         if (data.modules && data.cages && data.objects) {
           pushHistory();
+          setHoveredObj(null);
           setModules(data.modules);
           setCages(data.cages);
           setObjects(data.objects);
@@ -2773,8 +2899,9 @@ export default function App() {
             setPhaseConfigs((prev) => ({ ...prev, ...data.phaseConfigs }));
           }
           if (Array.isArray(data.symbolCatalog) && data.symbolCatalog.length > 0) {
-            setSymbolCatalog(data.symbolCatalog);
-            setPlaceTemplate(data.symbolCatalog[0]);
+            const normalizedCatalog = ensureProyectorInCatalog(data.symbolCatalog);
+            setSymbolCatalog(normalizedCatalog);
+            setPlaceTemplate(normalizedCatalog[0]);
           }
           if (typeof data.trunkLabel === 'string') setTrunkLabel(data.trunkLabel);
           if (typeof data.showTrunkLabel === 'boolean') setShowTrunkLabel(data.showTrunkLabel);
@@ -3331,7 +3458,6 @@ export default function App() {
           {obj.type === 'luminaria' ? (
             /* ÍCONO SUMERGIBLE PARA LUZ FOTOPERIODO (IP68 SUBACUÁTICO) */
             <g>
-              {/* Halo luminoso sumergido 360° */}
               <circle
                 cx="0"
                 cy="2"
@@ -3340,8 +3466,6 @@ export default function App() {
                 fillOpacity="0.22"
                 pointerEvents="none"
               />
-
-              {/* Ondas de agua subacuáticas laterales */}
               <path
                 d="M -18,-4 Q -15,-7 -12,-4 Q -9,-1 -6,-4"
                 fill="none"
@@ -3356,8 +3480,6 @@ export default function App() {
                 strokeWidth="1.4"
                 strokeLinecap="round"
               />
-
-              {/* Cable umbilical y prensaestopa estanco IP68 superior */}
               <line
                 x1="0"
                 y1="-20"
@@ -3375,8 +3497,6 @@ export default function App() {
                 rx="1.2"
                 fill={effectiveColor}
               />
-
-              {/* Cabezal superior hermético */}
               <rect
                 x="-6.5"
                 y="-11.5"
@@ -3387,8 +3507,6 @@ export default function App() {
                 stroke={effectiveColor}
                 strokeWidth="2"
               />
-
-              {/* Tubo difusor central sumergible */}
               <rect
                 x="-5.5"
                 y="-7"
@@ -3399,8 +3517,6 @@ export default function App() {
                 stroke={effectiveColor}
                 strokeWidth="2"
               />
-
-              {/* Núcleo LED interior */}
               <rect
                 x="-2.2"
                 y="-4.5"
@@ -3409,16 +3525,12 @@ export default function App() {
                 rx="2"
                 fill={effectiveColor}
               />
-
-              {/* Canastillo protector y lastre inferior */}
               <line x1="-6.5" y1="-2" x2="6.5" y2="-2" stroke={effectiveColor} strokeWidth="1.4" />
               <line x1="-6.5" y1="4" x2="6.5" y2="4" stroke={effectiveColor} strokeWidth="1.4" />
               <path
                 d="M -5.5,9.5 L 5.5,9.5 L 3.8,13.5 L -3.8,13.5 Z"
                 fill={effectiveColor}
               />
-
-              {/* Rayos radiales subacuáticos */}
               <line x1="-10" y1="-1" x2="-15" y2="-3" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
               <line x1="-10" y1="5" x2="-15" y2="8" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
               <line x1="10" y1="-1" x2="15" y2="-3" stroke={effectiveColor} strokeWidth="1.6" strokeLinecap="round" />
@@ -4269,11 +4381,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* PALETA RÁPIDA DE SIMBOLOGÍA */}
+            {/* PALETA DE SIMBOLOGÍA */}
             <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Paleta Rápida (1 clic)
+                  Paleta de Simbología (1 clic)
                 </span>
                 <button
                   onClick={() => {
@@ -4773,7 +4885,7 @@ export default function App() {
             onDoubleClick={handleCanvasDoubleClick}
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
-            onMouseLeave={handleCanvasMouseUp}
+            onMouseLeave={handleCanvasMouseLeave}
             onWheel={handleWheel}
             onTouchStart={handleCanvasTouchStart}
             onTouchMove={handleCanvasTouchMove}
@@ -4813,10 +4925,7 @@ export default function App() {
                 const bounds = moduleBoundsMap[mod.id];
                 if (!bounds || !bounds.hasCages) return null;
 
-                const { width: headerWidth, height: headerHeight } = getModuleHeaderDimensions(
-                  mod,
-                  bounds.count
-                );
+                const { width: headerWidth, height: headerHeight } = getModuleHeaderDimensions(mod);
                 const headerX = bounds.boxX + (Number(mod.headerOffsetX) || 0);
                 const headerY = bounds.boxY - (headerHeight + 10) + (Number(mod.headerOffsetY) || 0);
 
@@ -4865,7 +4974,7 @@ export default function App() {
                         fontWeight="800"
                         fill={darkMode ? '#f8fafc' : '#0f172a'}
                       >
-                        {mod.name} ({bounds.count} jaulas)
+                        {mod.name}
                       </text>
                       {mod.subtitle?.trim() && (
                         <text
@@ -4950,7 +5059,6 @@ export default function App() {
               {cages.map((cage) => {
                 const isSel = selectedKind === 'cage' && selectedId === cage.id;
                 const displayText = cage.label !== undefined ? cage.label : String(cage.number);
-                const cMeters = Number(cage.sizeMeters) || BASE_CAGE_METERS;
 
                 return (
                   <g
@@ -5008,26 +5116,15 @@ export default function App() {
                     {cage.showLabel !== false && displayText !== '' && (
                       <text
                         x={cage.size / 2}
-                        y={cage.size / 2 + 2}
+                        y={cage.size / 2 + 5}
                         textAnchor="middle"
-                        fontSize="15"
+                        fontSize="16"
                         fontWeight="800"
                         fill={darkMode ? '#f0f9ff' : '#0f172a'}
                       >
                         {displayText}
                       </text>
                     )}
-
-                    <text
-                      x={cage.size / 2}
-                      y={cage.size - 8}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fontWeight="700"
-                      fill={darkMode ? '#7dd3fc' : '#0369a1'}
-                    >
-                      {cMeters}×{cMeters}m
-                    </text>
                   </g>
                 );
               })}
@@ -5643,26 +5740,23 @@ export default function App() {
                       className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                         darkMode
                           ? 'bg-slate-800 border-slate-700 text-sky-300'
-                          : 'bg-slate-50 border-slate-200 text-sky-800'
+                          : 'bg-slate-50 border-slate-200 text-sky-900'
                       }`}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1">
-                    Componente Genérico (Agrupación Resumen)
-                  </label>
+                  <label className="block text-xs font-bold mb-1">Nombre Genérico (Agrupación PDF)</label>
                   <input
                     type="text"
-                    placeholder="Ej. Luz Fotoperiodo / Proyector LED"
                     value={
-                      selectedObject.genericName !== undefined
-                        ? selectedObject.genericName
-                        : TYPE_GENERIC_LABELS[selectedObject.type] || ''
+                      selectedObject.genericName ||
+                      TYPE_GENERIC_LABELS[selectedObject.type] ||
+                      ''
                     }
                     onChange={(e) => updateSelectedObject('genericName', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -5670,8 +5764,117 @@ export default function App() {
                   />
                 </div>
 
+                {/* Paleta de 32 colores básicos e inversión horizontal/vertical */}
+                <div
+                  className={`p-3 rounded-xl border space-y-2.5 ${
+                    darkMode
+                      ? 'bg-slate-800/70 border-slate-700'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                      <Palette className="w-3.5 h-3.5 text-sky-500" />
+                      <span>Color (32 Básicos) y Simetría</span>
+                    </span>
+                    {selectedObject.customColor && (
+                      <button
+                        type="button"
+                        onClick={() => updateSelectedObject('customColor', '')}
+                        className="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline"
+                      >
+                        Usar color circuito
+                      </button>
+                    )}
+                  </div>
+
+                  {renderBasic32ColorGrid(
+                    selectedObject.customColor || phaseConfigs[selectedObject.phase]?.color,
+                    (hex) => updateSelectedObject('customColor', hex)
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedObject('flipX', !selectedObject.flipX)}
+                      className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
+                        selectedObject.flipX
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : darkMode
+                          ? 'bg-slate-900 border-slate-700 text-slate-300'
+                          : 'bg-white border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <FlipHorizontal2 className="w-3.5 h-3.5" />
+                      <span>Invertir Horizontal</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedObject('flipY', !selectedObject.flipY)}
+                      className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
+                        selectedObject.flipY
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : darkMode
+                          ? 'bg-slate-900 border-slate-700 text-slate-300'
+                          : 'bg-white border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <FlipVertical2 className="w-3.5 h-3.5" />
+                      <span>Invertir Vertical</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Orientación y Rotación del Símbolo */}
+                <div
+                  className={`p-3 rounded-xl border space-y-2 ${
+                    darkMode
+                      ? 'bg-slate-800/70 border-slate-700'
+                      : 'bg-sky-50/60 border-sky-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span>Orientación / Giro del Símbolo</span>
+                    <span className="text-sky-600 dark:text-sky-400 font-extrabold">
+                      {selectedObject.rotation || 0}°
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="1"
+                    value={selectedObject.rotation || 0}
+                    onChange={(e) => updateSelectedObject('rotation', Number(e.target.value))}
+                    className="w-full accent-sky-600"
+                  />
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {[
+                      { deg: 0, label: '0° Der' },
+                      { deg: 90, label: '90° Abajo' },
+                      { deg: 180, label: '180° Izq' },
+                      { deg: 270, label: '270° Arriba' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.deg}
+                        type="button"
+                        onClick={() => updateSelectedObject('rotation', preset.deg)}
+                        className={`py-1 rounded-lg text-[10px] font-extrabold border transition-colors ${
+                          (selectedObject.rotation || 0) === preset.deg
+                            ? 'bg-sky-600 text-white border-sky-600'
+                            : darkMode
+                            ? 'bg-slate-900 border-slate-700 text-slate-300'
+                            : 'bg-white border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-bold mb-1">Características / Especificación</label>
+                  <label className="block text-xs font-bold mb-1">Especificación Técnica</label>
                   <input
                     type="text"
                     value={selectedObject.spec}
@@ -5684,82 +5887,87 @@ export default function App() {
                   />
                 </div>
 
-                {/* Sistema / Circuito */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold">Sistema / Circuito</label>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const currentCfg = phaseConfigs[selectedObject.phase] || {
-                            label: selectedObject.phase,
-                            color: '#0284c7',
-                          };
-                          setCircuitForm({
-                            key: selectedObject.phase,
-                            label: currentCfg.label,
-                            color: currentCfg.color,
-                          });
-                          setCircuitEditorMode(circuitEditorMode === 'edit' ? null : 'edit');
-                        }}
-                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-slate-200 dark:bg-slate-800 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center gap-1"
-                        title="Modificar nombre o color de este circuito"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                        <span>Editar</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCircuitForm({
-                            key: '',
-                            label: '',
-                            color: '#7c3aed',
-                          });
-                          setCircuitEditorMode(circuitEditorMode === 'create' ? null : 'create');
-                        }}
-                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-600 text-white hover:bg-sky-700 flex items-center gap-1"
-                        title="Crear un nuevo tipo de circuito"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Nuevo</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <select
-                      value={selectedObject.phase}
-                      onChange={(e) => updateSelectedObject('phase', e.target.value)}
-                      className={`col-span-2 px-2.5 py-2 rounded-xl text-xs font-bold border ${
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Potencia (W)</label>
+                    <input
+                      type="number"
+                      value={selectedObject.power}
+                      onChange={(e) => updateSelectedObject('power', Number(e.target.value))}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                         darkMode
                           ? 'bg-slate-800 border-slate-700 text-white'
                           : 'bg-slate-50 border-slate-200 text-slate-900'
                       }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Estado Operativo</label>
+                    <select
+                      value={selectedObject.status}
+                      onChange={(e) => updateSelectedObject('status', e.target.value)}
+                      className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-white border-slate-200 text-slate-900'
+                      }`}
                     >
-                      {Object.entries(phaseConfigs).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v.label}
-                        </option>
-                      ))}
+                      <option value="operativo">Operativo</option>
+                      <option value="mantencion">En Mantención</option>
+                      <option value="falla">Falla / Alerta</option>
                     </select>
+                  </div>
+                </div>
 
-                    <div>
-                      <input
-                        type="number"
-                        placeholder="Watts"
-                        value={selectedObject.power}
-                        onChange={(e) => updateSelectedObject('power', Number(e.target.value))}
-                        className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border ${
-                          darkMode
-                            ? 'bg-slate-800 border-slate-700 text-white'
-                            : 'bg-slate-50 border-slate-200 text-slate-900'
-                        }`}
-                        title="Potencia en Watts (W)"
-                      />
+                {/* Tipo de Circuito / Fase con botones para Crear o Modificar circuitos */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold">Tipo de Circuito / Fase</label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCircuitEditorMode('create');
+                          setCircuitForm({ key: '', label: '', color: '#7c3aed' });
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
+                      >
+                        + Nuevo Circuito
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currKey = selectedObject.phase;
+                          const currCfg = phaseConfigs[currKey] || { label: currKey, color: '#0284c7' };
+                          setCircuitEditorMode('edit');
+                          setCircuitForm({
+                            key: currKey,
+                            label: currCfg.label,
+                            color: currCfg.color,
+                          });
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25"
+                      >
+                        Editar Circuito
+                      </button>
                     </div>
                   </div>
+
+                  <select
+                    value={selectedObject.phase}
+                    onChange={(e) => updateSelectedObject('phase', e.target.value)}
+                    className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-white border-slate-200 text-slate-900'
+                    }`}
+                  >
+                    {Object.entries(phaseConfigs).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
 
                   {circuitEditorMode && (
                     <form
@@ -5767,10 +5975,10 @@ export default function App() {
                       className={`p-2.5 rounded-xl border space-y-2 ${
                         darkMode
                           ? 'bg-slate-800 border-slate-700'
-                          : 'bg-sky-50 border-sky-200'
+                          : 'bg-indigo-50/70 border-indigo-200'
                       }`}
                     >
-                      <div className="text-[10px] font-extrabold uppercase text-sky-600 dark:text-sky-400">
+                      <div className="text-[10px] font-extrabold uppercase text-indigo-600 dark:text-indigo-400">
                         {circuitEditorMode === 'edit'
                           ? 'Modificar Tipo de Circuito'
                           : 'Crear Nuevo Tipo de Circuito'}
@@ -5778,12 +5986,12 @@ export default function App() {
                       <input
                         type="text"
                         required
-                        placeholder="Nombre del circuito (Ej. Respaldo UPS)"
+                        placeholder="Ej. Circuito Auxiliar Pontón"
                         value={circuitForm.label}
                         onChange={(e) =>
-                          setCircuitForm((p) => ({ ...p, label: e.target.value }))
+                          setCircuitForm((prev) => ({ ...prev, label: e.target.value }))
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs border ${
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
                           darkMode
                             ? 'bg-slate-900 border-slate-700 text-white'
                             : 'bg-white border-slate-300 text-slate-900'
@@ -5791,128 +5999,29 @@ export default function App() {
                       />
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                          Color del Circuito (32 colores básicos)
+                          Color del Circuito (32 colores)
                         </label>
                         {renderBasic32ColorGrid(circuitForm.color, (hex) =>
-                          setCircuitForm((p) => ({ ...p, color: hex }))
+                          setCircuitForm((prev) => ({ ...prev, color: hex }))
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="submit"
-                          className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold"
+                          className="flex-1 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold"
                         >
                           Guardar Circuito
                         </button>
                         <button
                           type="button"
                           onClick={() => setCircuitEditorMode(null)}
-                          className="px-2 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-[11px] font-bold"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-bold"
                         >
-                          Cerrar
+                          Cancelar
                         </button>
                       </div>
                     </form>
                   )}
-                </div>
-
-                {/* Paleta de 32 colores básicos para el símbolo */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold flex items-center gap-1">
-                      <Palette className="w-3.5 h-3.5 text-sky-500" />
-                      <span>Color del Símbolo (32 colores)</span>
-                    </label>
-                    {selectedObject.customColor && (
-                      <button
-                        type="button"
-                        onClick={() => updateSelectedObject('customColor', '')}
-                        className="text-[10px] font-extrabold text-sky-600 dark:text-sky-400 hover:underline"
-                      >
-                        Usar color del circuito
-                      </button>
-                    )}
-                  </div>
-                  {renderBasic32ColorGrid(
-                    selectedObject.customColor || phaseConfigs[selectedObject.phase]?.color || '',
-                    (hex) => updateSelectedObject('customColor', hex)
-                  )}
-                </div>
-
-                {/* Orientación, Giro y Simetría */}
-                <div
-                  className={`p-3 rounded-xl border space-y-2.5 ${
-                    darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span>Orientación / Giro (°)</span>
-                    <span className="text-sky-500 font-extrabold">
-                      {selectedObject.rotation || 0}°
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="360"
-                    step="15"
-                    value={selectedObject.rotation || 0}
-                    onChange={(e) => updateSelectedObject('rotation', Number(e.target.value))}
-                    className="w-full accent-sky-600"
-                  />
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => updateSelectedObject('flipX', !selectedObject.flipX)}
-                      className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
-                        selectedObject.flipX
-                          ? 'bg-sky-600 text-white border-sky-600'
-                          : darkMode
-                          ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-sky-500'
-                          : 'bg-white border-slate-300 text-slate-800 hover:border-sky-500'
-                      }`}
-                    >
-                      <FlipHorizontal2 className="w-3.5 h-3.5" />
-                      <span>Voltear Horiz.</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => updateSelectedObject('flipY', !selectedObject.flipY)}
-                      className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-colors ${
-                        selectedObject.flipY
-                          ? 'bg-sky-600 text-white border-sky-600'
-                          : darkMode
-                          ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-sky-500'
-                          : 'bg-white border-slate-300 text-slate-800 hover:border-sky-500'
-                      }`}
-                    >
-                      <FlipVertical2 className="w-3.5 h-3.5" />
-                      <span>Voltear Vert.</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Estado Operativo */}
-                <div>
-                  <label className="block text-xs font-bold mb-1">Estado Operativo</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {Object.entries(STATUS_CONFIG).map(([k, st]) => (
-                      <button
-                        key={k}
-                        onClick={() => updateSelectedObject('status', k)}
-                        className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold border transition-all ${
-                          selectedObject.status === k
-                            ? 'border-slate-900 dark:border-white ring-1 ring-sky-500'
-                            : 'border-slate-200 dark:border-slate-700 opacity-70'
-                        }`}
-                      >
-                        <span className={`inline-block w-2 h-2 rounded-full mr-1 ${st.dot}`} />
-                        {st.label.split(' ')[0]}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 <div>
@@ -5930,9 +6039,9 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1">Observaciones de Terreno</label>
+                  <label className="block text-xs font-bold mb-1">Notas de Mantención</label>
                   <textarea
-                    rows={2}
+                    rows={3}
                     value={selectedObject.description || ''}
                     onChange={(e) => updateSelectedObject('description', e.target.value)}
                     className={`w-full px-3 py-2 rounded-xl text-xs border ${
@@ -5944,147 +6053,143 @@ export default function App() {
                 </div>
               </div>
             ) : selectedConduit ? (
-              /* EDITOR DE CANALIZACIÓN SELECCIONADA */
+              /* EDITOR DE CANALIZACIÓN ELÉCTRICA SELECCIONADA */
               <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-rose-500">
+                      Canalización por Fase
+                    </span>
+                    <h2 className="text-lg font-extrabold">{selectedConduit.tag}</h2>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={copySelectedToClipboard}
+                      className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
+                      title="Copiar (Ctrl+C)"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={cutSelectedToClipboard}
+                      className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                      title="Cortar (Ctrl+X)"
+                    >
+                      <Scissors className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteConduit(selectedConduit.id)}
+                      className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                      title="Eliminar tramo (Supr)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
                 {(() => {
-                  const cMetrics = calculateConduitMetrics(selectedConduit);
-                  const pCfg =
-                    CONDUIT_PHASE_CONFIG[selectedConduit.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                  const m = calculateConduitMetrics(selectedConduit);
                   return (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase text-rose-500">
-                            Canalización Eléctrica
-                          </span>
-                          <h2 className="text-lg font-extrabold">{selectedConduit.tag}</h2>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={copySelectedToClipboard}
-                            className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
-                            title="Copiar (Ctrl+C)"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={cutSelectedToClipboard}
-                            className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
-                            title="Cortar (Ctrl+X)"
-                          >
-                            <Scissors className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteConduit(selectedConduit.id)}
-                            className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                            title="Eliminar canalización (Supr)"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 grid grid-cols-3 gap-2 text-center">
-                        <div>
-                          <div className="text-[10px] text-slate-500 font-bold">Pasillo</div>
-                          <div className="text-sm font-extrabold">{cMetrics.horizontalMeters} m</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-slate-500 font-bold">Bajada</div>
-                          <div className="text-sm font-extrabold">{cMetrics.dropMeters} m</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-sky-600 font-extrabold">Total Cable</div>
-                          <div className="text-sm font-extrabold text-sky-600 dark:text-sky-400">
-                            {cMetrics.totalMeters} m
-                          </div>
-                        </div>
-                      </div>
-
+                    <div
+                      className={`p-3 rounded-xl border grid grid-cols-3 gap-2 text-center ${
+                        darkMode
+                          ? 'bg-slate-800/80 border-slate-700'
+                          : 'bg-sky-50 border-sky-200'
+                      }`}
+                    >
                       <div>
-                        <label className="block text-xs font-bold mb-1">TAG del Tramo</label>
-                        <input
-                          type="text"
-                          value={selectedConduit.tag}
-                          onChange={(e) => updateSelectedConduit('tag', e.target.value)}
-                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-700 text-white'
-                              : 'bg-slate-50 border-slate-200 text-slate-900'
-                          }`}
-                        />
+                        <div className="text-[10px] font-bold text-slate-400">Pasillo</div>
+                        <div className="text-xs font-extrabold">{m.horizontalMeters} m</div>
                       </div>
-
                       <div>
-                        <label className="block text-xs font-bold mb-1">Fase Eléctrica</label>
-                        <select
-                          value={selectedConduit.phase}
-                          onChange={(e) => updateSelectedConduit('phase', e.target.value)}
-                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-700 text-white'
-                              : 'bg-slate-50 border-slate-200 text-slate-900'
-                          }`}
-                          style={{ borderLeftWidth: '6px', borderLeftColor: pCfg.color }}
-                        >
-                          {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
-                            <option key={key} value={key}>
-                              {cfg.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="text-[10px] font-bold text-slate-400">Bajada/Holg.</div>
+                        <div className="text-xs font-extrabold">{m.dropMeters} m</div>
                       </div>
-
                       <div>
-                        <label className="block text-xs font-bold mb-1">
-                          Bajada / Holgura Vertical (metros)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={selectedConduit.dropMeters ?? 0}
-                          onChange={(e) =>
-                            updateSelectedConduit('dropMeters', Number(e.target.value))
-                          }
-                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-700 text-white'
-                              : 'bg-slate-50 border-slate-200 text-slate-900'
-                          }`}
-                        />
+                        <div className="text-[10px] font-bold text-sky-600">Total Cable</div>
+                        <div className="text-sm font-extrabold text-sky-600 dark:text-sky-400">
+                          {m.totalMeters} m
+                        </div>
                       </div>
-
-                      <div>
-                        <label className="block text-xs font-bold mb-1">Tipo de Conductor</label>
-                        <input
-                          type="text"
-                          value={selectedConduit.cableSpec || ''}
-                          onChange={(e) => updateSelectedConduit('cableSpec', e.target.value)}
-                          className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-700 text-white'
-                              : 'bg-slate-50 border-slate-200 text-slate-900'
-                          }`}
-                        />
-                      </div>
-                    </>
+                    </div>
                   );
                 })()}
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">TAG de Canalización</label>
+                  <input
+                    type="text"
+                    value={selectedConduit.tag}
+                    onChange={(e) => updateSelectedConduit('tag', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Fase Eléctrica</label>
+                  <select
+                    value={selectedConduit.phase}
+                    onChange={(e) => updateSelectedConduit('phase', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-white border-slate-200 text-slate-900'
+                    }`}
+                  >
+                    {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
+                      <option key={key} value={key}>
+                        {cfg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Bajada Sumergible / Holgura de Conexionado (metros)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={selectedConduit.dropMeters ?? 0}
+                    onChange={(e) => updateSelectedConduit('dropMeters', Number(e.target.value))}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-extrabold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Tipo de Conductor / Cable</label>
+                  <input
+                    type="text"
+                    value={selectedConduit.cableSpec || ''}
+                    onChange={(e) => updateSelectedConduit('cableSpec', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
               </div>
             ) : selectedCage ? (
               /* EDITOR DE JAULA SELECCIONADA */
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-extrabold uppercase text-amber-500">
-                      Unidad de Cultivo (Balsa Jaula)
+                    <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                      Unidad de Cultivo ({selectedCage.moduleId})
                     </span>
                     <h2 className="text-lg font-extrabold">
-                      Jaula{' '}
-                      {selectedCage.label !== undefined
-                        ? selectedCage.label
-                        : selectedCage.number}
+                      Jaula {selectedCage.label || selectedCage.number}
                     </h2>
                   </div>
                   <div className="flex items-center gap-1">
@@ -6114,70 +6219,67 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold mb-1">
-                    Tamaño / Lado de Jaula (metros)
+                    Número o Texto sobre la Jaula
                   </label>
-                  <input
-                    type="number"
-                    min="5"
-                    max="150"
-                    value={selectedCage.sizeMeters || BASE_CAGE_METERS}
-                    onChange={(e) => updateSelectedCage('sizeMeters', Number(e.target.value))}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-extrabold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    Escala activa: {selectedCage.sizeMeters || 30}m × {selectedCage.sizeMeters || 30}m (recalcula los metros de cable automáticamente).
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold mb-1">
-                    Número o Etiqueta de la Jaula
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. 201, J-01..."
-                    value={
-                      selectedCage.label !== undefined
-                        ? selectedCage.label
-                        : String(selectedCage.number)
-                    }
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      updateSelectedCage('label', val);
-                      const parsed = parseInt(val, 10);
-                      if (!Number.isNaN(parsed)) {
-                        updateSelectedCage('number', parsed);
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ej. 201, A1, Vacía..."
+                      value={
+                        selectedCage.label !== undefined
+                          ? selectedCage.label
+                          : String(selectedCage.number)
                       }
-                    }}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
+                      onChange={(e) => updateSelectedCage('label', e.target.value)}
+                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-extrabold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateSelectedCage('label', '')}
+                      className="px-2.5 py-2 rounded-xl text-xs font-bold bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                    >
+                      Borrar Texto
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <div className="text-xs font-extrabold">Fotoperiodo Activo</div>
-                    <div className="text-[11px] text-slate-500">
-                      Iluminación sumergida en esta jaula
-                    </div>
+                    <label className="block text-xs font-bold mb-1">Tamaño Jaula (m)</label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="150"
+                      value={selectedCage.sizeMeters || BASE_CAGE_METERS}
+                      onChange={(e) => updateSelectedCage('sizeMeters', Number(e.target.value))}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-extrabold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(selectedCage.photoperiodActive)}
-                    onChange={(e) => updateSelectedCage('photoperiodActive', e.target.checked)}
-                    className="w-5 h-5 accent-amber-500"
-                  />
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Profundidad Red</label>
+                    <input
+                      type="text"
+                      value={selectedCage.depth}
+                      onChange={(e) => updateSelectedCage('depth', e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1">Especie en Cultivo</label>
+                  <label className="block text-xs font-bold mb-1">Especie Cultivada</label>
                   <input
                     type="text"
                     value={selectedCage.species}
@@ -6190,11 +6292,30 @@ export default function App() {
                   />
                 </div>
 
+                <div
+                  className={`p-3 rounded-xl border flex items-center justify-between ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <div>
+                    <div className="text-xs font-extrabold">Sistema Fotoperiodo</div>
+                    <div className="text-[11px] text-slate-500">
+                      Iluminación artificial sumergida
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={selectedCage.photoperiodActive}
+                    onChange={(e) => updateSelectedCage('photoperiodActive', e.target.checked)}
+                    className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
+                  />
+                </div>
+
                 <div>
-                  <label className="block text-xs font-bold mb-1">Notas Operativas</label>
+                  <label className="block text-xs font-bold mb-1">Observaciones de Jaula</label>
                   <textarea
                     rows={3}
-                    value={selectedCage.notes}
+                    value={selectedCage.notes || ''}
                     onChange={(e) => updateSelectedCage('notes', e.target.value)}
                     className={`w-full px-3 py-2 rounded-xl text-xs border ${
                       darkMode
@@ -6205,44 +6326,44 @@ export default function App() {
                 </div>
               </div>
             ) : selectedModule ? (
-              /* EDITOR DE ENCABEZADO DEL MÓDULO */
+              /* EDITOR COMPLETO DEL TEXTO SOBRE LAS JAULAS (MÓDULO) */
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                      Encabezado de Módulo
-                    </span>
-                    <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => centerModuleHeaderOverCages(selectedModule.id)}
-                    className="px-2.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold flex items-center gap-1 shadow-xs"
-                    title="Centrar encabezado sobre las jaulas"
-                  >
-                    <AlignCenterHorizontal className="w-3.5 h-3.5" />
-                    <span>Centrar</span>
-                  </button>
-                </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1">Título del Módulo</label>
+                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                    Encabezado sobre Jaulas ({selectedModule.id})
+                  </span>
+                  <h2 className="text-lg font-extrabold">{selectedModule.name}</h2>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Texto Completo del Título Principal
+                  </label>
                   <input
                     type="text"
                     value={selectedModule.name}
                     onChange={(e) => updateSelectedModule('name', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                    placeholder="Ej. MÓDULO 200 (12 jaulas) - Sector Norte"
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-extrabold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Puedes escribir o borrar libremente todo el texto que aparece sobre el grupo de jaulas.
+                  </p>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold mb-1">Descripción / Subtítulo</label>
+                  <label className="block text-xs font-bold mb-1">
+                    Subtítulo / Descripción Secundaria (Opcional)
+                  </label>
                   <input
                     type="text"
-                    value={selectedModule.subtitle}
+                    value={selectedModule.subtitle || ''}
                     onChange={(e) => updateSelectedModule('subtitle', e.target.value)}
+                    placeholder="Deja vacío si solo deseas mostrar el título principal"
                     className={`w-full px-3 py-2 rounded-xl text-xs border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
@@ -6250,18 +6371,80 @@ export default function App() {
                     }`}
                   />
                 </div>
-              </div>
-            ) : selectedKind === 'trunk' ? (
-              /* EDITOR DE ETIQUETA TRONCAL SUBMARINA */
-              <div className="space-y-4">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                    Alimentación Principal
-                  </span>
-                  <h2 className="text-lg font-extrabold">Troncal Submarina</h2>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => centerModuleHeaderOverCages(selectedModule.id)}
+                    className="w-full py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5"
+                  >
+                    <AlignCenterHorizontal className="w-4 h-4" />
+                    <span>Centrar Encabezado sobre Jaulas</span>
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1">Texto de Etiqueta</label>
+              </div>
+            ) : (
+              /* RESUMEN GENERAL Y CUBICACIÓN DE CABLEADO POR FASE */
+              <div className="space-y-4">
+                <div
+                  className={`p-3.5 rounded-xl border ${
+                    darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-sky-50 border-sky-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-sky-600 dark:text-sky-400 mb-1">
+                    <Info className="w-4 h-4" />
+                    <span>Inspector de Propiedades</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Haz clic en cualquier equipo, canalización, figura o jaula para seleccionarlo y
+                    editar sus propiedades o colores. Presiona <strong>Enter</strong> en el plano
+                    para repetir la última acción de dibujo o inserción.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                      Cubicación de Cable por Fase
+                    </span>
+                    <span className="text-xs font-extrabold text-sky-600 dark:text-sky-400">
+                      Total: {totalCableMeters} m
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {cableSummaryByPhase.map((item) => (
+                      <div
+                        key={item.phase}
+                        className={`p-2 rounded-xl border flex items-center justify-between text-xs ${
+                          darkMode
+                            ? 'bg-slate-800/60 border-slate-700'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <div>
+                            <div className="font-bold">{item.label}</div>
+                            <div className="text-[10px] text-slate-400">
+                              {item.count} tramo(s) · Pasillo {item.horizontalMeters}m + Bajada{' '}
+                              {item.dropMeters}m
+                            </div>
+                          </div>
+                        </div>
+                        <span className="font-extrabold">{item.totalMeters} m</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                    Texto de Troncal Submarina
+                  </span>
                   <input
                     type="text"
                     value={trunkLabel}
@@ -6272,46 +6455,15 @@ export default function App() {
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
-                </div>
-              </div>
-            ) : (
-              /* VISTA POR DEFECTO DEL INSPECTOR CON RESUMEN DE CABLEADO */
-              <div className="space-y-3">
-                <div className="text-center py-4 space-y-2 border-b border-slate-200 dark:border-slate-800">
-                  <Info className="w-8 h-8 text-sky-500 mx-auto opacity-80" />
-                  <h3 className="text-sm font-extrabold">Selecciona un Elemento</h3>
-                  <p className="text-xs text-slate-500">
-                    Haz <strong>doble clic</strong> sobre cualquier equipo, texto, figura, jaula o canalización para editar sus propiedades.
-                  </p>
-                </div>
-
-                <div>
-                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">
-                    Resumen de Cableado por Fase
-                  </div>
-                  <div className="space-y-1.5">
-                    {cableSummaryByPhase.map((item) => (
-                      <div
-                        key={item.phase}
-                        className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs ${
-                          darkMode
-                            ? 'bg-slate-800/60 border-slate-700'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 font-bold">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span>{item.label}</span>
-                        </span>
-                        <span className="font-extrabold text-sky-600 dark:text-sky-400">
-                          {item.totalMeters} m
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showTrunkLabel}
+                      onChange={(e) => setShowTrunkLabel(e.target.checked)}
+                      className="accent-sky-600"
+                    />
+                    <span>Mostrar etiqueta sobre línea troncal</span>
+                  </label>
                 </div>
               </div>
             )}
@@ -6319,53 +6471,87 @@ export default function App() {
         )}
       </div>
 
+      {/* Tooltip Flotante al pasar cursor sobre equipo (solo si el objeto existe en el plano) */}
+      {activeHoveredObj && !draggingObjId && (
+        <div
+          className={`fixed bottom-24 right-4 z-30 pointer-events-none p-3 rounded-2xl border shadow-xl max-w-xs ${
+            darkMode
+              ? 'bg-slate-900/95 border-slate-700 text-white'
+              : 'bg-white/95 border-slate-200 text-slate-900'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <span className="text-xs font-extrabold text-sky-500">{activeHoveredObj.tag}</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-500/15">
+              {STATUS_CONFIG[activeHoveredObj.status]?.label}
+            </span>
+          </div>
+          <div className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">
+            {activeHoveredObj.genericName || TYPE_GENERIC_LABELS[activeHoveredObj.type]} ·{' '}
+            <span className="text-indigo-500">{activeHoveredObj.brand || 'Genérico'}</span>
+          </div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+            {activeHoveredObj.spec}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-1">
+            {activeHoveredObj.locationLabel} · {activeHoveredObj.power}W
+          </div>
+        </div>
+      )}
+
+      {/* Notificación Toast */}
+      {toast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold shadow-xl flex items-center gap-2 border border-slate-700">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* ====================================================================
-          MODAL DEDICADO: AGREGAR SÍMBOLO (POR TIPO, DESCRIPCIÓN Y CANTIDAD)
+          MODAL AGREGAR SÍMBOLO (SELECCIÓN DE TIPO, DESCRIPCIÓN, CIRCUITO, POTENCIA, MARCA Y CANTIDAD)
       ==================================================================== */}
       {showAddSymbolModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={handleInsertBatchSymbols}
-            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden flex flex-col ${
               darkMode
-                ? 'bg-slate-900 border-slate-800 text-slate-100'
+                ? 'bg-slate-900 border-slate-700 text-white'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-sky-600 text-white">
-              <div className="flex items-center gap-2">
-                <PlusCircle className="w-5 h-5" />
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <PlusCircle className="w-5 h-5 text-sky-500" />
                 <div>
-                  <h3 className="text-base font-extrabold">Agregar Símbolos al Plano</h3>
-                  <p className="text-[11px] text-sky-100">
-                    Define el equipo, su descripción técnica, marca y la cantidad a insertar
+                  <h3 className="text-base font-extrabold">Agregar Símbolo al Plano</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Define tipo, descripción, circuito, potencia, marca y cantidad de unidades
                   </p>
                 </div>
               </div>
               <button
-                type="button"
                 onClick={() => setShowAddSymbolModal(false)}
-                className="p-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white"
+                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-rose-500 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-3.5 max-h-[80vh] overflow-y-auto text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block font-bold mb-1">Tipo de Símbolo / Equipo</label>
+            <form onSubmit={handleInsertBatchSymbols} className="p-6 space-y-4 overflow-y-auto max-h-[82vh]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-extrabold mb-1">Tipo de Símbolo *</label>
                   <select
                     value={batchSymbolForm.symbolType}
                     onChange={(e) => handleBatchSymbolTypeChange(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   >
-                    <option value="luminaria">Luz Fotoperiodo (Sumergible IP68)</option>
-                    <option value="proyector_led">Proyector LED (Exterior / Perimetral)</option>
+                    <option value="luminaria">Luz Fotoperiodo (Sumergible)</option>
+                    <option value="proyector_led">Proyector LED</option>
                     <option value="enchufe_220v">Enchufe Industrial 220V</option>
                     <option value="fotocelda">Fotocelda Crepuscular</option>
                     <option value="tablero">Tablero Eléctrico IP66</option>
@@ -6377,8 +6563,8 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block font-extrabold text-sky-600 dark:text-sky-400 mb-1">
-                    Cantidad de Símbolos
+                  <label className="block text-xs font-extrabold mb-1">
+                    Cantidad de Unidades *
                   </label>
                   <input
                     type="number"
@@ -6392,39 +6578,38 @@ export default function App() {
                         quantity: Number(e.target.value),
                       }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl text-sm font-extrabold border-2 border-sky-500 ${
-                      darkMode ? 'bg-slate-800 text-white' : 'bg-sky-50 text-slate-900'
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-extrabold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-emerald-400'
+                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
                     }`}
                   />
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-extrabold mb-1">
+                  Descripción Técnica (se aplicará a las {batchSymbolForm.quantity || 1} unidades) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Luz Fotoperiodo Sumergible 1000W 5000K"
+                  value={batchSymbolForm.spec}
+                  onChange={(e) =>
+                    setBatchSymbolForm((prev) => ({ ...prev, spec: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold mb-1">
-                    Nombre Genérico (Para Resumen)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Luz Fotoperiodo / Proyector LED"
-                    value={batchSymbolForm.genericName}
-                    onChange={(e) =>
-                      setBatchSymbolForm((prev) => ({
-                        ...prev,
-                        genericName: e.target.value,
-                      }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold mb-1">Marca del Equipo</label>
+                  <label className="block text-xs font-extrabold mb-1">Marca del Equipo *</label>
                   <input
                     type="text"
                     required
@@ -6433,44 +6618,42 @@ export default function App() {
                     onChange={(e) =>
                       setBatchSymbolForm((prev) => ({ ...prev, brand: e.target.value }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-sky-300'
-                        : 'bg-slate-50 border-slate-200 text-sky-800'
+                        : 'bg-slate-50 border-slate-200 text-sky-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold mb-1">Potencia Unitaria (W) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={batchSymbolForm.power}
+                    onChange={(e) =>
+                      setBatchSymbolForm((prev) => ({ ...prev, power: Number(e.target.value) }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold mb-1">
-                  Descripción / Especificación Técnica (Aplicada a los {batchSymbolForm.quantity || 1} símbolos)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Luz Fotoperiodo Sumergible 1000W 5000K IP68"
-                  value={batchSymbolForm.spec}
-                  onChange={(e) =>
-                    setBatchSymbolForm((prev) => ({ ...prev, spec: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl font-semibold border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold mb-1">Circuito / Sistema</label>
+                  <label className="block text-xs font-extrabold mb-1">Tipo de Circuito *</label>
                   <select
                     value={batchSymbolForm.phase}
                     onChange={(e) =>
                       setBatchSymbolForm((prev) => ({ ...prev, phase: e.target.value }))
                     }
-                    className={`w-full px-2.5 py-2 rounded-xl font-bold border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -6485,36 +6668,13 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block font-bold mb-1">Potencia Unitaria (W)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={batchSymbolForm.power}
-                    onChange={(e) =>
-                      setBatchSymbolForm((prev) => ({
-                        ...prev,
-                        power: Number(e.target.value),
-                      }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl font-bold border ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold mb-1">Módulo de Destino</label>
+                  <label className="block text-xs font-extrabold mb-1">Módulo de Destino</label>
                   <select
                     value={batchSymbolForm.targetModuleId}
                     onChange={(e) =>
-                      setBatchSymbolForm((prev) => ({
-                        ...prev,
-                        targetModuleId: e.target.value,
-                      }))
+                      setBatchSymbolForm((prev) => ({ ...prev, targetModuleId: e.target.value }))
                     }
-                    className={`w-full px-2.5 py-2 rounded-xl font-bold border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -6522,7 +6682,7 @@ export default function App() {
                   >
                     {modules.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {m.name} ({m.id})
                       </option>
                     ))}
                   </select>
@@ -6531,50 +6691,36 @@ export default function App() {
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-bold">Color del Símbolo (Opcional · 32 colores)</label>
+                  <label className="text-xs font-extrabold">Color del Símbolo (Opcional)</label>
                   {batchSymbolForm.customColor && (
                     <button
                       type="button"
-                      onClick={() =>
-                        setBatchSymbolForm((prev) => ({ ...prev, customColor: '' }))
-                      }
-                      className="text-[10px] font-extrabold text-sky-600 hover:underline"
+                      onClick={() => setBatchSymbolForm((prev) => ({ ...prev, customColor: '' }))}
+                      className="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline"
                     >
-                      Color por defecto del circuito
+                      Usar color del circuito
                     </button>
                   )}
                 </div>
-                {renderBasic32ColorGrid(batchSymbolForm.customColor, (hex) =>
-                  setBatchSymbolForm((prev) => ({ ...prev, customColor: hex }))
+                {renderBasic32ColorGrid(
+                  batchSymbolForm.customColor || phaseConfigs[batchSymbolForm.phase]?.color,
+                  (hex) => setBatchSymbolForm((prev) => ({ ...prev, customColor: hex }))
                 )}
               </div>
 
-              <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={batchSymbolForm.saveInPalette}
                   onChange={(e) =>
-                    setBatchSymbolForm((prev) => ({
-                      ...prev,
-                      saveInPalette: e.target.checked,
-                    }))
+                    setBatchSymbolForm((prev) => ({ ...prev, saveInPalette: e.target.checked }))
                   }
-                  className="w-4 h-4 accent-sky-600"
+                  className="w-4 h-4 accent-sky-600 rounded"
                 />
-                <span className="font-bold text-slate-600 dark:text-slate-300">
-                  Guardar también esta configuración como plantilla en la Paleta Rápida
-                </span>
+                <span>Guardar también como plantilla rápida en la paleta lateral</span>
               </label>
-            </div>
 
-            <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/80">
-              <span className="text-[11px] font-bold text-slate-500">
-                Potencia total lote:{' '}
-                <strong className="text-emerald-600">
-                  {(((Number(batchSymbolForm.quantity) || 1) * (Number(batchSymbolForm.power) || 0)) / 1000).toFixed(2)} kW
-                </strong>
-              </span>
-              <div className="flex items-center gap-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddSymbolModal(false)}
@@ -6584,78 +6730,81 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
+                  className="px-5 py-2 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5 shadow-sm"
                 >
-                  Insertar {batchSymbolForm.quantity || 1} Símbolo(s)
+                  <PlusCircle className="w-4 h-4" />
+                  <span>
+                    Insertar {batchSymbolForm.quantity || 1}{' '}
+                    {(batchSymbolForm.quantity || 1) === 1 ? 'Símbolo' : 'Símbolos'}
+                  </span>
                 </button>
               </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL NUEVO PROYECTO CON DISTRIBUCIÓN DE JAULAS
+          MODAL NUEVO PROYECTO CON CONFIGURACIÓN DE JAULAS Y MÓDULOS
       ==================================================================== */}
       {showNewProjectModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={handleCreateNewProject}
-            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden ${
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
               darkMode
-                ? 'bg-slate-900 border-slate-800 text-slate-100'
+                ? 'bg-slate-900 border-slate-700 text-white'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
                 <FolderPlus className="w-5 h-5 text-emerald-500" />
                 <div>
-                  <h3 className="text-base font-extrabold">Crear Nuevo Proyecto y Distribución</h3>
-                  <p className="text-[11px] text-slate-500">
-                    Define los datos del centro y la cantidad de jaulas por módulo
+                  <h3 className="text-base font-extrabold">Crear Nuevo Proyecto y Trenes de Jaulas</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Define los datos del proyecto y la distribución de jaulas con separación estándar
                   </p>
                 </div>
               </div>
               <button
-                type="button"
                 onClick={() => setShowNewProjectModal(false)}
-                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
+                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-rose-500 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+            <form onSubmit={handleCreateNewProject} className="p-6 space-y-4 overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold mb-1">Nombre del Proyecto *</label>
+                  <label className="block text-xs font-extrabold mb-1">Nombre del Proyecto *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Instalación Fotoperiodo 2026"
                     value={newProjectForm.projectName}
                     onChange={(e) =>
-                      setNewProjectForm((p) => ({ ...p, projectName: e.target.value }))
+                      setNewProjectForm((prev) => ({ ...prev, projectName: e.target.value }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold mb-1">Centro / Pontón *</label>
+                  <label className="block text-xs font-extrabold mb-1">Cliente *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Centro Isla Guar · Trenes A y B"
-                    value={newProjectForm.centerName}
+                    placeholder="Ej. Salmones Austral S.A."
+                    value={newProjectForm.clientName}
                     onChange={(e) =>
-                      setNewProjectForm((p) => ({ ...p, centerName: e.target.value }))
+                      setNewProjectForm((prev) => ({ ...prev, clientName: e.target.value }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -6666,31 +6815,35 @@ export default function App() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold mb-1">Cliente / Mandante</label>
+                  <label className="block text-xs font-extrabold mb-1">Centro / Pontón *</label>
                   <input
                     type="text"
-                    placeholder="Ej. Salmones Austral S.A."
-                    value={newProjectForm.clientName}
+                    required
+                    placeholder="Ej. Centro Navarro - Canal Chacao"
+                    value={newProjectForm.centerName}
                     onChange={(e) =>
-                      setNewProjectForm((p) => ({ ...p, clientName: e.target.value }))
+                      setNewProjectForm((prev) => ({ ...prev, centerName: e.target.value }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold mb-1">Coordenadas Geográficas</label>
+                  <label className="block text-xs font-extrabold mb-1">
+                    Coordenadas Geográficas (Lat, Lon)
+                  </label>
                   <input
                     type="text"
-                    placeholder="-41.784520, -73.124890"
+                    placeholder="Ej. -41.784520, -73.124890"
                     value={newProjectForm.coordinates}
                     onChange={(e) =>
-                      setNewProjectForm((p) => ({ ...p, coordinates: e.target.value }))
+                      setNewProjectForm((prev) => ({ ...prev, coordinates: e.target.value }))
                     }
-                    className={`w-full px-3 py-2 rounded-xl border ${
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
                       darkMode
                         ? 'bg-slate-800 border-slate-700 text-white'
                         : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -6700,15 +6853,17 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Descripción del Alcance</label>
+                <label className="block text-xs font-extrabold mb-1">
+                  Descripción del Alcance Técnico
+                </label>
                 <textarea
                   rows={2}
-                  placeholder="Describe brevemente los trabajos..."
+                  placeholder="Detalle los sistemas eléctricos, luminarias o telemetría a instalar..."
                   value={newProjectForm.projectDescription}
                   onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, projectDescription: e.target.value }))
+                    setNewProjectForm((prev) => ({ ...prev, projectDescription: e.target.value }))
                   }
-                  className={`w-full px-3 py-2 rounded-xl border ${
+                  className={`w-full px-3 py-2 rounded-xl text-xs border ${
                     darkMode
                       ? 'bg-slate-800 border-slate-700 text-white'
                       : 'bg-slate-50 border-slate-200 text-slate-900'
@@ -6716,197 +6871,176 @@ export default function App() {
                 />
               </div>
 
-              {/* CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS */}
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              {/* Configuración de Distribución de Jaulas */}
+              <div
+                className={`p-3.5 rounded-2xl border space-y-3 ${
+                  darkMode ? 'bg-slate-800/70 border-slate-700' : 'bg-sky-50/70 border-sky-200'
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="font-extrabold uppercase text-[11px] text-sky-600 dark:text-sky-400">
-                    Distribución de Jaulas por Módulo
-                  </span>
-                  <span className="text-[11px] font-extrabold text-emerald-600">
-                    Total:{' '}
-                    {Math.max(1, Number(newProjectForm.mod1Rows) || 1) *
-                      Math.max(1, Number(newProjectForm.mod1Cols) || 1) +
-                      (newProjectForm.hasMod2
-                        ? Math.max(1, Number(newProjectForm.mod2Rows) || 1) *
-                          Math.max(1, Number(newProjectForm.mod2Cols) || 1)
-                        : 0)}{' '}
-                    jaulas
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                    Distribución de Jaulas (Separación Estándar Automática)
                   </span>
                 </div>
 
-                <div
-                  className={`p-3 rounded-xl border space-y-2.5 ${
-                    darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="font-extrabold text-xs">Módulo / Tren Principal</div>
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
+                    Tren / Módulo Principal
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Nombre</label>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500">Nombre Módulo</label>
                       <input
                         type="text"
                         value={newProjectForm.mod1Name}
                         onChange={(e) =>
-                          setNewProjectForm((p) => ({ ...p, mod1Name: e.target.value }))
+                          setNewProjectForm((prev) => ({ ...prev, mod1Name: e.target.value }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
-                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
+                          darkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Filas</label>
+                      <label className="block text-[10px] font-bold text-slate-500">Filas</label>
                       <input
                         type="number"
                         min="1"
                         max="10"
                         value={newProjectForm.mod1Rows}
                         onChange={(e) =>
-                          setNewProjectForm((p) => ({ ...p, mod1Rows: Number(e.target.value) }))
+                          setNewProjectForm((prev) => ({ ...prev, mod1Rows: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
-                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                          darkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Columnas</label>
+                      <label className="block text-[10px] font-bold text-slate-500">Columnas</label>
                       <input
                         type="number"
                         min="1"
                         max="20"
                         value={newProjectForm.mod1Cols}
                         onChange={(e) =>
-                          setNewProjectForm((p) => ({ ...p, mod1Cols: Number(e.target.value) }))
+                          setNewProjectForm((prev) => ({ ...prev, mod1Cols: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
-                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                          darkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">N° Inicial</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={newProjectForm.mod1StartNumber}
-                        onChange={(e) =>
-                          setNewProjectForm((p) => ({ ...p, mod1StartNumber: Number(e.target.value) }))
-                        }
-                        className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
-                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Lado (m)</label>
+                      <label className="block text-[10px] font-bold text-slate-500">Medida (m)</label>
                       <input
                         type="number"
                         min="5"
                         max="150"
                         value={newProjectForm.mod1CageMeters}
                         onChange={(e) =>
-                          setNewProjectForm((p) => ({ ...p, mod1CageMeters: Number(e.target.value) }))
+                          setNewProjectForm((prev) => ({
+                            ...prev,
+                            mod1CageMeters: Number(e.target.value),
+                          }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
-                          darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                          darkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                   </div>
                 </div>
 
-                <div
-                  className={`p-3 rounded-xl border space-y-2.5 ${
-                    darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs">Segundo Módulo / Tren</span>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newProjectForm.hasMod2}
-                        onChange={(e) =>
-                          setNewProjectForm((p) => ({ ...p, hasMod2: e.target.checked }))
-                        }
-                        className="w-4 h-4 accent-sky-600"
-                      />
-                      <span className="font-bold">Incluir 2° Módulo</span>
-                    </label>
-                  </div>
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <label className="flex items-center gap-2 text-[11px] font-extrabold text-slate-600 dark:text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newProjectForm.hasMod2}
+                      onChange={(e) =>
+                        setNewProjectForm((prev) => ({ ...prev, hasMod2: e.target.checked }))
+                      }
+                      className="accent-sky-600"
+                    />
+                    <span>Incluir Segundo Tren / Módulo</span>
+                  </label>
 
                   {newProjectForm.hasMod2 && (
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                      <div className="col-span-2 sm:col-span-1">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Nombre</label>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-500">Nombre Módulo</label>
                         <input
                           type="text"
                           value={newProjectForm.mod2Name}
                           onChange={(e) =>
-                            setNewProjectForm((p) => ({ ...p, mod2Name: e.target.value }))
+                            setNewProjectForm((prev) => ({ ...prev, mod2Name: e.target.value }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
-                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                          className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Filas</label>
+                        <label className="block text-[10px] font-bold text-slate-500">Filas</label>
                         <input
                           type="number"
                           min="1"
                           max="10"
                           value={newProjectForm.mod2Rows}
                           onChange={(e) =>
-                            setNewProjectForm((p) => ({ ...p, mod2Rows: Number(e.target.value) }))
+                            setNewProjectForm((prev) => ({ ...prev, mod2Rows: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
-                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Columnas</label>
+                        <label className="block text-[10px] font-bold text-slate-500">Columnas</label>
                         <input
                           type="number"
                           min="1"
                           max="20"
                           value={newProjectForm.mod2Cols}
                           onChange={(e) =>
-                            setNewProjectForm((p) => ({ ...p, mod2Cols: Number(e.target.value) }))
+                            setNewProjectForm((prev) => ({ ...prev, mod2Cols: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg font-extrabold border ${
-                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">N° Inicial</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={newProjectForm.mod2StartNumber}
-                          onChange={(e) =>
-                            setNewProjectForm((p) => ({ ...p, mod2StartNumber: Number(e.target.value) }))
-                          }
-                          className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
-                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
-                          }`}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Lado (m)</label>
+                        <label className="block text-[10px] font-bold text-slate-500">Medida (m)</label>
                         <input
                           type="number"
                           min="5"
                           max="150"
                           value={newProjectForm.mod2CageMeters}
                           onChange={(e) =>
-                            setNewProjectForm((p) => ({ ...p, mod2CageMeters: Number(e.target.value) }))
+                            setNewProjectForm((prev) => ({
+                              ...prev,
+                              mod2CageMeters: Number(e.target.value),
+                            }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg font-bold border ${
-                            darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
@@ -6915,478 +7049,197 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <div>
-                  <div className="font-extrabold">Iniciar lienzo limpio sin equipos previos</div>
-                  <div className="text-[11px] text-slate-500">
-                    Si lo desmarcas, conservarás los equipos actuales sobre las nuevas jaulas
-                  </div>
-                </div>
+              <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={newProjectForm.clearExistingObjects}
                   onChange={(e) =>
-                    setNewProjectForm((p) => ({ ...p, clearExistingObjects: e.target.checked }))
+                    setNewProjectForm((prev) => ({
+                      ...prev,
+                      clearExistingObjects: e.target.checked,
+                    }))
                   }
-                  className="w-5 h-5 accent-emerald-600"
+                  className="w-4 h-4 accent-emerald-600 rounded"
                 />
-              </div>
-            </div>
+                <span>Iniciar plano en blanco (limpiar equipos y canalizaciones anteriores)</span>
+              </label>
 
-            <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowNewProjectModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Crear Proyecto
-              </button>
-            </div>
-          </form>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowNewProjectModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>Crear Proyecto</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL PROYECTOS GUARDADOS EN LA NUBE
+          MODAL GESTOR DE PROYECTOS EN LA NUBE (FIREBASE CLOUD FIRESTORE)
       ==================================================================== */}
       {showCloudModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-2xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
+            className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
               darkMode
-                ? 'bg-slate-900 border-slate-800 text-slate-100'
+                ? 'bg-slate-900 border-slate-700 text-white'
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Cloud className="w-5 h-5 text-sky-500" />
                 <div>
                   <h3 className="text-base font-extrabold">Proyectos Guardados en la Nube</h3>
-                  <p className="text-xs text-slate-500">
-                    Carga, actualiza o busca tus proyectos sincronizados
+                  <p className="text-[11px] text-slate-400">
+                    Búsqueda por centro, cliente o proyecto · Sincronización en tiempo real
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowCloudModal(false)}
-                className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
+                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-rose-500 hover:text-white transition-colors"
               >
-                Cerrar
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-2 bg-sky-500/5">
-              <label className="block text-xs font-extrabold text-sky-600 dark:text-sky-400">
-                Guardar Proyecto Actual en la Nube
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <input
-                  type="text"
-                  placeholder="Nombre del centro o proyecto..."
-                  value={blueprintNameInput}
-                  onChange={(e) => setBlueprintNameInput(e.target.value)}
-                  className={`flex-1 min-w-[200px] px-3 py-2 rounded-xl text-xs font-bold border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                />
-                <button
-                  onClick={() => handleSaveToCloud(currentBlueprintId, blueprintNameInput)}
-                  disabled={isSavingCloud}
-                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Actualizar</span>
-                </button>
-                <button
-                  onClick={() => {
-                    const newId = `${blueprintNameInput || 'plano'}-${Date.now()}`;
-                    handleSaveToCloud(newId, blueprintNameInput);
-                  }}
-                  disabled={isSavingCloud}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Guardar Como Nuevo</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="px-4 pt-3">
-              <input
-                type="text"
-                placeholder="Buscar proyecto guardado..."
-                value={cloudSearchQuery}
-                onChange={(e) => setCloudSearchQuery(e.target.value)}
-                className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-700 text-white'
-                    : 'bg-slate-50 border-slate-200 text-slate-900'
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div
+                className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                  darkMode ? 'bg-slate-800/70 border-slate-700' : 'bg-sky-50/70 border-sky-200'
                 }`}
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-              {filteredBlueprints.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-500">
-                  No se encontraron proyectos guardados en la nube.
-                </div>
-              ) : (
-                filteredBlueprints.map((bp) => (
-                  <div
-                    key={bp.id}
-                    className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
-                      bp.id === currentBlueprintId
-                        ? 'border-sky-500 bg-sky-500/10'
-                        : darkMode
-                        ? 'border-slate-800 bg-slate-800/50'
-                        : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-extrabold truncate">
-                          {bp.companyInfo?.centerName || bp.title || bp.id}
-                        </span>
-                        {bp.id === currentBlueprintId && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-600 text-white">
-                            Activo
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate">
-                        {bp.companyInfo?.projectName || bp.projectName || 'Sin título'} ·{' '}
-                        {bp.companyInfo?.clientName || bp.clientName || 'Sin cliente'}
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        {bp.totalCages || 0} jaulas · {bp.totalObjects || 0} equipos · Actualizado:{' '}
-                        {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString() : 'Reciente'}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleLoadFromCloud(bp)}
-                        className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold"
-                      >
-                        Abrir
-                      </button>
-                      <button
-                        onClick={() => handleDeleteFromCloud(bp.id, bp.title || bp.id)}
-                        className="p-1.5 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                        title="Eliminar de la nube"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          MODAL INVENTARIO Y RESUMEN AGRUPADO POR COMPONENTE Y MARCA
-      ==================================================================== */}
-      {showInventoryModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div
-            className={`w-full max-w-5xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
-              darkMode
-                ? 'bg-slate-900 border-slate-800 text-slate-100'
-                : 'bg-white border-slate-200 text-slate-900'
-            }`}
-          >
-            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold">
-                  Resumen General de Equipos y Cubicación de Cableado
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Agrupación por componente genérico y marca ({objects.length} equipos ·{' '}
-                  {metrics.totalPowerKw} kW · {totalCableMeters} m cable)
-                </p>
-              </div>
-              <button
-                onClick={() => setShowInventoryModal(false)}
-                className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
               >
-                Cerrar
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4 space-y-5">
-              <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-sky-600 mb-2">
-                  1. Resumen de Equipos Instalados por Componente Genérico y Marca
-                </h4>
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-300 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
-                      <th className="py-2 px-2 text-center">Cant.</th>
-                      <th className="py-2 px-2">Componente Genérico</th>
-                      <th className="py-2 px-2">Marca</th>
-                      <th className="py-2 px-2">TAGs Agrupados</th>
-                      <th className="py-2 px-2">Módulo</th>
-                      <th className="py-2 px-2">Características Técnicas</th>
-                      <th className="py-2 px-2">Circuito / Fase</th>
-                      <th className="py-2 px-2 text-right">Pot. Unit.</th>
-                      <th className="py-2 px-2 text-right">Pot. Total</th>
-                      <th className="py-2 px-2">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summarizedEquipment.map((g) => (
-                      <tr
-                        key={g.key}
-                        className="border-b border-slate-200/70 dark:border-slate-800 hover:bg-sky-500/5"
-                      >
-                        <td className="py-2 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
-                          {g.count}
-                        </td>
-                        <td className="py-2 px-2 font-extrabold">{g.genericName}</td>
-                        <td className="py-2 px-2 font-bold text-indigo-600 dark:text-indigo-400">
-                          {g.brand}
-                        </td>
-                        <td className="py-2 px-2 text-[11px] text-slate-500 max-w-[160px] truncate" title={g.tagsLabel}>
-                          {g.tagsLabel}
-                        </td>
-                        <td className="py-2 px-2 font-semibold">{g.modulesLabel}</td>
-                        <td className="py-2 px-2">{g.spec}</td>
-                        <td className="py-2 px-2 font-bold">
-                          {phaseConfigs[g.phase]?.label || g.phase}
-                        </td>
-                        <td className="py-2 px-2 text-right">{g.unitPower} W</td>
-                        <td className="py-2 px-2 text-right font-extrabold">{g.totalPower} W</td>
-                        <td className="py-2 px-2 font-bold">{g.summaryStatus}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {conduits.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-500 mb-2">
-                    2. Cubicación de Canalizaciones y Tramos de Cable por Fase
-                  </h4>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-300 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
-                        <th className="py-2 px-2">TAG Tramo</th>
-                        <th className="py-2 px-2">Fase Eléctrica</th>
-                        <th className="py-2 px-2">Conductor</th>
-                        <th className="py-2 px-2 text-right">Tramo Pasillo</th>
-                        <th className="py-2 px-2 text-right">Bajada</th>
-                        <th className="py-2 px-2 text-right">Total Cable</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {conduits.map((c) => {
-                        const m = calculateConduitMetrics(c);
-                        const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
-                        return (
-                          <tr
-                            key={c.id}
-                            className="border-b border-slate-200/70 dark:border-slate-800"
-                          >
-                            <td className="py-2 px-2 font-extrabold">{c.tag}</td>
-                            <td className="py-2 px-2 font-bold" style={{ color: pCfg.color }}>
-                              {pCfg.label}
-                            </td>
-                            <td className="py-2 px-2">{c.cableSpec}</td>
-                            <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
-                            <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
-                            <td className="py-2 px-2 text-right font-extrabold">
-                              {m.totalMeters} m
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      <tr className="bg-slate-500/10 font-extrabold">
-                        <td colSpan={5} className="py-2 px-2 text-right">
-                          TOTAL GENERAL DE CABLE UTILIZADO:
-                        </td>
-                        <td className="py-2 px-2 text-right text-sky-600 dark:text-sky-400">
-                          {totalCableMeters} m
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                  Guardar Proyecto Actual en la Nube
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          MODAL CONFIGURACIÓN PROYECTO Y EMPRESA
-      ==================================================================== */}
-      {showCompanyModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div
-            className={`w-full max-w-xl rounded-2xl border shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto ${
-              darkMode
-                ? 'bg-slate-900 border-slate-800 text-slate-100'
-                : 'bg-white border-slate-200 text-slate-900'
-            }`}
-          >
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-base font-extrabold">Datos del Proyecto, Ubicación y Empresa</h3>
-              <button
-                onClick={() => setShowCompanyModal(false)}
-                className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800"
-              >
-                Listo
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold mb-1">Nombre de la Empresa Ejecutora</label>
-                <input
-                  type="text"
-                  value={companyInfo.companyName}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Nombre del Proyecto</label>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
-                    value={companyInfo.projectName || ''}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    placeholder="Nombre o identificador del proyecto..."
+                    value={blueprintNameInput}
+                    onChange={(e) => setBlueprintNameInput(e.target.value)}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-700 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'
                     }`}
                   />
-                </div>
-                <div>
-                  <label className="block font-bold mb-1">Cliente / Mandante</label>
-                  <input
-                    type="text"
-                    value={companyInfo.clientName || ''}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Descripción del Proyecto</label>
-                <textarea
-                  rows={2}
-                  value={companyInfo.projectDescription || ''}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, projectDescription: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Centro de Cultivo / Pontón</label>
-                <input
-                  type="text"
-                  value={companyInfo.centerName}
-                  onChange={(e) => {
-                    setCompanyInfo((p) => ({ ...p, centerName: e.target.value }));
-                    setBlueprintNameInput(e.target.value);
-                  }}
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
-                  <input
-                    type="text"
-                    placeholder="-41.784520, -73.124890"
-                    value={companyInfo.coordinates || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCompanyInfo((p) => ({
-                        ...p,
-                        coordinates: val,
-                        googleMapsUrl: buildGoogleMapsLink(val),
-                      }));
+                  <button
+                    onClick={() => {
+                      const slugId =
+                        blueprintNameInput
+                          .normalize('NFD')
+                          .replace(/[\u0300-\u036f]/g, '')
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, '-')
+                          .replace(/^-+|-+$/g, '') || `proyecto-${Date.now()}`;
+                      handleSaveToCloud(slugId, blueprintNameInput);
                     }}
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold mb-1">Enlace Directo Google Maps</label>
-                  <input
-                    type="url"
-                    placeholder="https://maps.google.com/..."
-                    value={companyInfo.googleMapsUrl || ''}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, googleMapsUrl: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  />
+                    disabled={isSavingCloud}
+                    className="px-4 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isSavingCloud ? 'Guardando...' : 'Guardar en Nube'}</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Ingeniero / Técnico Responsable</label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Proyectos Disponibles ({filteredBlueprints.length})
+                  </span>
                   <input
                     type="text"
-                    value={companyInfo.responsibleName}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    placeholder="Filtrar por centro, cliente o proyecto..."
+                    value={cloudSearchQuery}
+                    onChange={(e) => setCloudSearchQuery(e.target.value)}
+                    className={`w-64 px-3 py-1.5 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
                 </div>
-                <div>
-                  <label className="block font-bold mb-1">Registro / Licencia SEC</label>
-                  <input
-                    type="text"
-                    value={companyInfo.responsibleLicense}
-                    onChange={(e) =>
-                      setCompanyInfo((p) => ({ ...p, responsibleLicense: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border ${
-                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  />
-                </div>
+
+                {filteredBlueprints.length === 0 ? (
+                  <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-400">
+                    No se encontraron proyectos con ese criterio de búsqueda.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredBlueprints.map((bp) => {
+                      const isCurrent = bp.id === currentBlueprintId;
+                      return (
+                        <div
+                          key={bp.id}
+                          className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                            isCurrent
+                              ? 'border-sky-500 bg-sky-500/10'
+                              : darkMode
+                              ? 'border-slate-800 bg-slate-800/50'
+                              : 'border-slate-200 bg-slate-50/70'
+                          }`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-extrabold truncate">
+                                {bp.companyInfo?.centerName || bp.title || bp.id}
+                              </span>
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-600 text-white">
+                                  Activo
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 truncate">
+                              Proyecto: {bp.projectName || bp.companyInfo?.projectName || '-'} ·
+                              Cliente: {bp.clientName || bp.companyInfo?.clientName || '-'}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {bp.totalCages || bp.cages?.length || 0} jaulas ·{' '}
+                              {bp.totalObjects || bp.objects?.length || 0} equipos · Guardado:{' '}
+                              {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString('es-CL') : '-'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => handleLoadFromCloud(bp)}
+                              className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-700 text-white"
+                            >
+                              Abrir Proyecto
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleDeleteFromCloud(
+                                  bp.id,
+                                  bp.companyInfo?.centerName || bp.title || bp.id
+                                )
+                              }
+                              className="p-2 rounded-xl bg-rose-500/15 text-rose-500 hover:bg-rose-500/25"
+                              title="Eliminar de la nube"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -7398,25 +7251,32 @@ export default function App() {
       ==================================================================== */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl max-h-[92vh] bg-white text-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MonitorPlay className="w-4 h-4 text-sky-400" />
+          <div className="w-full max-w-6xl max-h-[92vh] rounded-3xl bg-white text-slate-900 border border-slate-300 shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <MonitorPlay className="w-5 h-5 text-sky-400" />
                 <span className="text-sm font-extrabold">
-                  Vista Previa de Lámina Técnica — {companyInfo.centerName}
+                  Vista Previa Lámina Técnica · {companyInfo.centerName}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={handleExportPNG}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1.5"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Descargar PNG</span>
+                </button>
+                <button
                   onClick={handleExportPDF}
-                  className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir / Guardar PDF</span>
+                  <span>Imprimir / PDF</span>
                 </button>
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200"
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-white transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -7424,8 +7284,8 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
-              <div className="max-w-5xl mx-auto bg-white border-2 border-slate-300 rounded-xl p-6 shadow-md space-y-4">
-                <div className="flex items-center justify-between gap-4 border-b pb-3">
+              <div className="max-w-5xl mx-auto bg-white border border-slate-300 rounded-2xl p-6 shadow-md space-y-4">
+                <div className="flex items-center justify-between gap-4">
                   {companyInfo.logoDataUrl ? (
                     <img
                       src={companyInfo.logoDataUrl}
@@ -7433,81 +7293,110 @@ export default function App() {
                       className="max-h-16 max-w-[220px] object-contain"
                     />
                   ) : (
-                    <div className="w-24" />
+                    <div className="w-16" />
                   )}
-                  <div className="flex-1 text-center font-extrabold text-sm tracking-wide uppercase text-slate-900">
+                  <div className="flex-1 text-center text-sm font-extrabold uppercase tracking-wide text-slate-900">
                     PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO
                   </div>
-                  <div className="w-24" />
+                  <div className="w-16" />
                 </div>
 
                 <div
-                  className="border border-slate-300 rounded-lg p-3 bg-white overflow-hidden"
+                  className="border border-slate-300 rounded-xl p-2 bg-white overflow-hidden"
                   dangerouslySetInnerHTML={{
                     __html: generateSvgStringForExport(true) || '',
                   }}
                 />
 
-                <table className="w-full border-collapse border border-slate-900 text-xs">
-                  <tbody>
-                    <tr>
-                      <td className="border border-slate-900 p-2 w-2/5">
-                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                          Proyecto
-                        </span>
-                        <span className="font-extrabold">{companyInfo.projectName}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2 w-1/4">
-                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                          Cliente
-                        </span>
-                        <span className="font-bold">{companyInfo.clientName}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2">
-                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                          Centro / Pontón
-                        </span>
-                        <span className="font-bold">{companyInfo.centerName}</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan={2} className="border border-slate-900 p-2">
-                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                          Descripción
-                        </span>
-                        <span>{companyInfo.projectDescription || '-'}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2">
-                        <span className="block text-[9px] font-extrabold uppercase text-slate-500">
-                          Coordenadas
-                        </span>
-                        <a
-                          href={mapsHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-bold text-sky-600 underline"
-                        >
-                          {companyInfo.coordinates || 'Sin coordenadas'}
-                        </a>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="grid grid-cols-1 md:grid-cols-3 border-2 border-slate-900 text-xs">
+                  <div className="p-2.5 border-b md:border-b-0 md:border-r border-slate-900">
+                    <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                      Proyecto
+                    </span>
+                    <span className="font-extrabold">{companyInfo.projectName}</span>
+                  </div>
+                  <div className="p-2.5 border-b md:border-b-0 md:border-r border-slate-900">
+                    <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                      Cliente
+                    </span>
+                    <span className="font-bold">{companyInfo.clientName}</span>
+                  </div>
+                  <div className="p-2.5">
+                    <span className="block text-[9px] font-extrabold uppercase text-slate-500">
+                      Centro / Coordenadas
+                    </span>
+                    <span className="font-bold block">{companyInfo.centerName}</span>
+                    {companyInfo.coordinates && (
+                      <a
+                        href={mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sky-600 font-bold hover:underline"
+                      >
+                        {companyInfo.coordinates}
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">
+                      Jaulas Totales
+                    </div>
+                    <div className="text-base font-extrabold">{cages.length} Unidades</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">
+                      Con Fotoperiodo
+                    </div>
+                    <div className="text-base font-extrabold text-amber-600">
+                      {metrics.activeCages} Jaulas
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">
+                      Equipos Instalados
+                    </div>
+                    <div className="text-base font-extrabold">{objects.length} Equipos</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">
+                      Carga Eléctrica
+                    </div>
+                    <div className="text-base font-extrabold text-emerald-600">
+                      {metrics.totalPowerKw} kW
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">
+                      Cableado Total
+                    </div>
+                    <div className="text-base font-extrabold text-rose-600">
+                      {totalCableMeters} m
+                    </div>
+                  </div>
+                </div>
 
                 <div className="flex items-end justify-between pt-4 border-t border-slate-200">
-                  <div className="text-sm font-extrabold uppercase tracking-wide text-slate-900">
+                  <div className="text-sm font-extrabold text-slate-900">
                     {companyInfo.companyName}
                   </div>
-                  <div className="text-center border-t border-slate-500 pt-1 px-6 text-xs">
-                    {companyInfo.signatureDataUrl && (
+                  <div className="text-center border-t border-slate-400 pt-2 w-60 text-xs">
+                    {companyInfo.signatureDataUrl ? (
                       <img
                         src={companyInfo.signatureDataUrl}
                         alt="Firma"
                         className="max-h-12 mx-auto mb-1"
                       />
+                    ) : (
+                      <div className="h-6" />
                     )}
                     <div className="font-extrabold">{companyInfo.responsibleName}</div>
-                    <div className="text-[11px] text-slate-600">{companyInfo.responsibleRole}</div>
+                    <div className="text-slate-600">{companyInfo.responsibleRole}</div>
+                    <div className="text-[10px] text-slate-400">
+                      {companyInfo.responsibleLicense}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -7516,37 +7405,358 @@ export default function App() {
         </div>
       )}
 
-      {/* TOOLTIP FLOTANTE AL PASAR EL MOUSE */}
-      {hoveredObj && !draggingObjId && (
-        <div
-          className={`fixed bottom-24 right-4 z-30 pointer-events-none px-3.5 py-2.5 rounded-2xl border shadow-xl text-xs max-w-xs ${
-            darkMode
-              ? 'bg-slate-900/95 border-slate-700 text-slate-100'
-              : 'bg-white/95 border-slate-200 text-slate-900'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="font-extrabold text-sky-500">{hoveredObj.tag}</span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-500/15">
-              {STATUS_CONFIG[hoveredObj.status]?.label}
-            </span>
-          </div>
-          <div className="font-bold">
-            {hoveredObj.genericName || TYPE_GENERIC_LABELS[hoveredObj.type]} ·{' '}
-            <span className="text-indigo-500">{hoveredObj.brand || 'Genérico'}</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{hoveredObj.spec}</div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            {hoveredObj.locationLabel} · {hoveredObj.power}W
+      {/* ====================================================================
+          MODAL INVENTARIO GENERAL AGRUPADO POR COMPONENTE GENÉRICO Y MARCA
+      ==================================================================== */}
+      {showInventoryModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-5xl max-h-[85vh] rounded-3xl border shadow-2xl overflow-hidden flex flex-col ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-white'
+                : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold">
+                  Resumen General de Equipos por Componente y Marca ({objects.length} unidades) y
+                  Cableado ({totalCableMeters} m)
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Agrupación automática por tipo genérico, marca y potencia unitaria
+                </p>
+              </div>
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6 space-y-6">
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2">
+                  1. Resumen de Equipos Instalados (Agrupados por Componente Genérico y Marca)
+                </h4>
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                      <th className="py-2 px-2 text-center">Cant.</th>
+                      <th className="py-2 px-2">Componente Genérico</th>
+                      <th className="py-2 px-2">Marca</th>
+                      <th className="py-2 px-2">TAGs Agrupados</th>
+                      <th className="py-2 px-2">Características Técnicas</th>
+                      <th className="py-2 px-2">Circuito / Fase</th>
+                      <th className="py-2 px-2 text-right">Pot. Unit.</th>
+                      <th className="py-2 px-2 text-right">Pot. Total</th>
+                      <th className="py-2 px-2">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summarizedEquipment.map((g) => (
+                      <tr
+                        key={g.key}
+                        className="border-b border-slate-100 dark:border-slate-800/70 hover:bg-slate-500/5"
+                      >
+                        <td className="py-2.5 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
+                          {g.count}
+                        </td>
+                        <td className="py-2.5 px-2 font-extrabold">{g.genericName}</td>
+                        <td className="py-2.5 px-2 font-bold text-indigo-600 dark:text-indigo-400">
+                          {g.brand}
+                        </td>
+                        <td className="py-2.5 px-2 text-[11px] text-slate-500 max-w-[180px] truncate">
+                          {g.tagsLabel}
+                        </td>
+                        <td className="py-2.5 px-2">{g.spec}</td>
+                        <td className="py-2.5 px-2">
+                          <span
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+                            style={{ backgroundColor: phaseConfigs[g.phase]?.color || '#0284c7' }}
+                          >
+                            {phaseConfigs[g.phase]?.label || g.phase}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-2 text-right">{g.unitPower} W</td>
+                        <td className="py-2.5 px-2 text-right font-extrabold">{g.totalPower} W</td>
+                        <td className="py-2.5 px-2 font-bold">{g.summaryStatus}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {conduits.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2">
+                    2. Cubicación de Cableado por Fase Eléctrica
+                  </h4>
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                        <th className="py-2 px-2">TAG Tramo</th>
+                        <th className="py-2 px-2">Fase</th>
+                        <th className="py-2 px-2">Conductor</th>
+                        <th className="py-2 px-2 text-right">Tramo Pasillo</th>
+                        <th className="py-2 px-2 text-right">Bajada/Holgura</th>
+                        <th className="py-2 px-2 text-right">Total Cable</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {conduits.map((c) => {
+                        const m = calculateConduitMetrics(c);
+                        const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                        return (
+                          <tr
+                            key={c.id}
+                            className="border-b border-slate-100 dark:border-slate-800/70"
+                          >
+                            <td className="py-2 px-2 font-extrabold">{c.tag}</td>
+                            <td className="py-2 px-2">
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+                                style={{ backgroundColor: pCfg.color }}
+                              >
+                                {pCfg.label}
+                              </span>
+                            </td>
+                            <td className="py-2 px-2">{c.cableSpec}</td>
+                            <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
+                            <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
+                            <td className="py-2 px-2 text-right font-extrabold">
+                              {m.totalMeters} m
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* NOTIFICACIÓN TOAST */}
-      {toast && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold shadow-xl flex items-center gap-2 border border-slate-700">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toast.message}</span>
+      {/* ====================================================================
+          MODAL DATOS DE PROYECTO, EMPRESA Y COORDENADAS
+      ==================================================================== */}
+      {showCompanyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-xl rounded-3xl border shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-white'
+                : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-extrabold">
+                Configuración de Proyecto, Empresa y Coordenadas
+              </h3>
+              <button
+                onClick={() => setShowCompanyModal(false)}
+                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold mb-1">Nombre del Proyecto</label>
+                <input
+                  type="text"
+                  value={companyInfo.projectName}
+                  onChange={(e) =>
+                    setCompanyInfo((prev) => ({ ...prev, projectName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1">Descripción del Proyecto</label>
+                <textarea
+                  rows={2}
+                  value={companyInfo.projectDescription}
+                  onChange={(e) =>
+                    setCompanyInfo((prev) => ({ ...prev, projectDescription: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold mb-1">Cliente</label>
+                  <input
+                    type="text"
+                    value={companyInfo.clientName}
+                    onChange={(e) =>
+                      setCompanyInfo((prev) => ({ ...prev, clientName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Centro / Pontón (Nombre Archivo PDF/PNG)
+                  </label>
+                  <input
+                    type="text"
+                    value={companyInfo.centerName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCompanyInfo((prev) => ({ ...prev, centerName: val }));
+                      setBlueprintNameInput(val);
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Coordenadas Geográficas (Lat, Lon)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="-41.784520, -73.124890"
+                    value={companyInfo.coordinates}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCompanyInfo((prev) => ({
+                        ...prev,
+                        coordinates: val,
+                        googleMapsUrl: buildGoogleMapsLink(val),
+                      }));
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Enlace Directo Google Maps
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://www.google.com/maps/..."
+                    value={companyInfo.googleMapsUrl}
+                    onChange={(e) =>
+                      setCompanyInfo((prev) => ({ ...prev, googleMapsUrl: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div>
+                  <label className="block text-xs font-bold mb-1">Empresa Instaladora</label>
+                  <input
+                    type="text"
+                    value={companyInfo.companyName}
+                    onChange={(e) =>
+                      setCompanyInfo((prev) => ({ ...prev, companyName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Profesional Responsable</label>
+                  <input
+                    type="text"
+                    value={companyInfo.responsibleName}
+                    onChange={(e) =>
+                      setCompanyInfo((prev) => ({ ...prev, responsibleName: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold mb-1">Cargo</label>
+                  <input
+                    type="text"
+                    value={companyInfo.responsibleRole}
+                    onChange={(e) =>
+                      setCompanyInfo((prev) => ({ ...prev, responsibleRole: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">Registro / Licencia SEC</label>
+                  <input
+                    type="text"
+                    value={companyInfo.responsibleLicense}
+                    onChange={(e) =>
+                      setCompanyInfo((prev) => ({ ...prev, responsibleLicense: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setShowCompanyModal(false);
+                  notify('Información de proyecto y empresa actualizada', 'success');
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white"
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
