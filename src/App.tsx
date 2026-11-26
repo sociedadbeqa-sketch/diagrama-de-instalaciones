@@ -1,13 +1,15 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  ZoomIn, ZoomOut, Maximize2, RotateCcw, Plus, Trash2, Download, Upload,
-  Sun, Moon, Filter, FileText, Image as ImageIcon, CheckCircle2, AlertTriangle,
-  Wrench, Zap, Camera, Radio, Cpu, Compass, Sliders, Edit3, Save, Copy,
-  Magnet, Eye, EyeOff, Info, Layers, Grid, ArrowRightLeft, Building2, Printer,
-  Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  MonitorPlay, X, Cloud, FolderOpen, CloudUpload, RefreshCw, MapPin, ExternalLink, FolderPlus,
-  Route, Square, Scissors, ClipboardPaste, Undo2, Redo2, Lock, Unlock, FlipHorizontal2, FlipVertical2, AlignCenterHorizontal, Palette
+  ZoomIn, ZoomOut, Maximize2, Plus, Trash2, Upload,
+  Sun, Moon, Image as ImageIcon, CheckCircle2, AlertTriangle,
+  Zap, Camera, Radio, Cpu, Compass, Sliders, Edit3, Save, Copy,
+  Magnet, Eye, Info, Layers, Grid, Building2, Printer,
+  Expand, Minimize, PanelLeftClose, PanelLeftOpen, PanelRightOpen,
+  MonitorPlay, X, Cloud, FolderOpen, CloudUpload, MapPin, ExternalLink, FolderPlus,
+  Route, Square, Scissors, ClipboardPaste, Undo2, Redo2, Lock, Unlock,
+  FlipHorizontal2, FlipVertical2, AlignCenterHorizontal, Palette,
+  Type, Circle, Triangle, ArrowRight, Diamond, Minus
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -71,15 +73,26 @@ const TYPE_GENERIC_LABELS = {
   alimentador: 'Selector de Alimentación',
 };
 
-const SYMBOL_COLOR_PRESETS = [
-  '#1d4ed8', // Azul técnico
-  '#f59e0b', // Ámbar
-  '#ef4444', // Rojo
-  '#10b981', // Esmeralda
-  '#06b6d4', // Cian
-  '#8b5cf6', // Violeta
-  '#ec4899', // Magenta
-  '#0f172a', // Negro / Grafito
+// Paleta de 32 colores básicos organizada en 4 filas x 8 columnas
+const BASIC_32_COLORS = [
+  // Fila 1: Neutros y Rojos/Naranjas
+  '#000000', '#334155', '#64748b', '#94a3b8', '#cbd5e1', '#ffffff', '#991b1b', '#dc2626',
+  // Fila 2: Rojos claros, Naranjas y Amarillos
+  '#ef4444', '#f87171', '#c2410c', '#ea580c', '#f97316', '#f59e0b', '#eab308', '#fde047',
+  // Fila 3: Verdes y Cianes
+  '#4d7c0f', '#65a30d', '#15803d', '#16a34a', '#10b981', '#0d9488', '#0891b2', '#06b6d4',
+  // Fila 4: Azules, Violetas y Magentas
+  '#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#4f46e5', '#7c3aed', '#a855f7', '#db2777',
+];
+
+const BASIC_SHAPES_CATALOG = [
+  { shapeType: 'text', label: 'Cuadro de Texto' },
+  { shapeType: 'arrow', label: 'Flecha' },
+  { shapeType: 'rect', label: 'Cuadrado / Rectángulo' },
+  { shapeType: 'circle', label: 'Círculo' },
+  { shapeType: 'triangle', label: 'Triángulo' },
+  { shapeType: 'diamond', label: 'Rombo' },
+  { shapeType: 'line', label: 'Línea' },
 ];
 
 // ============================================================================
@@ -259,7 +272,7 @@ const INITIAL_OBJECTS = [
     brand: 'JVA',
     type: 'energizador',
     icon: 'radio',
-    phase: 'control',
+    phase: 'cerco_electrico',
     power: 450,
     rotation: 0,
     flipX: false,
@@ -587,6 +600,8 @@ const INITIAL_COMPANY_INFO = {
 
 const INITIAL_PHASE_CONFIG = {
   fotoperiodo: { label: 'Fotoperiodo LED', color: '#f59e0b' },
+  luces_perimetrales: { label: 'Luces Perimetrales', color: '#eab308' },
+  cerco_electrico: { label: 'Cerco Eléctrico', color: '#dc2626' },
   fuerza_aux: { label: 'Fuerza 220V Auxiliar', color: '#2563eb' },
   control: { label: 'Fuerza y Control', color: '#ef4444' },
   monitoreo: { label: 'Sensores / Cámaras', color: '#06b6d4' },
@@ -637,7 +652,7 @@ const SYMBOL_CATALOG = [
   { type: 'enchufe_220v', label: 'Enchufe Industrial 220V', brand: 'Mennekes', icon: 'plug', phase: 'fuerza_aux', power: 3520, rotation: 0, amperage: '16A', ipGrade: 'IP67', customColor: '' },
   { type: 'fotocelda', label: 'Fotocelda Crepuscular', brand: 'Finder', icon: 'eye', phase: 'fotoperiodo', power: 15, rotation: 0, luxThreshold: '15 Lux', controlledCircuit: 'Contactor Fotoperiodo', customColor: '' },
   { type: 'tablero', label: 'Tablero Eléctrico IP66', brand: 'Schneider Electric', icon: 'zap', phase: 'control', power: 1200, rotation: 0, customColor: '' },
-  { type: 'energizador', label: 'Energizador / Telemetría', brand: 'JVA', icon: 'radio', phase: 'control', power: 450, rotation: 0, customColor: '' },
+  { type: 'energizador', label: 'Energizador / Cerco Eléctrico', brand: 'JVA', icon: 'radio', phase: 'cerco_electrico', power: 450, rotation: 0, customColor: '' },
   { type: 'sensor', label: 'Sensor / Sonda Multiparámetro', brand: 'OxyGuard', icon: 'cpu', phase: 'monitoreo', power: 60, rotation: 0, customColor: '' },
   { type: 'camara', label: 'Cámara Submarina / PTZ', brand: 'Hikvision', icon: 'camera', phase: 'monitoreo', power: 85, rotation: 0, customColor: '' },
   { type: 'alimentador', label: 'Selector de Alimentación', brand: 'AKVA Group', icon: 'compass', phase: 'alimentacion', power: 350, rotation: 0, customColor: '' },
@@ -696,6 +711,7 @@ export default function App() {
   const [cages, setCages] = useState(generateInitialCages);
   const [objects, setObjects] = useState(INITIAL_OBJECTS);
   const [conduits, setConduits] = useState(INITIAL_CONDUITS);
+  const [annotations, setAnnotations] = useState([]);
   const [phaseConfigs, setPhaseConfigs] = useState(INITIAL_PHASE_CONFIG);
   const [symbolCatalog, setSymbolCatalog] = useState(SYMBOL_CATALOG);
   const [isEditingCatalog, setIsEditingCatalog] = useState(false);
@@ -715,7 +731,7 @@ export default function App() {
   const [circuitForm, setCircuitForm] = useState({
     key: '',
     label: '',
-    color: '#8b5cf6',
+    color: '#7c3aed',
   });
 
   const [companyInfo, setCompanyInfo] = useState(INITIAL_COMPANY_INFO);
@@ -735,6 +751,7 @@ export default function App() {
     cages: JSON.parse(JSON.stringify(cages)),
     objects: JSON.parse(JSON.stringify(objects)),
     conduits: JSON.parse(JSON.stringify(conduits)),
+    annotations: JSON.parse(JSON.stringify(annotations)),
     phaseConfigs: JSON.parse(JSON.stringify(phaseConfigs)),
     trunkLabel,
     showTrunkLabel,
@@ -760,6 +777,7 @@ export default function App() {
     setCages(previous.cages);
     setObjects(previous.objects);
     setConduits(previous.conduits);
+    if (Array.isArray(previous.annotations)) setAnnotations(previous.annotations);
     if (previous.phaseConfigs) setPhaseConfigs(previous.phaseConfigs);
     setTrunkLabel(previous.trunkLabel);
     setShowTrunkLabel(previous.showTrunkLabel);
@@ -780,6 +798,7 @@ export default function App() {
     setCages(next.cages);
     setObjects(next.objects);
     setConduits(next.conduits);
+    if (Array.isArray(next.annotations)) setAnnotations(next.annotations);
     if (next.phaseConfigs) setPhaseConfigs(next.phaseConfigs);
     setTrunkLabel(next.trunkLabel);
     setShowTrunkLabel(next.showTrunkLabel);
@@ -818,6 +837,7 @@ export default function App() {
   // Herramientas y selección
   const [activeTool, setActiveTool] = useState('select');
   const [placeTemplate, setPlaceTemplate] = useState(SYMBOL_CATALOG[0]);
+  const [placeShapeTemplate, setPlaceShapeTemplate] = useState(BASIC_SHAPES_CATALOG[0]);
   const [selectedId, setSelectedId] = useState('OBJ-02');
   const [selectedKind, setSelectedKind] = useState('object');
 
@@ -857,7 +877,6 @@ export default function App() {
   const [showLeftSidebar, setShowLeftSidebar] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
-  // Panel derecho inicia cerrado; se abre al hacer doble clic en un elemento o con el botón Inspector
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [autoHideRightPanel, setAutoHideRightPanel] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -867,6 +886,7 @@ export default function App() {
   const [draggingObjId, setDraggingObjId] = useState(null);
   const [draggingCageId, setDraggingCageId] = useState(null);
   const [draggingModuleId, setDraggingModuleId] = useState(null);
+  const [draggingAnnotationId, setDraggingAnnotationId] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -1098,6 +1118,7 @@ export default function App() {
       const cagesToUse = overrideData?.cages || cages;
       const modulesToUse = overrideData?.modules || modules;
       const conduitsToUse = overrideData?.conduits || conduits;
+      const annotationsToUse = overrideData?.annotations || annotations;
       const catalogToUse = overrideData?.symbolCatalog || symbolCatalog;
       const phasesToUse = overrideData?.phaseConfigs || phaseConfigs;
 
@@ -1130,6 +1151,7 @@ export default function App() {
         cages: cagesToUse,
         objects: objectsToUse,
         conduits: conduitsToUse,
+        annotations: annotationsToUse,
         phaseConfigs: phasesToUse,
         symbolCatalog: catalogToUse,
         trunkLabel,
@@ -1156,6 +1178,8 @@ export default function App() {
     if (Array.isArray(bp.cages)) setCages(bp.cages);
     if (Array.isArray(bp.objects)) setObjects(bp.objects);
     if (Array.isArray(bp.conduits)) setConduits(bp.conduits);
+    if (Array.isArray(bp.annotations)) setAnnotations(bp.annotations);
+    else setAnnotations([]);
     if (bp.phaseConfigs && typeof bp.phaseConfigs === 'object') {
       setPhaseConfigs((prev) => ({ ...prev, ...bp.phaseConfigs }));
     }
@@ -1232,6 +1256,11 @@ export default function App() {
     [conduits, selectedId, selectedKind]
   );
 
+  const selectedAnnotation = useMemo(
+    () => (selectedKind === 'annotation' ? annotations.find((a) => a.id === selectedId) : null),
+    [annotations, selectedId, selectedKind]
+  );
+
   const filteredBlueprints = useMemo(() => {
     const q = cloudSearchQuery.trim().toLowerCase();
     if (!q) return savedBlueprints;
@@ -1281,7 +1310,7 @@ export default function App() {
         ...prev,
         [newKey]: {
           label: cleanName,
-          color: circuitForm.color || '#8b5cf6',
+          color: circuitForm.color || '#7c3aed',
         },
       }));
 
@@ -1470,6 +1499,7 @@ export default function App() {
     const nextCages = generateCagesFromModules(generatedModules);
     const nextObjects = newProjectForm.clearExistingObjects ? [] : objects;
     const nextConduits = newProjectForm.clearExistingObjects ? [] : conduits;
+    const nextAnnotations = newProjectForm.clearExistingObjects ? [] : annotations;
 
     setCompanyInfo(updatedInfo);
     setModules(generatedModules);
@@ -1477,6 +1507,7 @@ export default function App() {
     if (newProjectForm.clearExistingObjects) {
       setObjects([]);
       setConduits([]);
+      setAnnotations([]);
     }
     setSelectedId(null);
     setSelectedKind(null);
@@ -1502,6 +1533,7 @@ export default function App() {
         companyInfo: updatedInfo,
         objects: nextObjects,
         conduits: nextConduits,
+        annotations: nextAnnotations,
         cages: nextCages,
         modules: generatedModules,
         phaseConfigs,
@@ -1550,7 +1582,7 @@ export default function App() {
   };
 
   // ============================================================================
-  // FUNCIONES DE COPIAR, CORTAR, PEGAR Y DUPLICAR (EQUIPOS, JAULAS Y CANALIZACIONES)
+  // FUNCIONES DE COPIAR, CORTAR, PEGAR Y DUPLICAR
   // ============================================================================
   const copySelectedToClipboard = () => {
     if (selectedObject) {
@@ -1569,6 +1601,11 @@ export default function App() {
         data: { ...selectedConduit, points: selectedConduit.points.map((p) => ({ ...p })) },
       });
       notify(`Canalización "${selectedConduit.tag}" copiada (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    if (selectedAnnotation) {
+      setClipboardItem({ kind: 'annotation', data: { ...selectedAnnotation } });
+      notify('Figura / texto copiado (Ctrl+V para pegar)', 'info');
       return true;
     }
     return false;
@@ -1594,6 +1631,12 @@ export default function App() {
       });
       deleteConduit(selectedConduit.id, true);
       notify(`Canalización "${selectedConduit.tag}" cortada (Ctrl+V para pegar)`, 'info');
+      return true;
+    }
+    if (selectedAnnotation) {
+      setClipboardItem({ kind: 'annotation', data: { ...selectedAnnotation } });
+      deleteAnnotation(selectedAnnotation.id, true);
+      notify('Figura / texto cortado (Ctrl+V para pegar)', 'info');
       return true;
     }
     return false;
@@ -1676,6 +1719,21 @@ export default function App() {
     notify(`Canalización pegada como "${clonedConduit.tag}"`, 'success');
   };
 
+  const duplicateAnnotation = (sourceAnn, offsetX = 28, offsetY = 28) => {
+    if (!sourceAnn) return;
+    pushHistory();
+    const cloned = {
+      ...sourceAnn,
+      id: `ANN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      x: Math.round(sourceAnn.x + offsetX),
+      y: Math.round(sourceAnn.y + offsetY),
+    };
+    setAnnotations((prev) => [...prev, cloned]);
+    setSelectedId(cloned.id);
+    setSelectedKind('annotation');
+    notify('Elemento gráfico pegado en el plano', 'success');
+  };
+
   const pasteFromClipboard = () => {
     if (!clipboardItem) return;
     if (clipboardItem.kind === 'object') {
@@ -1702,6 +1760,11 @@ export default function App() {
             }
           : null
       );
+    } else if (clipboardItem.kind === 'annotation') {
+      duplicateAnnotation(clipboardItem.data, 28, 28);
+      setClipboardItem((prev) =>
+        prev ? { ...prev, data: { ...prev.data, x: prev.data.x + 28, y: prev.data.y + 28 } } : null
+      );
     }
   };
 
@@ -1713,14 +1776,12 @@ export default function App() {
       const tag = e.target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
-      // Deshacer: Ctrl + Z (sin Shift)
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         handleUndo();
         return;
       }
 
-      // Rehacer: Ctrl + Y o Ctrl + Shift + Z
       if (
         ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
         ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
@@ -1730,7 +1791,6 @@ export default function App() {
         return;
       }
 
-      // Desplazamiento fino con Shift + Flechas (1 px) o Flechas (4 px)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         const step = e.shiftKey ? 1 : 4;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
@@ -1742,6 +1802,17 @@ export default function App() {
           setObjects((prev) =>
             prev.map((o) =>
               o.id === selectedObject.id ? { ...o, x: o.x + dx, y: o.y + dy } : o
+            )
+          );
+          return;
+        }
+
+        if (selectedAnnotation) {
+          e.preventDefault();
+          if (!e.repeat) pushHistory();
+          setAnnotations((prev) =>
+            prev.map((a) =>
+              a.id === selectedAnnotation.id ? { ...a, x: a.x + dx, y: a.y + dy } : a
             )
           );
           return;
@@ -1834,6 +1905,9 @@ export default function App() {
         } else if (selectedConduit) {
           e.preventDefault();
           duplicateConduit(selectedConduit);
+        } else if (selectedAnnotation) {
+          e.preventDefault();
+          duplicateAnnotation(selectedAnnotation);
         }
         return;
       }
@@ -1848,6 +1922,9 @@ export default function App() {
         } else if (selectedConduit) {
           e.preventDefault();
           deleteConduit(selectedConduit.id);
+        } else if (selectedAnnotation) {
+          e.preventDefault();
+          deleteAnnotation(selectedAnnotation.id);
         }
         return;
       }
@@ -1878,11 +1955,13 @@ export default function App() {
     selectedCage,
     selectedConduit,
     selectedModule,
+    selectedAnnotation,
     lockCages,
     clipboardItem,
     objects,
     cages,
     conduits,
+    annotations,
     modules,
     pastHistory,
     futureHistory,
@@ -1892,7 +1971,6 @@ export default function App() {
     drawingPoints,
   ]);
 
-  // Líneas magnéticas dinámicas calculadas a partir de los bordes reales de cada jaula y pasillo estándar
   const walkwayLines = useMemo(() => {
     const xsSet = new Set();
     const ysSet = new Set();
@@ -2010,8 +2088,44 @@ export default function App() {
   };
 
   // ============================================================================
-  // CREAR JAULA CON SEPARACIÓN ESTÁNDAR FIJA (SIN DESPLAZAMIENTO LIBRE AL DIBUJAR)
+  // INSERTAR CUADRO DE TEXTO O FIGURA BÁSICA EN EL PLANO
   // ============================================================================
+  const placeAnnotationAtCoords = (rawX, rawY) => {
+    pushHistory();
+    const shapeType = placeShapeTemplate?.shapeType || 'text';
+    const isText = shapeType === 'text';
+    const isArrowOrLine = shapeType === 'arrow' || shapeType === 'line';
+
+    const newAnnotation = {
+      id: `ANN-${Date.now()}`,
+      shapeType,
+      text: isText ? 'Nota / Texto Técnico' : '',
+      x: Math.round(rawX),
+      y: Math.round(rawY),
+      width: isText ? 170 : isArrowOrLine ? 110 : 76,
+      height: isText ? 42 : isArrowOrLine ? 24 : 76,
+      strokeColor: '#0284c7',
+      fillColor: isText ? '#ffffff' : '#bae6fd',
+      fillOpacity: isText ? 0.95 : 0.35,
+      strokeWidth: 2.5,
+      fontSize: 12,
+      textColor: '#0f172a',
+      rotation: 0,
+    };
+
+    setAnnotations((prev) => [...prev, newAnnotation]);
+    setSelectedId(newAnnotation.id);
+    setSelectedKind('annotation');
+    setActiveTool('select');
+    if (isText) {
+      setShowRightSidebar(true);
+    }
+    notify(
+      `${placeShapeTemplate?.label || 'Elemento'} insertado (doble clic para editar propiedades)`,
+      'success'
+    );
+  };
+
   const placeCageAtCoords = (rawX, rawY) => {
     pushHistory();
     const meters = Math.max(5, Number(newCageSizeMeters) || 30);
@@ -2071,6 +2185,11 @@ export default function App() {
       return;
     }
 
+    if (activeTool === 'place_shape') {
+      placeAnnotationAtCoords(coords.x, coords.y);
+      return;
+    }
+
     if (activeTool === 'draw_cage') {
       placeCageAtCoords(coords.x, coords.y);
       return;
@@ -2116,6 +2235,17 @@ export default function App() {
           obj.id === draggingObjId
             ? { ...obj, x: snapped.x, y: snapped.y, moduleId: modId }
             : obj
+        )
+      );
+      return;
+    }
+
+    if (draggingAnnotationId) {
+      const nextX = Math.round(coords.x - dragOffset.x);
+      const nextY = Math.round(coords.y - dragOffset.y);
+      setAnnotations((prev) =>
+        prev.map((ann) =>
+          ann.id === draggingAnnotationId ? { ...ann, x: nextX, y: nextY } : ann
         )
       );
       return;
@@ -2168,6 +2298,7 @@ export default function App() {
     setDraggingObjId(null);
     setDraggingCageId(null);
     setDraggingModuleId(null);
+    setDraggingAnnotationId(null);
     setIsPanning(false);
   };
 
@@ -2187,6 +2318,7 @@ export default function App() {
       setDraggingObjId(null);
       setDraggingCageId(null);
       setDraggingModuleId(null);
+      setDraggingAnnotationId(null);
       return;
     }
 
@@ -2196,6 +2328,11 @@ export default function App() {
 
       if (activeTool === 'place') {
         placeSymbolAtCoords(coords.x, coords.y);
+        return;
+      }
+
+      if (activeTool === 'place_shape') {
+        placeAnnotationAtCoords(coords.x, coords.y);
         return;
       }
 
@@ -2264,6 +2401,7 @@ export default function App() {
     setDraggingObjId(null);
     setDraggingCageId(null);
     setDraggingModuleId(null);
+    setDraggingAnnotationId(null);
     setIsPanning(false);
   };
 
@@ -2272,6 +2410,14 @@ export default function App() {
     pushHistory();
     setObjects((prev) =>
       prev.map((obj) => (obj.id === selectedObject.id ? { ...obj, [field]: value } : obj))
+    );
+  };
+
+  const updateSelectedAnnotation = (field, value) => {
+    if (!selectedAnnotation) return;
+    pushHistory();
+    setAnnotations((prev) =>
+      prev.map((ann) => (ann.id === selectedAnnotation.id ? { ...ann, [field]: value } : ann))
     );
   };
 
@@ -2335,6 +2481,16 @@ export default function App() {
       setSelectedKind(null);
     }
     if (!silent) notify('Equipo eliminado del plano', 'warn');
+  };
+
+  const deleteAnnotation = (id, silent = false) => {
+    pushHistory();
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
+    if (selectedId === id) {
+      setSelectedId(null);
+      setSelectedKind(null);
+    }
+    if (!silent) notify('Elemento gráfico eliminado del plano', 'warn');
   };
 
   const deleteConduit = (id, silent = false) => {
@@ -2403,6 +2559,7 @@ export default function App() {
           setCages(data.cages);
           setObjects(data.objects);
           if (Array.isArray(data.conduits)) setConduits(data.conduits);
+          if (Array.isArray(data.annotations)) setAnnotations(data.annotations);
           if (data.phaseConfigs && typeof data.phaseConfigs === 'object') {
             setPhaseConfigs((prev) => ({ ...prev, ...data.phaseConfigs }));
           }
@@ -2445,6 +2602,17 @@ export default function App() {
       minY = Math.min(...activeBounds.map((b) => b.boxY - 90)) - 20;
       maxX = Math.max(...activeBounds.map((b) => b.boxX + b.totalW)) + 60;
       maxY = Math.max(...activeBounds.map((b) => b.boxY + b.totalH)) + 60;
+    }
+
+    if (annotations.length > 0) {
+      const annMinX = Math.min(...annotations.map((a) => a.x - (a.width || 100)));
+      const annMinY = Math.min(...annotations.map((a) => a.y - (a.height || 60)));
+      const annMaxX = Math.max(...annotations.map((a) => a.x + (a.width || 100)));
+      const annMaxY = Math.max(...annotations.map((a) => a.y + (a.height || 60)));
+      minX = Math.min(minX, annMinX - 30);
+      minY = Math.min(minY, annMinY - 30);
+      maxX = Math.max(maxX, annMaxX + 30);
+      maxY = Math.max(maxY, annMaxY + 30);
     }
 
     const exportWidth = Math.max(800, Math.round(maxX - minX));
@@ -2613,8 +2781,9 @@ export default function App() {
         <style>
           @page { margin: 8mm; }
           body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
-          .logo-bar { margin-bottom: 10px; display: flex; align-items: center; }
-          .logo { max-height: 76px; max-width: 280px; object-fit: contain; }
+          .header-pdf { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 12px; }
+          .logo { max-height: 70px; max-width: 240px; object-fit: contain; }
+          .platform-title { flex: 1; text-align: center; font-size: 14px; font-weight: 800; letter-spacing: 0.4px; color: #0f172a; }
           .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #ffffff; margin-bottom: 10px; }
           .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
           .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
@@ -2636,7 +2805,11 @@ export default function App() {
         </style>
       </head>
       <body>
-        ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
+        <div class="header-pdf">
+          ${companyInfo.logoDataUrl ? `<img src="${companyInfo.logoDataUrl}" class="logo" />` : '<div></div>'}
+          <div class="platform-title">PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO</div>
+          <div style="width:80px;"></div>
+        </div>
 
         <div class="plan-box">${svgString}</div>
 
@@ -2752,6 +2925,182 @@ export default function App() {
     };
   }, [objects, cages]);
 
+  // Renderizado SVG de Cuadro de Texto y Figuras Básicas
+  const renderAnnotationGraphic = (ann, isSelected) => {
+    const w = Math.max(20, Number(ann.width) || 100);
+    const h = Math.max(16, Number(ann.height) || 50);
+    const halfW = w / 2;
+    const halfH = h / 2;
+    const rot = Number(ann.rotation) || 0;
+    const stroke = ann.strokeColor || '#0284c7';
+    const fill = ann.fillColor || '#ffffff';
+    const fillOpacity = ann.fillOpacity ?? 0.35;
+    const strokeWidth = Number(ann.strokeWidth) || 2.5;
+    const fontSize = Number(ann.fontSize) || 12;
+    const textColor = ann.textColor || '#0f172a';
+    const lines = (ann.text || '').split('\n');
+
+    return (
+      <g transform={`rotate(${rot})`}>
+        {isSelected && (
+          <rect
+            x={-halfW - 6}
+            y={-halfH - 6}
+            width={w + 12}
+            height={h + 12}
+            rx="6"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="1.8"
+            strokeDasharray="4 3"
+          />
+        )}
+
+        {ann.shapeType === 'text' && (
+          <g>
+            <rect
+              x={-halfW}
+              y={-halfH}
+              width={w}
+              height={h}
+              rx="6"
+              fill={fill}
+              fillOpacity={fillOpacity}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+            />
+            {lines.map((line, idx) => {
+              const offsetY = (idx - (lines.length - 1) / 2) * (fontSize + 4) + fontSize * 0.35;
+              return (
+                <text
+                  key={idx}
+                  x="0"
+                  y={offsetY}
+                  textAnchor="middle"
+                  fontSize={fontSize}
+                  fontWeight="700"
+                  fill={textColor}
+                >
+                  {line}
+                </text>
+              );
+            })}
+          </g>
+        )}
+
+        {ann.shapeType === 'rect' && (
+          <rect
+            x={-halfW}
+            y={-halfH}
+            width={w}
+            height={h}
+            rx="4"
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+          />
+        )}
+
+        {ann.shapeType === 'circle' && (
+          <ellipse
+            cx="0"
+            cy="0"
+            rx={halfW}
+            ry={halfH}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+          />
+        )}
+
+        {ann.shapeType === 'triangle' && (
+          <polygon
+            points={`0,${-halfH} ${halfW},${halfH} ${-halfW},${halfH}`}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+        )}
+
+        {ann.shapeType === 'diamond' && (
+          <polygon
+            points={`0,${-halfH} ${halfW},0 0,${halfH} ${-halfW},0`}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+        )}
+
+        {ann.shapeType === 'line' && (
+          <g>
+            <line
+              x1={-halfW}
+              y1="0"
+              x2={halfW}
+              y2="0"
+              stroke="transparent"
+              strokeWidth="14"
+            />
+            <line
+              x1={-halfW}
+              y1="0"
+              x2={halfW}
+              y2="0"
+              stroke={stroke}
+              strokeWidth={strokeWidth + 1}
+              strokeLinecap="round"
+            />
+          </g>
+        )}
+
+        {ann.shapeType === 'arrow' && (
+          <g>
+            <rect
+              x={-halfW}
+              y={-12}
+              width={w}
+              height={24}
+              fill="transparent"
+            />
+            <line
+              x1={-halfW}
+              y1="0"
+              x2={halfW - 14}
+              y2="0"
+              stroke={stroke}
+              strokeWidth={strokeWidth + 1.2}
+              strokeLinecap="round"
+            />
+            <polygon
+              points={`${halfW},0 ${halfW - 16},-9 ${halfW - 16},9`}
+              fill={stroke}
+            />
+          </g>
+        )}
+
+        {/* Texto opcional centrado dentro de figuras geométricas */}
+        {ann.shapeType !== 'text' && ann.text && ann.text.trim() !== '' && (
+          <text
+            x="0"
+            y={fontSize * 0.35}
+            textAnchor="middle"
+            fontSize={fontSize}
+            fontWeight="800"
+            fill={textColor}
+          >
+            {ann.text}
+          </text>
+        )}
+      </g>
+    );
+  };
+
   const renderSymbolGraphic = (obj, isSelected) => {
     const phaseColor = phaseConfigs[obj.phase]?.color || '#0284c7';
     const effectiveColor = obj.customColor && obj.customColor.trim() ? obj.customColor.trim() : phaseColor;
@@ -2773,7 +3122,6 @@ export default function App() {
           />
         )}
 
-        {/* Grupo transformado con rotación y volteo asimétrico (tipo espejo) */}
         <g transform={`scale(${scaleX}, ${scaleY}) rotate(${rot})`}>
           {obj.type === 'luminaria' ? (
             <g>
@@ -2938,7 +3286,6 @@ export default function App() {
           )}
         </g>
 
-        {/* Indicador de Estado Operativo (sin espejar) */}
         <circle
           cx="13"
           cy="-13"
@@ -2948,7 +3295,6 @@ export default function App() {
           strokeWidth="1.8"
         />
 
-        {/* Etiqueta TAG del equipo */}
         {showLabels && (
           <g transform="translate(0, 26)">
             <rect
@@ -3006,7 +3352,7 @@ export default function App() {
       case 'zap':
         return <Zap className="w-4 h-4" style={{ color: colorOverride || '#ef4444' }} />;
       case 'radio':
-        return <Radio className="w-4 h-4" style={{ color: colorOverride || '#ef4444' }} />;
+        return <Radio className="w-4 h-4" style={{ color: colorOverride || '#dc2626' }} />;
       case 'cpu':
         return <Cpu className="w-4 h-4" style={{ color: colorOverride || '#06b6d4' }} />;
       case 'camera':
@@ -3016,9 +3362,50 @@ export default function App() {
     }
   };
 
+  const renderShapeIcon = (shapeType) => {
+    switch (shapeType) {
+      case 'text':
+        return <Type className="w-4 h-4 text-sky-600" />;
+      case 'arrow':
+        return <ArrowRight className="w-4 h-4 text-sky-600" />;
+      case 'rect':
+        return <Square className="w-4 h-4 text-sky-600" />;
+      case 'circle':
+        return <Circle className="w-4 h-4 text-sky-600" />;
+      case 'triangle':
+        return <Triangle className="w-4 h-4 text-sky-600" />;
+      case 'diamond':
+        return <Diamond className="w-4 h-4 text-sky-600" />;
+      default:
+        return <Minus className="w-4 h-4 text-sky-600" />;
+    }
+  };
+
+  // Renderizador reutilizable de paleta de 32 colores básicos
+  const renderBasic32ColorGrid = (selectedHex, onSelectHex) => (
+    <div className="grid grid-cols-8 gap-1 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70">
+      {BASIC_32_COLORS.map((hex) => {
+        const isCurrent = (selectedHex || '').toLowerCase() === hex.toLowerCase();
+        return (
+          <button
+            key={hex}
+            type="button"
+            onClick={() => onSelectHex(hex)}
+            className={`w-5 h-5 rounded-md border transition-transform hover:scale-110 ${
+              isCurrent
+                ? 'ring-2 ring-sky-500 border-white scale-110'
+                : 'border-slate-300 dark:border-slate-600'
+            }`}
+            style={{ backgroundColor: hex }}
+            title={hex.toUpperCase()}
+          />
+        );
+      })}
+    </div>
+  );
+
   const mapsHref = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
 
-  // Cálculo dinámico de línea troncal entre módulos activos
   const trunkCoords = useMemo(() => {
     if (modules.length < 2) return null;
     const b1 = moduleBoundsMap[modules[0].id];
@@ -3043,59 +3430,65 @@ export default function App() {
       }`}
     >
       {/* ====================================================================
-          BARRA SUPERIOR DE HERRAMIENTAS Y ACCIONES
+          BARRA SUPERIOR DE HERRAMIENTAS Y TÍTULO CENTRADO
       ==================================================================== */}
       <header
         className={`z-30 border-b px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-xs ${
           darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}
       >
-        {/* Identidad Empresa con Espacio Ampliado para Logo */}
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Izquierda: Identidad Empresa */}
+        <div className="flex items-center gap-2.5 min-w-0">
           {companyInfo.logoDataUrl ? (
             <div
               onClick={() => logoInputRef.current?.click()}
               title="Haz clic para cambiar logotipo"
-              className="h-12 min-w-[140px] max-w-[240px] rounded-xl border border-slate-200/80 bg-white px-2.5 py-1 flex items-center justify-center cursor-pointer shadow-xs shrink-0"
+              className="h-11 min-w-[110px] max-w-[190px] rounded-xl border border-slate-200/80 bg-white px-2 py-1 flex items-center justify-center cursor-pointer shadow-xs shrink-0"
             >
               <img
                 src={companyInfo.logoDataUrl}
                 alt="Logo Empresa"
-                className="max-h-10 w-auto max-w-full object-contain"
+                className="max-h-9 w-auto max-w-full object-contain"
               />
             </div>
           ) : (
             <div
               onClick={() => logoInputRef.current?.click()}
               title="Haz clic para subir tu logotipo"
-              className="h-12 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-sm flex items-center gap-2 shadow-xs cursor-pointer shrink-0 transition-colors"
+              className="h-11 px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 transition-colors"
             >
-              <Building2 className="w-5 h-5" />
+              <Building2 className="w-4 h-4" />
               <span>BEQA</span>
             </div>
           )}
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xs sm:text-sm font-extrabold truncate">
+          <div className="min-w-0 hidden sm:block">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-extrabold truncate">
                 {companyInfo.companyName}
-              </h1>
+              </span>
               <button
                 onClick={() => setShowCompanyModal(true)}
-                className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25 transition-colors"
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25 transition-colors"
               >
-                Configurar Empresa / Firma
+                Configurar
               </button>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-              {companyInfo.centerName} · {companyInfo.projectName}
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
+              {companyInfo.centerName}
             </p>
           </div>
         </div>
 
-        {/* Acciones Principales */}
+        {/* Centro: Título Principal Centrado */}
+        <div className="flex-1 text-center px-2 min-w-[220px]">
+          <h1 className="text-xs sm:text-sm md:text-base font-extrabold tracking-wide uppercase text-sky-700 dark:text-sky-400">
+            PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO
+          </h1>
+        </div>
+
+        {/* Derecha: Acciones Principales */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* Botones Deshacer (Ctrl+Z) y Rehacer (Ctrl+Y) */}
           <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             <button
               onClick={handleUndo}
@@ -3108,7 +3501,6 @@ export default function App() {
               title="Deshacer última acción (Ctrl+Z)"
             >
               <Undo2 className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline">Deshacer</span>
             </button>
             <button
               onClick={handleRedo}
@@ -3124,7 +3516,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* Botón Fijar / Bloquear Jaulas */}
           <button
             onClick={() => {
               setLockCages((v) => {
@@ -3148,7 +3539,7 @@ export default function App() {
             title="Fijar jaulas para no modificar su distribución al mover simbología"
           >
             {lockCages ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{lockCages ? 'Jaulas Fijas' : 'Jaulas Libres'}</span>
+            <span className="hidden xl:inline">{lockCages ? 'Jaulas Fijas' : 'Jaulas Libres'}</span>
           </button>
 
           <button
@@ -3175,10 +3566,11 @@ export default function App() {
               });
               setShowNewProjectModal(true);
             }}
-            className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition-colors"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 shadow-xs transition-colors"
+            title="Nuevo Proyecto"
           >
             <FolderPlus className="w-3.5 h-3.5" />
-            <span>Nuevo Proyecto</span>
+            <span className="hidden 2xl:inline">Nuevo</span>
           </button>
 
           <button
@@ -3186,23 +3578,24 @@ export default function App() {
               setCloudSearchQuery('');
               setShowCloudModal(true);
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-colors ${
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
               darkMode
                 ? 'bg-slate-800 border-slate-700 text-sky-300 hover:bg-slate-700'
                 : 'bg-sky-50 border-sky-200 text-sky-800 hover:bg-sky-100'
             }`}
+            title="Proyectos en la Nube"
           >
             <FolderOpen className="w-3.5 h-3.5 text-sky-500" />
-            <span>Proyectos ({savedBlueprints.length})</span>
+            <span>({savedBlueprints.length})</span>
           </button>
 
           <button
             onClick={() => handleSaveToCloud()}
             disabled={isSavingCloud}
-            className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-60"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1 shadow-xs transition-colors disabled:opacity-60"
+            title="Guardar en la Nube"
           >
             <CloudUpload className="w-3.5 h-3.5" />
-            <span>{isSavingCloud ? 'Guardando...' : 'Guardar'}</span>
             <span
               className={`w-2 h-2 rounded-full ${
                 cloudStatus === 'connected'
@@ -3216,30 +3609,30 @@ export default function App() {
 
           <button
             onClick={() => setSnapToWalkway((v) => !v)}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
+            className={`p-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
               snapToWalkway
                 ? 'bg-blue-600 text-white border-blue-600'
                 : darkMode
                 ? 'bg-slate-800 border-slate-700 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700'
             }`}
+            title="Imán de pasillos"
           >
             <Magnet className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Imán</span>
           </button>
 
           <button
             onClick={() => setShowLabels((v) => !v)}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
+            className={`p-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 transition-colors ${
               showLabels
                 ? 'bg-indigo-600 text-white border-indigo-600'
                 : darkMode
                 ? 'bg-slate-800 border-slate-700 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700'
             }`}
+            title="Mostrar/Ocultar etiquetas"
           >
             <Eye className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Etiquetas</span>
           </button>
 
           <button
@@ -3251,36 +3644,38 @@ export default function App() {
             }`}
             title="Modo Oscuro / Claro"
           >
-            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {darkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </button>
 
           <button
             onClick={() => setShowInventoryModal(true)}
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white flex items-center gap-1"
+            title="Resumen e Inventario de Equipos"
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Inventario ({objects.length})</span>
+            <span>({objects.length})</span>
           </button>
 
           <button
             onClick={handleExportPNG}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1"
+            className="px-2 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1"
+            title="Exportar PNG"
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            <span>PNG</span>
           </button>
 
           <button
             onClick={() => setShowPreviewModal(true)}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-700 hover:bg-slate-800 text-white flex items-center gap-1"
+            className="px-2 py-1.5 rounded-xl text-xs font-bold bg-slate-700 hover:bg-slate-800 text-white flex items-center gap-1"
+            title="Vista Previa Lámina Técnica"
           >
             <MonitorPlay className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Vista Previa</span>
           </button>
 
           <button
             onClick={handleExportPDF}
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1"
+            title="Exportar PDF"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>PDF</span>
@@ -3288,14 +3683,14 @@ export default function App() {
 
           <button
             onClick={() => jsonInputRef.current?.click()}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${
+            className={`p-1.5 rounded-xl text-xs font-bold border flex items-center gap-1 ${
               darkMode
                 ? 'bg-slate-800 border-slate-700 text-slate-200'
                 : 'bg-white border-slate-200 text-slate-700'
             }`}
+            title="Cargar JSON"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Cargar</span>
           </button>
           <input
             ref={jsonInputRef}
@@ -3314,7 +3709,7 @@ export default function App() {
             }`}
             title="Pantalla Completa"
           >
-            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Expand className="w-4 h-4" />}
+            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
           </button>
         </div>
       </header>
@@ -3423,27 +3818,6 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-1 pt-1">
-                  {Object.entries(CONDUIT_PHASE_CONFIG).map(([key, cfg]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setConduitPhase(key)}
-                      className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[10px] font-bold border text-left ${
-                        conduitPhase === key
-                          ? 'border-sky-500 bg-sky-500/10'
-                          : 'border-transparent hover:bg-slate-200/50 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: cfg.color }}
-                      />
-                      <span className="truncate">{cfg.short}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* 2. Dibujar Jaula con Separación Estándar */}
@@ -3519,63 +3893,42 @@ export default function App() {
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-500 leading-tight">
-                  <strong>Doble clic</strong> abre Inspector · <strong>Shift+Flecha</strong> ajuste fino · <strong>Ctrl+Z/Y</strong> deshace/rehace.
-                </p>
               </div>
             </div>
 
-            {/* Identidad y Firma PDF */}
+            {/* CUADROS DE TEXTO Y FIGURAS BÁSICAS */}
             <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Identidad y Firma PDF
-                </span>
-                <button
-                  onClick={() => setShowCompanyModal(true)}
-                  className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline"
-                >
-                  Editar
-                </button>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                Cuadro de Texto y Figuras
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {BASIC_SHAPES_CATALOG.map((shape) => {
+                  const isActiveShape =
+                    activeTool === 'place_shape' &&
+                    placeShapeTemplate?.shapeType === shape.shapeType;
+                  return (
+                    <button
+                      key={shape.shapeType}
+                      type="button"
+                      onClick={() => {
+                        setPlaceShapeTemplate(shape);
+                        setActiveTool('place_shape');
+                        notify(`Haz clic en el plano para insertar: ${shape.label}`, 'info');
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-left text-xs font-bold transition-all ${
+                        isActiveShape
+                          ? 'border-sky-500 bg-sky-500/15 ring-1 ring-sky-500'
+                          : darkMode
+                          ? 'border-slate-800 bg-slate-800/60 hover:border-slate-700'
+                          : 'border-slate-200 bg-slate-50 hover:border-sky-400'
+                      }`}
+                    >
+                      {renderShapeIcon(shape.shapeType)}
+                      <span className="truncate">{shape.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => logoInputRef.current?.click()}
-                  className={`p-2.5 rounded-xl border border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
-                    darkMode
-                      ? 'border-slate-700 hover:border-sky-500 bg-slate-800/60'
-                      : 'border-slate-300 hover:border-sky-500 bg-slate-50'
-                  }`}
-                >
-                  <Upload className="w-4 h-4 text-sky-500" />
-                  <span>Insertar Logo</span>
-                </button>
-                <button
-                  onClick={() => signatureInputRef.current?.click()}
-                  className={`p-2.5 rounded-xl border border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
-                    darkMode
-                      ? 'border-slate-700 hover:border-emerald-500 bg-slate-800/60'
-                      : 'border-slate-300 hover:border-emerald-500 bg-slate-50'
-                  }`}
-                >
-                  <Edit3 className="w-4 h-4 text-emerald-500" />
-                  <span>Insertar Firma</span>
-                </button>
-              </div>
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, 'logoDataUrl')}
-                className="hidden"
-              />
-              <input
-                ref={signatureInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, 'signatureDataUrl')}
-                className="hidden"
-              />
             </div>
 
             {/* PALETA DE SIMBOLOGÍA EDITABLE Y EXTENSIBLE */}
@@ -3679,7 +4032,7 @@ export default function App() {
                         <option value="plug">Enchufe 220V</option>
                         <option value="eye">Fotocelda</option>
                         <option value="zap">Tablero IP66</option>
-                        <option value="radio">Energizador</option>
+                        <option value="radio">Energizador / Cerco</option>
                         <option value="cpu">Sensor / Sonda</option>
                         <option value="camera">Cámara PTZ</option>
                         <option value="compass">Alimentador</option>
@@ -3706,42 +4059,36 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 items-end">
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Sistema / Circuito
-                      </label>
-                      <select
-                        value={catalogForm.phase}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({ ...prev, phase: e.target.value }))
-                        }
-                        className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-700 text-white'
-                            : 'bg-white border-slate-300 text-slate-900'
-                        }`}
-                      >
-                        {Object.entries(phaseConfigs).map(([key, val]) => (
-                          <option key={key} value={key}>
-                            {val.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Color
-                      </label>
-                      <input
-                        type="color"
-                        value={catalogForm.customColor || phaseConfigs[catalogForm.phase]?.color || '#1d4ed8'}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({ ...prev, customColor: e.target.value }))
-                        }
-                        className="w-full h-7 rounded-lg cursor-pointer border border-slate-300 dark:border-slate-700"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                      Sistema / Circuito
+                    </label>
+                    <select
+                      value={catalogForm.phase}
+                      onChange={(e) =>
+                        setCatalogForm((prev) => ({ ...prev, phase: e.target.value }))
+                      }
+                      className={`w-full px-2 py-1.5 text-xs rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    >
+                      {Object.entries(phaseConfigs).map(([key, val]) => (
+                        <option key={key} value={key}>
+                          {val.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                      Color Básico (32 colores)
+                    </label>
+                    {renderBasic32ColorGrid(catalogForm.customColor, (hex) =>
+                      setCatalogForm((prev) => ({ ...prev, customColor: hex }))
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -3820,8 +4167,61 @@ export default function App() {
               </div>
             </div>
 
+            {/* Identidad y Firma PDF */}
+            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Identidad y Firma PDF
+                </span>
+                <button
+                  onClick={() => setShowCompanyModal(true)}
+                  className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline"
+                >
+                  Editar
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => logoInputRef.current?.click()}
+                  className={`p-2 rounded-xl border border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                    darkMode
+                      ? 'border-slate-700 hover:border-sky-500 bg-slate-800/60'
+                      : 'border-slate-300 hover:border-sky-500 bg-slate-50'
+                  }`}
+                >
+                  <Upload className="w-4 h-4 text-sky-500" />
+                  <span>Insertar Logo</span>
+                </button>
+                <button
+                  onClick={() => signatureInputRef.current?.click()}
+                  className={`p-2 rounded-xl border border-dashed text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors ${
+                    darkMode
+                      ? 'border-slate-700 hover:border-emerald-500 bg-slate-800/60'
+                      : 'border-slate-300 hover:border-emerald-500 bg-slate-50'
+                  }`}
+                >
+                  <Edit3 className="w-4 h-4 text-emerald-500" />
+                  <span>Insertar Firma</span>
+                </button>
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, 'logoDataUrl')}
+                className="hidden"
+              />
+              <input
+                ref={signatureInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, 'signatureDataUrl')}
+                className="hidden"
+              />
+            </div>
+
             {/* Filtros de Capas y Búsqueda */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
                 Filtros de Capas
               </span>
@@ -3941,10 +4341,22 @@ export default function App() {
               </div>
             )}
 
+            {activeTool === 'place_shape' && (
+              <div className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
+                <span>Haz clic en el plano para insertar: {placeShapeTemplate?.label}</span>
+                <button
+                  onClick={() => setActiveTool('select')}
+                  className="px-1.5 py-0.5 bg-white/20 rounded-md hover:bg-white/30"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
             {activeTool === 'draw_cage' && (
               <div className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
                 <span>
-                  Haz clic en el plano para insertar Jaula ({newCageSizeMeters}m × {newCageSizeMeters}m) con separación estándar
+                  Haz clic en el plano para insertar Jaula ({newCageSizeMeters}m × {newCageSizeMeters}m)
                 </span>
                 <button
                   onClick={() => setActiveTool('select')}
@@ -4040,7 +4452,7 @@ export default function App() {
             <rect id="sea-grid-bg" width="100%" height="100%" fill="url(#seaGrid)" />
 
             <g id="plan-viewport" transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              {/* Estructuras de Módulos y Pasillos (Zona Gris Autoajustada a las Jaulas) */}
+              {/* Estructuras de Módulos y Pasillos */}
               {modules.map((mod) => {
                 const bounds = moduleBoundsMap[mod.id];
                 if (!bounds || !bounds.hasCages) return null;
@@ -4054,7 +4466,6 @@ export default function App() {
 
                 return (
                   <g key={mod.id}>
-                    {/* Cuadro de texto con el nombre del módulo autoajustado al texto */}
                     <g
                       transform={`translate(${headerX}, ${headerY})`}
                       onMouseDown={(e) => {
@@ -4113,7 +4524,6 @@ export default function App() {
                       )}
                     </g>
 
-                    {/* Zona gris que se adapta automáticamente a la cantidad de jaulas */}
                     <rect
                       x={bounds.boxX}
                       y={bounds.boxY}
@@ -4180,7 +4590,7 @@ export default function App() {
                 </g>
               )}
 
-              {/* Jaulas de Cultivo (Fijas por defecto; clic selecciona, doble clic abre inspector) */}
+              {/* Jaulas de Cultivo */}
               {cages.map((cage) => {
                 const isSel = selectedKind === 'cage' && selectedId === cage.id;
                 const displayText = cage.label !== undefined ? cage.label : String(cage.number);
@@ -4220,7 +4630,6 @@ export default function App() {
                       strokeWidth={isSel ? '3.5' : '1.8'}
                     />
 
-                    {/* Halo de Fotoperiodo Activo */}
                     {cage.photoperiodActive && (
                       <>
                         <circle
@@ -4240,7 +4649,6 @@ export default function App() {
                       </>
                     )}
 
-                    {/* Etiqueta de la jaula */}
                     {cage.showLabel !== false && displayText !== '' && (
                       <text
                         x={cage.size / 2}
@@ -4254,7 +4662,6 @@ export default function App() {
                       </text>
                     )}
 
-                    {/* Cota de dimensión real en metros */}
                     <text
                       x={cage.size / 2}
                       y={cage.size - 8}
@@ -4440,7 +4847,38 @@ export default function App() {
                 </g>
               )}
 
-              {/* Equipos Eléctricos y Luminarias (Clic arrastra/selecciona, Doble Clic abre Inspector) */}
+              {/* Cuadros de Texto y Figuras Básicas */}
+              {annotations.map((ann) => {
+                const isSel = selectedKind === 'annotation' && selectedId === ann.id;
+                return (
+                  <g
+                    key={ann.id}
+                    transform={`translate(${ann.x}, ${ann.y})`}
+                    onMouseDown={(e) => {
+                      if (activeTool !== 'select' || e.button !== 0) return;
+                      e.stopPropagation();
+                      pushHistory();
+                      const coords = clientToSvgCoords(e.clientX, e.clientY);
+                      setSelectedId(ann.id);
+                      setSelectedKind('annotation');
+                      setDraggingAnnotationId(ann.id);
+                      setDragOffset({ x: coords.x - ann.x, y: coords.y - ann.y });
+                    }}
+                    onDoubleClick={(e) => {
+                      if (activeTool !== 'select') return;
+                      e.stopPropagation();
+                      setSelectedId(ann.id);
+                      setSelectedKind('annotation');
+                      setShowRightSidebar(true);
+                    }}
+                    className="cursor-move"
+                  >
+                    {renderAnnotationGraphic(ann, isSel)}
+                  </g>
+                );
+              })}
+
+              {/* Equipos Eléctricos y Luminarias */}
               {filteredObjects.map((obj) => {
                 const isSel = selectedKind === 'object' && selectedId === obj.id;
                 return (
@@ -4586,7 +5024,7 @@ export default function App() {
         </main>
 
         {/* ====================================================================
-            PANEL DERECHO DESPLEGABLE SUPERPUESTO (SE ABRE CON DOBLE CLIC EN OBJETO)
+            PANEL DERECHO DESPLEGABLE SUPERPUESTO
         ==================================================================== */}
         {showRightSidebar && (
           <aside
@@ -4625,8 +5063,174 @@ export default function App() {
               </div>
             </div>
 
-            {/* EDITOR DE EQUIPO SELECCIONADO */}
-            {selectedObject ? (
+            {/* EDITOR DE CUADRO DE TEXTO O FIGURA BÁSICA */}
+            {selectedAnnotation ? (
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-indigo-500">
+                      Elemento Gráfico / Anotación
+                    </span>
+                    <h2 className="text-lg font-extrabold">
+                      {BASIC_SHAPES_CATALOG.find((s) => s.shapeType === selectedAnnotation.shapeType)?.label ||
+                        'Figura'}
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={copySelectedToClipboard}
+                      className="p-2 rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300 hover:bg-slate-500/25"
+                      title="Copiar (Ctrl+C)"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={cutSelectedToClipboard}
+                      className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
+                      title="Cortar (Ctrl+X)"
+                    >
+                      <Scissors className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteAnnotation(selectedAnnotation.id)}
+                      className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                      title="Eliminar (Supr)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    {selectedAnnotation.shapeType === 'text'
+                      ? 'Contenido del Cuadro de Texto'
+                      : 'Etiqueta / Texto Interior (Opcional)'}
+                  </label>
+                  <textarea
+                    rows={selectedAnnotation.shapeType === 'text' ? 3 : 1}
+                    placeholder="Escribe el texto aquí..."
+                    value={selectedAnnotation.text || ''}
+                    onChange={(e) => updateSelectedAnnotation('text', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold mb-1">Ancho (px)</label>
+                    <input
+                      type="number"
+                      min="20"
+                      max="800"
+                      value={selectedAnnotation.width || 100}
+                      onChange={(e) => updateSelectedAnnotation('width', Number(e.target.value))}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold mb-1">Alto (px)</label>
+                    <input
+                      type="number"
+                      min="16"
+                      max="800"
+                      value={selectedAnnotation.height || 50}
+                      onChange={(e) => updateSelectedAnnotation('height', Number(e.target.value))}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold mb-1">Letra (px)</label>
+                    <input
+                      type="number"
+                      min="8"
+                      max="48"
+                      value={selectedAnnotation.fontSize || 12}
+                      onChange={(e) => updateSelectedAnnotation('fontSize', Number(e.target.value))}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">
+                    Color de Borde / Flecha / Línea (32 colores)
+                  </label>
+                  {renderBasic32ColorGrid(selectedAnnotation.strokeColor, (hex) =>
+                    updateSelectedAnnotation('strokeColor', hex)
+                  )}
+                </div>
+
+                {selectedAnnotation.shapeType !== 'arrow' &&
+                  selectedAnnotation.shapeType !== 'line' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold">Color de Fondo / Relleno</label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateSelectedAnnotation(
+                              'fillOpacity',
+                              selectedAnnotation.fillOpacity === 0 ? 0.35 : 0
+                            )
+                          }
+                          className="text-[10px] font-extrabold text-sky-600 dark:text-sky-400 hover:underline"
+                        >
+                          {selectedAnnotation.fillOpacity === 0 ? 'Activar relleno' : 'Sin relleno (transparente)'}
+                        </button>
+                      </div>
+                      {renderBasic32ColorGrid(selectedAnnotation.fillColor, (hex) => {
+                        updateSelectedAnnotation('fillColor', hex);
+                        if (selectedAnnotation.fillOpacity === 0) {
+                          updateSelectedAnnotation('fillOpacity', 0.45);
+                        }
+                      })}
+                    </div>
+                  )}
+
+                <div>
+                  <label className="block text-xs font-bold mb-1">Color del Texto</label>
+                  {renderBasic32ColorGrid(selectedAnnotation.textColor, (hex) =>
+                    updateSelectedAnnotation('textColor', hex)
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-xs font-bold mb-1">
+                    <span>Rotación (°)</span>
+                    <span className="text-sky-500 font-extrabold">
+                      {selectedAnnotation.rotation || 0}°
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="1"
+                    value={selectedAnnotation.rotation || 0}
+                    onChange={(e) => updateSelectedAnnotation('rotation', Number(e.target.value))}
+                    className="w-full accent-sky-600"
+                  />
+                </div>
+              </div>
+            ) : selectedObject ? (
+              /* EDITOR DE EQUIPO SELECCIONADO */
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -4725,7 +5329,7 @@ export default function App() {
                   />
                 </div>
 
-                {/* Sistema / Circuito con creación y edición directa */}
+                {/* Sistema / Circuito con Luces Perimetrales, Cerco Eléctrico y creación/edición */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold">Sistema / Circuito</label>
@@ -4756,7 +5360,7 @@ export default function App() {
                           setCircuitForm({
                             key: '',
                             label: '',
-                            color: '#8b5cf6',
+                            color: '#7c3aed',
                           });
                           setCircuitEditorMode(circuitEditorMode === 'create' ? null : 'create');
                         }}
@@ -4816,30 +5420,23 @@ export default function App() {
                           ? 'Modificar Tipo de Circuito'
                           : 'Crear Nuevo Tipo de Circuito'}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nombre del circuito (Ej. Respaldo UPS)"
-                          value={circuitForm.label}
-                          onChange={(e) =>
-                            setCircuitForm((p) => ({ ...p, label: e.target.value }))
-                          }
-                          className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs border ${
-                            darkMode
-                              ? 'bg-slate-900 border-slate-700 text-white'
-                              : 'bg-white border-slate-300 text-slate-900'
-                          }`}
-                        />
-                        <input
-                          type="color"
-                          value={circuitForm.color}
-                          onChange={(e) =>
-                            setCircuitForm((p) => ({ ...p, color: e.target.value }))
-                          }
-                          className="w-8 h-7 rounded cursor-pointer border border-slate-300"
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nombre del circuito (Ej. Respaldo UPS)"
+                        value={circuitForm.label}
+                        onChange={(e) =>
+                          setCircuitForm((p) => ({ ...p, label: e.target.value }))
+                        }
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs border ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      />
+                      {renderBasic32ColorGrid(circuitForm.color, (hex) =>
+                        setCircuitForm((p) => ({ ...p, color: hex }))
+                      )}
                       <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
@@ -4859,12 +5456,12 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Selector de Color de la Simbología */}
+                {/* Paleta de 32 Colores Básicos para la Simbología */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-bold flex items-center gap-1.5">
                       <Palette className="w-3.5 h-3.5 text-sky-500" />
-                      <span>Color de la Simbología</span>
+                      <span>Color de la Simbología (32 colores)</span>
                     </label>
                     {selectedObject.customColor && (
                       <button
@@ -4872,38 +5469,13 @@ export default function App() {
                         onClick={() => updateSelectedObject('customColor', '')}
                         className="text-[10px] font-extrabold text-sky-600 dark:text-sky-400 hover:underline"
                       >
-                        Usar color del circuito
+                        Usar color circuito
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <input
-                      type="color"
-                      value={
-                        selectedObject.customColor ||
-                        (selectedObject.type === 'luminaria'
-                          ? '#1d4ed8'
-                          : phaseConfigs[selectedObject.phase]?.color || '#0284c7')
-                      }
-                      onChange={(e) => updateSelectedObject('customColor', e.target.value)}
-                      className="w-8 h-7 rounded-lg cursor-pointer border border-slate-300 dark:border-slate-700 shrink-0"
-                      title="Elegir color personalizado"
-                    />
-                    {SYMBOL_COLOR_PRESETS.map((hex) => (
-                      <button
-                        key={hex}
-                        type="button"
-                        onClick={() => updateSelectedObject('customColor', hex)}
-                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                          selectedObject.customColor === hex
-                            ? 'border-sky-400 scale-110'
-                            : 'border-white dark:border-slate-800'
-                        }`}
-                        style={{ backgroundColor: hex }}
-                        title={`Aplicar color ${hex}`}
-                      />
-                    ))}
-                  </div>
+                  {renderBasic32ColorGrid(selectedObject.customColor, (hex) =>
+                    updateSelectedObject('customColor', hex)
+                  )}
                 </div>
 
                 {/* Volteo Asimétrico (Tipo Espejo) */}
@@ -5257,7 +5829,7 @@ export default function App() {
                 </div>
               </div>
             ) : selectedModule ? (
-              /* EDITOR DE TÍTULO DE MÓDULO (CON CENTRADO AUTOMÁTICO Y ANCHO DINÁMICO) */
+              /* EDITOR DE TÍTULO DE MÓDULO */
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -5304,35 +5876,23 @@ export default function App() {
                   />
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  El tamaño del cuadro se ajusta automáticamente al texto. Puedes arrastrarlo o usar <strong>Shift + Flechas</strong> para alinearlo con precisión.
+                  El tamaño del cuadro se ajusta automáticamente al texto. Puedes arrastrarlo libremente o usar el botón Centrar.
                 </p>
               </div>
             ) : selectedKind === 'trunk' ? (
-              /* EDITOR DE ETIQUETA TRONCAL */
+              /* EDITOR DE LÍNEA TRONCAL */
               <div className="space-y-3.5">
+                <span className="text-[10px] font-extrabold uppercase text-sky-500">
+                  Troncal Submarina entre Módulos
+                </span>
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                    Etiqueta Troncal
-                  </span>
-                  <h2 className="text-lg font-extrabold">Línea Interconexión</h2>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold">Texto Troncal</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowTrunkLabel(false)}
-                      className="text-[11px] font-bold text-rose-500 hover:underline"
-                    >
-                      Ocultar / Eliminar
-                    </button>
-                  </div>
+                  <label className="block text-xs font-bold mb-1">Texto de Etiqueta</label>
                   <input
                     type="text"
                     value={trunkLabel}
                     onChange={(e) => {
+                      pushHistory();
                       setTrunkLabel(e.target.value);
-                      setShowTrunkLabel(true);
                     }}
                     className={`w-full px-3 py-2 rounded-xl text-sm font-bold border ${
                       darkMode
@@ -5341,47 +5901,29 @@ export default function App() {
                     }`}
                   />
                 </div>
+                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-bold">Mostrar Etiqueta en Plano</span>
+                  <input
+                    type="checkbox"
+                    checked={showTrunkLabel}
+                    onChange={(e) => {
+                      pushHistory();
+                      setShowTrunkLabel(e.target.checked);
+                    }}
+                    className="w-4 h-4 accent-sky-600"
+                  />
+                </div>
               </div>
             ) : (
-              /* RESUMEN DE CABLEADO POR FASE CUANDO NO HAY ELEMENTO SELECCIONADO */
-              <div className="space-y-3">
-                <div className="text-xs text-slate-500 text-center py-2">
-                  <Info className="w-6 h-6 mx-auto text-sky-500 opacity-80 mb-1" />
-                  <p>
-                    Haz <strong>doble clic</strong> sobre cualquier equipo, canalización, jaula o encabezado para editar sus propiedades.
-                  </p>
-                </div>
-
-                <div
-                  className={`p-3 rounded-xl border space-y-2 ${
-                    darkMode
-                      ? 'bg-slate-800/60 border-slate-700'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                    Cubicación de Cable por Fase
-                  </div>
-                  {cableSummaryByPhase.map((item) => (
-                    <div
-                      key={item.phase}
-                      className="flex items-center justify-between text-xs py-1 border-b last:border-b-0 border-slate-200/60 dark:border-slate-700/60"
-                    >
-                      <span className="flex items-center gap-1.5 font-bold">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span>{item.label}</span>
-                      </span>
-                      <span className="font-extrabold">{item.totalMeters} m</span>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between text-xs font-extrabold pt-1 text-sky-600 dark:text-sky-400">
-                    <span>Total Cableado:</span>
-                    <span>{totalCableMeters} m</span>
-                  </div>
-                </div>
+              /* VISTA POR DEFECTO SIN ELEMENTO SELECCIONADO */
+              <div className="py-10 text-center space-y-2 text-slate-400">
+                <Info className="w-8 h-8 mx-auto text-sky-500/70" />
+                <p className="text-xs font-bold">
+                  Haz doble clic sobre cualquier equipo, figura, texto, canalización o jaula del plano para editar sus propiedades.
+                </p>
+                <p className="text-[11px]">
+                  Usa <strong>Ctrl+Z</strong> para deshacer, <strong>Ctrl+Y</strong> para rehacer y <strong>Shift + Flechas</strong> para ajuste fino.
+                </p>
               </div>
             )}
           </aside>
@@ -5389,193 +5931,158 @@ export default function App() {
       </div>
 
       {/* ====================================================================
-          MODAL: NUEVO PROYECTO (CON CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS)
+          MODAL: CREAR NUEVO PROYECTO CON DISTRIBUCIÓN DE JAULAS
       ==================================================================== */}
       {showNewProjectModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div
-            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${
-              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleCreateNewProject}
+            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between shrink-0">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-emerald-600 text-white">
               <div className="flex items-center gap-2">
                 <FolderPlus className="w-5 h-5" />
                 <div>
-                  <h3 className="text-base font-extrabold">Nuevo Proyecto de Instalación</h3>
-                  <p className="text-xs text-emerald-100">
-                    Define los datos del centro y la distribución inicial de trenes y jaulas
+                  <h3 className="text-sm font-extrabold">
+                    Crear Nuevo Proyecto y Configurar Distribución de Jaulas
+                  </h3>
+                  <p className="text-[11px] text-emerald-100">
+                    Define la identificación del centro, trenes de cultivo, cantidad de filas/columnas y tamaño de jaulas
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowNewProjectModal(false)}
-                className="p-1 rounded-lg hover:bg-white/20"
+                className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewProject} className="p-5 space-y-3.5 text-xs overflow-y-auto">
-              <div>
-                <label className="block font-bold mb-1">Nombre del Proyecto *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Instalación Fotoperiodo Tren Norte y Sur"
-                  value={newProjectForm.projectName}
-                  onChange={(e) =>
-                    setNewProjectForm((prev) => ({ ...prev, projectName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border text-sm font-semibold ${
+            <div className="p-5 space-y-4 overflow-y-auto text-xs">
+              {/* Identificación del Proyecto */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  1. Identificación del Proyecto y Centro
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold mb-1">Nombre del Proyecto *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Instalación Fotoperiodo Ciclo 2026"
+                      value={newProjectForm.projectName}
+                      onChange={(e) =>
+                        setNewProjectForm((p) => ({ ...p, projectName: e.target.value }))
+                      }
+                      className={`w-full px-3 py-2 rounded-xl border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold mb-1">Nombre del Centro / Pontón *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Centro Engorda Isla Quinchao"
+                      value={newProjectForm.centerName}
+                      onChange={(e) =>
+                        setNewProjectForm((p) => ({ ...p, centerName: e.target.value }))
+                      }
+                      className={`w-full px-3 py-2 rounded-xl border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold mb-1">Cliente / Empresa Mandante</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Salmones Austral S.A."
+                      value={newProjectForm.clientName}
+                      onChange={(e) =>
+                        setNewProjectForm((p) => ({ ...p, clientName: e.target.value }))
+                      }
+                      className={`w-full px-3 py-2 rounded-xl border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold mb-1">Coordenadas Geográficas</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. -42.451200, -73.512400"
+                      value={newProjectForm.coordinates}
+                      onChange={(e) =>
+                        setNewProjectForm((p) => ({ ...p, coordinates: e.target.value }))
+                      }
+                      className={`w-full px-3 py-2 rounded-xl border ${
+                        darkMode
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Configuración de Trenes y Distribución de Jaulas */}
+              <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                  2. Configuración de Trenes de Cultivo y Jaulas (Separación Estándar)
+                </div>
+
+                {/* Módulo 1 */}
+                <div
+                  className={`p-3.5 rounded-xl border space-y-2.5 ${
                     darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-300 text-slate-900'
+                      ? 'bg-slate-800/70 border-slate-700'
+                      : 'bg-sky-50/70 border-sky-200'
                   }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Nombre del Cliente *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Salmones Austral S.A."
-                    value={newProjectForm.clientName}
-                    onChange={(e) =>
-                      setNewProjectForm((prev) => ({ ...prev, clientName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-300 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold mb-1">Nombre del Centro *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Centro Engorda Canal Dalcahue"
-                    value={newProjectForm.centerName}
-                    onChange={(e) =>
-                      setNewProjectForm((prev) => ({ ...prev, centerName: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-300 text-slate-900'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Descripción del Proyecto</label>
-                <input
-                  type="text"
-                  placeholder="Breve resumen técnico del alcance, potencia o equipamiento..."
-                  value={newProjectForm.projectDescription}
-                  onChange={(e) =>
-                    setNewProjectForm((prev) => ({ ...prev, projectDescription: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border text-xs ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-300 text-slate-900'
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. -42.381240, -73.654120"
-                    value={newProjectForm.coordinates}
-                    onChange={(e) =>
-                      setNewProjectForm((prev) => ({ ...prev, coordinates: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs font-mono ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-300 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold mb-1">Enlace Google Maps (Opcional)</label>
-                  <input
-                    type="url"
-                    placeholder="https://maps.google.com/..."
-                    value={newProjectForm.googleMapsUrl}
-                    onChange={(e) =>
-                      setNewProjectForm((prev) => ({ ...prev, googleMapsUrl: e.target.value }))
-                    }
-                    className={`w-full px-3 py-2 rounded-xl border text-xs ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-300 text-slate-900'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* CONFIGURACIÓN DE DISTRIBUCIÓN DE JAULAS */}
-              <div
-                className={`p-3.5 rounded-2xl border space-y-3 ${
-                  darkMode
-                    ? 'bg-slate-800/70 border-slate-700'
-                    : 'bg-sky-50/70 border-sky-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
-                    <Grid className="w-4 h-4" />
-                    <span>Configuración y Distribución de Jaulas (Separación Estándar)</span>
-                  </span>
-                  <span className="text-[11px] font-extrabold text-slate-500">
-                    Total:{' '}
-                    {(Number(newProjectForm.mod1Rows) || 1) *
-                      (Number(newProjectForm.mod1Cols) || 1) +
-                      (newProjectForm.hasMod2
-                        ? (Number(newProjectForm.mod2Rows) || 1) *
-                          (Number(newProjectForm.mod2Cols) || 1)
-                        : 0)}{' '}
-                    jaulas
-                  </span>
-                </div>
-
-                {/* Tren / Módulo 1 */}
-                <div className="space-y-2">
-                  <div className="text-[11px] font-extrabold text-slate-500">
-                    Tren / Módulo Principal
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                      Tren Principal (Módulo 1)
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-500">
+                      Total: {(Number(newProjectForm.mod1Rows) || 1) * (Number(newProjectForm.mod1Cols) || 1)} jaulas
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Nombre
-                      </label>
+                      <label className="block text-[10px] font-bold mb-0.5">Nombre</label>
                       <input
                         type="text"
                         value={newProjectForm.mod1Name}
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, mod1Name: e.target.value }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
-                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Filas
-                      </label>
+                      <label className="block text-[10px] font-bold mb-0.5">Filas</label>
                       <input
                         type="number"
                         min="1"
@@ -5584,15 +6091,15 @@ export default function App() {
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, mod1Rows: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
-                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Columnas
-                      </label>
+                      <label className="block text-[10px] font-bold mb-0.5">Columnas</label>
                       <input
                         type="number"
                         min="1"
@@ -5601,15 +6108,15 @@ export default function App() {
                         onChange={(e) =>
                           setNewProjectForm((p) => ({ ...p, mod1Cols: Number(e.target.value) }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
-                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        N° Inicial
-                      </label>
+                      <label className="block text-[10px] font-bold mb-0.5">N° Inicial</label>
                       <input
                         type="number"
                         min="1"
@@ -5620,15 +6127,15 @@ export default function App() {
                             mod1StartNumber: Number(e.target.value),
                           }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
-                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Tamaño (m)
-                      </label>
+                      <label className="block text-[10px] font-bold mb-0.5">Lado Jaula (m)</label>
                       <input
                         type="number"
                         min="5"
@@ -5640,51 +6147,65 @@ export default function App() {
                             mod1CageMeters: Number(e.target.value),
                           }))
                         }
-                        className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
-                          darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                        className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-700 text-white'
+                            : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Tren / Módulo 2 (Opcional) */}
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newProjectForm.hasMod2}
-                      onChange={(e) =>
-                        setNewProjectForm((p) => ({ ...p, hasMod2: e.target.checked }))
-                      }
-                      className="w-4 h-4 accent-sky-600"
-                    />
-                    <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
-                      Incluir Segundo Tren / Módulo de Jaulas
-                    </span>
-                  </label>
+                {/* Módulo 2 Opcional */}
+                <div
+                  className={`p-3.5 rounded-xl border space-y-2.5 ${
+                    darkMode
+                      ? 'bg-slate-800/70 border-slate-700'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 font-extrabold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newProjectForm.hasMod2}
+                        onChange={(e) =>
+                          setNewProjectForm((p) => ({ ...p, hasMod2: e.target.checked }))
+                        }
+                        className="w-4 h-4 accent-emerald-600"
+                      />
+                      <span>Incluir Segundo Tren de Cultivo (Módulo 2)</span>
+                    </label>
+                    {newProjectForm.hasMod2 && (
+                      <span className="text-[11px] font-bold text-slate-500">
+                        Total:{' '}
+                        {(Number(newProjectForm.mod2Rows) || 1) *
+                          (Number(newProjectForm.mod2Cols) || 1)}{' '}
+                        jaulas
+                      </span>
+                    )}
+                  </div>
 
                   {newProjectForm.hasMod2 && (
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       <div className="col-span-2 sm:col-span-1">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          Nombre
-                        </label>
+                        <label className="block text-[10px] font-bold mb-0.5">Nombre</label>
                         <input
                           type="text"
                           value={newProjectForm.mod2Name}
                           onChange={(e) =>
                             setNewProjectForm((p) => ({ ...p, mod2Name: e.target.value }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
-                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                            darkMode
+                              ? 'bg-slate-900 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          Filas
-                        </label>
+                        <label className="block text-[10px] font-bold mb-0.5">Filas</label>
                         <input
                           type="number"
                           min="1"
@@ -5693,15 +6214,15 @@ export default function App() {
                           onChange={(e) =>
                             setNewProjectForm((p) => ({ ...p, mod2Rows: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
-                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                            darkMode
+                              ? 'bg-slate-900 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          Columnas
-                        </label>
+                        <label className="block text-[10px] font-bold mb-0.5">Columnas</label>
                         <input
                           type="number"
                           min="1"
@@ -5710,15 +6231,15 @@ export default function App() {
                           onChange={(e) =>
                             setNewProjectForm((p) => ({ ...p, mod2Cols: Number(e.target.value) }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
-                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                            darkMode
+                              ? 'bg-slate-900 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          N° Inicial
-                        </label>
+                        <label className="block text-[10px] font-bold mb-0.5">N° Inicial</label>
                         <input
                           type="number"
                           min="1"
@@ -5729,15 +6250,15 @@ export default function App() {
                               mod2StartNumber: Number(e.target.value),
                             }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold ${
-                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                            darkMode
+                              ? 'bg-slate-900 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          Tamaño (m)
-                        </label>
+                        <label className="block text-[10px] font-bold mb-0.5">Lado Jaula (m)</label>
                         <input
                           type="number"
                           min="5"
@@ -5749,8 +6270,10 @@ export default function App() {
                               mod2CageMeters: Number(e.target.value),
                             }))
                           }
-                          className={`w-full px-2 py-1.5 rounded-lg border text-xs font-extrabold ${
-                            darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
+                          className={`w-full px-2 py-1.5 rounded-lg border font-bold ${
+                            darkMode
+                              ? 'bg-slate-900 border-slate-700 text-white'
+                              : 'bg-white border-slate-300 text-slate-900'
                           }`}
                         />
                       </div>
@@ -5759,222 +6282,365 @@ export default function App() {
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 pt-1 cursor-pointer">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
                 <input
+                  id="clearExistingObjCheck"
                   type="checkbox"
                   checked={newProjectForm.clearExistingObjects}
                   onChange={(e) =>
-                    setNewProjectForm((prev) => ({
-                      ...prev,
-                      clearExistingObjects: e.target.checked,
-                    }))
+                    setNewProjectForm((p) => ({ ...p, clearExistingObjects: e.target.checked }))
                   }
                   className="w-4 h-4 accent-emerald-600"
                 />
-                <span className="font-semibold">
-                  Iniciar con el plano limpio (sin equipos ni canalizaciones previas)
-                </span>
-              </label>
+                <label htmlFor="clearExistingObjCheck" className="font-bold cursor-pointer">
+                  Iniciar plano limpio (sin equipos ni canalizaciones previas)
+                </label>
+              </div>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowNewProjectModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+              >
+                <FolderPlus className="w-4 h-4" />
+                <span>Generar Proyecto</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ====================================================================
+          MODAL: VISTA PREVIA LÁMINA TÉCNICA DE IMPRESIÓN PDF
+      ==================================================================== */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-6xl max-h-[92vh] rounded-2xl bg-white text-slate-900 shadow-2xl border border-slate-300 flex flex-col overflow-hidden">
+            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MonitorPlay className="w-5 h-5 text-sky-400" />
+                <span className="text-sm font-extrabold">
+                  Vista Previa Lámina Técnica · {companyInfo.centerName}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  onClick={() => setShowNewProjectModal(false)}
-                  className="px-4 py-2 rounded-xl font-bold bg-slate-200 dark:bg-slate-800"
+                  onClick={handleExportPDF}
+                  className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1.5"
                 >
-                  Cancelar
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir / Guardar PDF</span>
                 </button>
                 <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
                 >
-                  Crear Proyecto
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 bg-white">
+              <div className="flex items-center justify-between gap-4">
+                {companyInfo.logoDataUrl ? (
+                  <img
+                    src={companyInfo.logoDataUrl}
+                    alt="Logo"
+                    className="max-h-16 max-w-[230px] object-contain"
+                  />
+                ) : (
+                  <div className="w-16" />
+                )}
+                <div className="flex-1 text-center font-extrabold text-sm tracking-wide uppercase text-slate-900">
+                  PLATAFORMA DE DISTRIBUCION EQUIPOS EN CENTROS DE CULTIVO
+                </div>
+                <div className="w-16" />
+              </div>
+
+              <div
+                className="border-2 border-slate-300 rounded-xl p-2 bg-white overflow-hidden"
+                dangerouslySetInnerHTML={{
+                  __html: generateSvgStringForExport(true) || '',
+                }}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 border-2 border-slate-900 text-xs">
+                <div className="p-2.5 border-b md:border-b-0 md:border-r border-slate-900">
+                  <div className="text-[9px] font-extrabold uppercase text-slate-500">Proyecto</div>
+                  <div className="font-extrabold text-slate-900">{companyInfo.projectName}</div>
+                  {companyInfo.projectDescription && (
+                    <div className="text-[11px] text-slate-600 mt-0.5">
+                      {companyInfo.projectDescription}
+                    </div>
+                  )}
+                </div>
+                <div className="p-2.5 border-b md:border-b-0 md:border-r border-slate-900">
+                  <div className="text-[9px] font-extrabold uppercase text-slate-500">
+                    Cliente / Mandante
+                  </div>
+                  <div className="font-extrabold text-slate-900">{companyInfo.clientName}</div>
+                </div>
+                <div className="p-2.5">
+                  <div className="text-[9px] font-extrabold uppercase text-slate-500">
+                    Centro y Coordenadas
+                  </div>
+                  <div className="font-extrabold text-slate-900">{companyInfo.centerName}</div>
+                  {companyInfo.coordinates && (
+                    <a
+                      href={mapsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-sky-600 hover:underline flex items-center gap-1 mt-0.5"
+                    >
+                      <MapPin className="w-3 h-3" />
+                      <span>{companyInfo.coordinates}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="p-3 rounded-xl border border-slate-300 bg-slate-50">
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Jaulas Totales</div>
+                  <div className="text-base font-extrabold">{cages.length} Unidades</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 bg-slate-50">
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Con Fotoperiodo</div>
+                  <div className="text-base font-extrabold">{metrics.activeCages} Jaulas</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 bg-slate-50">
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Equipos</div>
+                  <div className="text-base font-extrabold">{objects.length} Unidades</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 bg-slate-50">
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Potencia Total</div>
+                  <div className="text-base font-extrabold">{metrics.totalPowerKw} kW</div>
+                </div>
+                <div className="p-3 rounded-xl border border-slate-300 bg-slate-50">
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Cableado Total</div>
+                  <div className="text-base font-extrabold text-sky-700">{totalCableMeters} m</div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-end pt-4 border-t border-slate-300">
+                <div className="text-sm font-extrabold tracking-wide text-slate-900">
+                  {companyInfo.companyName}
+                </div>
+                <div className="w-64 text-center border-t border-slate-800 pt-2 text-xs">
+                  {companyInfo.signatureDataUrl ? (
+                    <img
+                      src={companyInfo.signatureDataUrl}
+                      alt="Firma"
+                      className="max-h-12 mx-auto mb-1 object-contain"
+                    />
+                  ) : (
+                    <div className="h-8" />
+                  )}
+                  <div className="font-extrabold">{companyInfo.responsibleName}</div>
+                  <div>{companyInfo.responsibleRole}</div>
+                  <div className="text-slate-500 text-[11px]">{companyInfo.responsibleLicense}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL: BASE DE DATOS DE PROYECTOS EN LA NUBE (FIREBASE FIRESTORE)
+          MODAL: RESUMEN DE EQUIPOS Y CUBICACIÓN DE CABLEADO
       ==================================================================== */}
-      {showCloudModal && (
+      {showInventoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-3xl max-h-[88vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
-              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            className={`w-full max-w-5xl max-h-[88vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-sky-600 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Cloud className="w-5 h-5" />
-                <div>
-                  <h3 className="text-base font-extrabold">
-                    Base de Datos de Proyectos en la Nube
-                  </h3>
-                  <p className="text-xs text-sky-100">
-                    Búsqueda por centro, cliente o proyecto · Sincronización en tiempo real
-                  </p>
-                </div>
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold">
+                  Resumen de Equipos por Componente Genérico / Marca y Cubicación de Cable
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {companyInfo.centerName} · {objects.length} equipos agrupados · {totalCableMeters} m de cable total
+                </p>
               </div>
               <button
-                onClick={() => setShowCloudModal(false)}
-                className="p-1.5 rounded-xl hover:bg-white/20"
+                onClick={() => setShowInventoryModal(false)}
+                className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold"
               >
-                <X className="w-5 h-5" />
+                Cerrar
               </button>
             </div>
 
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-2.5">
-              <input
-                type="text"
-                placeholder="Buscar proyecto por nombre de centro, cliente o código..."
-                value={cloudSearchQuery}
-                onChange={(e) => setCloudSearchQuery(e.target.value)}
-                className={`w-full px-3.5 py-2 rounded-xl text-xs font-semibold border ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-700 text-white'
-                    : 'bg-slate-50 border-slate-300 text-slate-900'
-                }`}
-              />
-
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Nombre del centro / proyecto actual..."
-                  value={blueprintNameInput}
-                  onChange={(e) => setBlueprintNameInput(e.target.value)}
-                  className={`flex-1 min-w-[200px] px-3 py-2 rounded-xl text-xs font-bold border ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
-                />
-                <button
-                  onClick={() => handleSaveToCloud(currentBlueprintId, blueprintNameInput)}
-                  disabled={isSavingCloud}
-                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Guardar Actual</span>
-                </button>
-                <button
-                  onClick={() =>
-                    handleSaveToCloud(`plano-${Date.now()}`, `${blueprintNameInput} (Copia)`)
-                  }
-                  disabled={isSavingCloud}
-                  className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Guardar Como Nuevo</span>
-                </button>
+            <div className="p-5 overflow-auto space-y-6">
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2">
+                  1. Resumen de Equipos Instalados (Agrupados por Componente Genérico y Marca)
+                </h4>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800 text-white">
+                      <th className="p-2.5 text-center">Cant.</th>
+                      <th className="p-2.5 text-left">Componente Genérico</th>
+                      <th className="p-2.5 text-left">Marca</th>
+                      <th className="p-2.5 text-left">TAGs Agrupados</th>
+                      <th className="p-2.5 text-left">Módulo</th>
+                      <th className="p-2.5 text-left">Características</th>
+                      <th className="p-2.5 text-left">Circuito</th>
+                      <th className="p-2.5 text-right">Pot. Unit.</th>
+                      <th className="p-2.5 text-right">Pot. Total</th>
+                      <th className="p-2.5 text-left">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summarizedEquipment.map((g) => (
+                      <tr
+                        key={g.key}
+                        className="border-b border-slate-200 dark:border-slate-800 hover:bg-sky-500/5"
+                      >
+                        <td className="p-2.5 text-center font-extrabold text-sm">{g.count}</td>
+                        <td className="p-2.5 font-extrabold">{g.genericName}</td>
+                        <td className="p-2.5 font-bold text-sky-600 dark:text-sky-400">{g.brand}</td>
+                        <td className="p-2.5 text-[11px] text-slate-500 dark:text-slate-400 max-w-[180px] truncate" title={g.tagsLabel}>
+                          {g.tagsLabel}
+                        </td>
+                        <td className="p-2.5">{g.modulesLabel}</td>
+                        <td className="p-2.5">{g.spec}</td>
+                        <td className="p-2.5">{phaseConfigs[g.phase]?.label || g.phase}</td>
+                        <td className="p-2.5 text-right">{g.unitPower} W</td>
+                        <td className="p-2.5 text-right font-extrabold">{g.totalPower} W</td>
+                        <td className="p-2.5 font-bold">{g.summaryStatus}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {filteredBlueprints.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-sm">
-                  <Cloud className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                  <p className="font-bold">No se encontraron proyectos con ese criterio</p>
-                  <p className="text-xs mt-1">
-                    Usa "Nuevo Proyecto" o "Guardar Actual" para almacenar tu centro en la nube.
-                  </p>
-                </div>
-              ) : (
-                filteredBlueprints.map((bp) => {
-                  const isCurrent = bp.id === currentBlueprintId;
-                  const displayCenter = bp.companyInfo?.centerName || bp.title || bp.id;
-                  const displayProject = bp.companyInfo?.projectName || bp.projectName || '';
-                  const displayClient = bp.companyInfo?.clientName || bp.clientName || '';
-                  return (
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2">
+                  2. Resumen de Metros de Cable por Fase Eléctrica
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-3">
+                  {cableSummaryByPhase.map((s) => (
                     <div
-                      key={bp.id}
-                      className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
-                        isCurrent
-                          ? 'border-sky-500 bg-sky-500/10'
-                          : darkMode
-                          ? 'border-slate-800 bg-slate-800/50'
-                          : 'border-slate-200 bg-slate-50/70'
+                      key={s.phase}
+                      className={`p-2.5 rounded-xl border ${
+                        darkMode
+                          ? 'bg-slate-800/70 border-slate-700'
+                          : 'bg-slate-50 border-slate-200'
                       }`}
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm truncate">{displayCenter}</span>
-                          {isCurrent && (
-                            <span className="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-extrabold">
-                              Activo
-                            </span>
-                          )}
-                        </div>
-                        {displayProject && (
-                          <div className="text-xs font-semibold text-sky-600 dark:text-sky-400 truncate">
-                            {displayProject} {displayClient ? `· Cliente: ${displayClient}` : ''}
-                          </div>
-                        )}
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {bp.totalCages || 0} jaulas · {bp.totalObjects || 0} equipos ·{' '}
-                          {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString() : 'Sin fecha'}
-                        </div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-extrabold">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: s.color }}
+                        />
+                        <span className="truncate">{s.label}</span>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleLoadFromCloud(bp)}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
-                        >
-                          Abrir Proyecto
-                        </button>
-                        <button
-                          onClick={() => handleDeleteFromCloud(bp.id, displayCenter)}
-                          className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
-                          title="Eliminar de la nube"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <div className="text-base font-extrabold mt-1">{s.totalMeters} m</div>
+                      <div className="text-[10px] text-slate-400">{s.count} tramo(s)</div>
                     </div>
-                  );
-                })
-              )}
+                  ))}
+                </div>
+
+                {conduits.length > 0 && (
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800 text-white">
+                        <th className="p-2.5 text-left">TAG Tramo</th>
+                        <th className="p-2.5 text-left">Fase Eléctrica</th>
+                        <th className="p-2.5 text-left">Especificación Cable</th>
+                        <th className="p-2.5 text-right">Tramo Pasillo</th>
+                        <th className="p-2.5 text-right">Bajada / Holgura</th>
+                        <th className="p-2.5 text-right">Total Cable</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {conduits.map((c) => {
+                        const m = calculateConduitMetrics(c);
+                        const pCfg =
+                          CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                        return (
+                          <tr
+                            key={c.id}
+                            className="border-b border-slate-200 dark:border-slate-800 hover:bg-sky-500/5"
+                          >
+                            <td className="p-2.5 font-extrabold">{c.tag}</td>
+                            <td className="p-2.5 font-bold" style={{ color: pCfg.color }}>
+                              {pCfg.label}
+                            </td>
+                            <td className="p-2.5">{c.cableSpec || '-'}</td>
+                            <td className="p-2.5 text-right">{m.horizontalMeters} m</td>
+                            <td className="p-2.5 text-right">{m.dropMeters} m</td>
+                            <td className="p-2.5 text-right font-extrabold">{m.totalMeters} m</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-sky-500/10 font-extrabold">
+                        <td colSpan={5} className="p-2.5 text-right">
+                          TOTAL GENERAL DE CABLE UTILIZADO:
+                        </td>
+                        <td className="p-2.5 text-right text-sky-600 dark:text-sky-400">
+                          {totalCableMeters} m
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ====================================================================
-          MODAL: CONFIGURAR EMPRESA, PROYECTO, COORDENADAS Y FIRMA DIGITAL
+          MODAL: CONFIGURACIÓN EMPRESA, PROYECTO, COORDENADAS Y FIRMA
       ==================================================================== */}
       {showCompanyModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl p-5 space-y-4 ${
-              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            className={`w-full max-w-xl rounded-2xl border shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <h3 className="text-base font-extrabold">
-                Datos del Proyecto, Empresa y Responsable Técnico
+                Configuración de Proyecto, Empresa y Viñeta Técnica
               </h3>
               <button
                 onClick={() => setShowCompanyModal(false)}
-                className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800"
+                className="text-xs font-bold text-slate-400 hover:text-slate-600"
               >
-                <X className="w-5 h-5" />
+                Cerrar
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="sm:col-span-2">
-                <label className="block font-bold mb-1">Nombre del Proyecto</label>
+              <div>
+                <label className="block font-bold mb-1">Nombre de Empresa Instaladora</label>
                 <input
                   type="text"
-                  value={companyInfo.projectName || ''}
+                  value={companyInfo.companyName}
                   onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                    setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
                   }
-                  className={`w-full px-3 py-2 rounded-xl border font-semibold ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
@@ -5988,7 +6654,41 @@ export default function App() {
                     setCompanyInfo((p) => ({ ...p, clientName: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-bold mb-1">Nombre del Proyecto</label>
+                <input
+                  type="text"
+                  value={companyInfo.projectName}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, projectName: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-bold mb-1">Descripción del Proyecto</label>
+                <textarea
+                  rows={2}
+                  value={companyInfo.projectDescription || ''}
+                  onChange={(e) =>
+                    setCompanyInfo((p) => ({ ...p, projectDescription: e.target.value }))
+                  }
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
@@ -5997,48 +6697,41 @@ export default function App() {
                 <label className="block font-bold mb-1">Centro / Pontón</label>
                 <input
                   type="text"
-                  value={companyInfo.centerName || ''}
-                  onChange={(e) => {
-                    setCompanyInfo((p) => ({ ...p, centerName: e.target.value }));
-                    setBlueprintNameInput(e.target.value);
-                  }}
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block font-bold mb-1">Descripción del Proyecto</label>
-                <input
-                  type="text"
-                  value={companyInfo.projectDescription || ''}
+                  value={companyInfo.centerName}
                   onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, projectDescription: e.target.value }))
+                    setCompanyInfo((p) => ({ ...p, centerName: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Coordenadas (Lat, Lon)</label>
+                <label className="block font-bold mb-1">Coordenadas (Lat, Lng)</label>
                 <input
                   type="text"
                   placeholder="-41.784520, -73.124890"
                   value={companyInfo.coordinates || ''}
                   onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, coordinates: e.target.value }))
+                    setCompanyInfo((p) => ({
+                      ...p,
+                      coordinates: e.target.value,
+                      googleMapsUrl: buildGoogleMapsLink(e.target.value, ''),
+                    }))
                   }
-                  className={`w-full px-3 py-2 rounded-xl border font-mono ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
 
-              <div>
-                <label className="block font-bold mb-1">Enlace Google Maps</label>
+              <div className="sm:col-span-2">
+                <label className="block font-bold mb-1">Enlace Directo a Google Maps</label>
                 <input
                   type="url"
                   placeholder="https://www.google.com/maps/..."
@@ -6047,109 +6740,56 @@ export default function App() {
                     setCompanyInfo((p) => ({ ...p, googleMapsUrl: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Empresa Instaladora (Pie PDF)</label>
+                <label className="block font-bold mb-1">Profesional Responsable</label>
                 <input
                   type="text"
-                  value={companyInfo.companyName || ''}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, companyName: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Responsable Técnico</label>
-                <input
-                  type="text"
-                  value={companyInfo.responsibleName || ''}
+                  value={companyInfo.responsibleName}
                   onChange={(e) =>
                     setCompanyInfo((p) => ({ ...p, responsibleName: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Cargo</label>
+                <label className="block font-bold mb-1">Cargo / Licencia SEC</label>
                 <input
                   type="text"
-                  value={companyInfo.responsibleRole || ''}
-                  onChange={(e) =>
-                    setCompanyInfo((p) => ({ ...p, responsibleRole: e.target.value }))
-                  }
-                  className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold mb-1">Registro / Licencia SEC</label>
-                <input
-                  type="text"
-                  value={companyInfo.responsibleLicense || ''}
+                  value={companyInfo.responsibleLicense}
                   onChange={(e) =>
                     setCompanyInfo((p) => ({ ...p, responsibleLicense: e.target.value }))
                   }
                   className={`w-full px-3 py-2 rounded-xl border ${
-                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                    darkMode
+                      ? 'bg-slate-800 border-slate-700 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
                   }`}
                 />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
-                <div className="text-xs font-bold">Logotipo Empresa</div>
-                {companyInfo.logoDataUrl && (
-                  <img
-                    src={companyInfo.logoDataUrl}
-                    alt="Logo"
-                    className="max-h-14 mx-auto object-contain"
-                  />
-                )}
-                <button
-                  onClick={() => logoInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-bold"
-                >
-                  Subir Logo
-                </button>
-              </div>
-              <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
-                <div className="text-xs font-bold">Firma Digital</div>
-                {companyInfo.signatureDataUrl && (
-                  <img
-                    src={companyInfo.signatureDataUrl}
-                    alt="Firma"
-                    className="max-h-14 mx-auto object-contain"
-                  />
-                )}
-                <button
-                  onClick={() => signatureInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold"
-                >
-                  Subir Firma
-                </button>
               </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
-                onClick={() => setShowCompanyModal(false)}
-                className="px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-extrabold"
+                onClick={() => {
+                  setShowCompanyModal(false);
+                  notify('Datos del proyecto actualizados', 'success');
+                }}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold flex items-center gap-1.5"
               >
-                Listo
+                <Save className="w-4 h-4" />
+                <span>Guardar Configuración</span>
               </button>
             </div>
           </div>
@@ -6157,246 +6797,166 @@ export default function App() {
       )}
 
       {/* ====================================================================
-          MODAL: INVENTARIO RESUMIDO POR COMPONENTE GENÉRICO, MARCA Y CABLEADO
+          MODAL: PROYECTOS GUARDADOS EN LA NUBE (FIREBASE FIRESTORE)
       ==================================================================== */}
-      {showInventoryModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+      {showCloudModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-5xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
-              darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[88vh] ${
+              darkMode
+                ? 'bg-slate-900 border-slate-700 text-slate-100'
+                : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-5 py-4 bg-violet-600 text-white flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold">
-                  Resumen de Equipos Instalados (Componente Genérico y Marca) + Cableado
-                </h3>
-                <p className="text-xs text-violet-100">
-                  {objects.length} equipos instalados · {(metrics.totalPower / 1000).toFixed(2)} kW · {totalCableMeters} m de cable
-                </p>
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Cloud className="w-5 h-5 text-sky-500" />
+                <div>
+                  <h3 className="text-base font-extrabold">
+                    Proyectos Guardados en la Nube
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Búsqueda por centro, cliente o proyecto · Sincronización en tiempo real
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setShowInventoryModal(false)}
-                className="p-1.5 rounded-xl hover:bg-white/20"
+                onClick={() => setShowCloudModal(false)}
+                className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto p-4 space-y-5">
-              <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
-                  1. Equipos Agrupados por Componente Genérico, Marca y Características
-                </h4>
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400">
-                      <th className="py-2 px-2 text-center">Cant.</th>
-                      <th className="py-2 px-2">Componente Genérico</th>
-                      <th className="py-2 px-2">Marca</th>
-                      <th className="py-2 px-2">TAGs Agrupados</th>
-                      <th className="py-2 px-2">Módulo</th>
-                      <th className="py-2 px-2">Características Técnicas</th>
-                      <th className="py-2 px-2">Circuito / Fase</th>
-                      <th className="py-2 px-2 text-right">Pot. Unit.</th>
-                      <th className="py-2 px-2 text-right">Pot. Total</th>
-                      <th className="py-2 px-2">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summarizedEquipment.map((g) => (
-                      <tr key={g.key} className="border-b border-slate-100 dark:border-slate-800">
-                        <td className="py-2 px-2 text-center font-extrabold text-sky-600 dark:text-sky-400">
-                          {g.count}
-                        </td>
-                        <td className="py-2 px-2 font-extrabold">{g.genericName}</td>
-                        <td className="py-2 px-2 font-bold text-indigo-600 dark:text-indigo-400">
-                          {g.brand}
-                        </td>
-                        <td className="py-2 px-2 text-[11px] font-mono">{g.tagsLabel}</td>
-                        <td className="py-2 px-2">{g.modulesLabel}</td>
-                        <td className="py-2 px-2">{g.spec}</td>
-                        <td className="py-2 px-2">
-                          <span
-                            className="inline-flex items-center gap-1.5 font-bold"
-                            style={{ color: phaseConfigs[g.phase]?.color || '#0284c7' }}
-                          >
-                            <span
-                              className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: phaseConfigs[g.phase]?.color || '#0284c7' }}
-                            />
-                            {phaseConfigs[g.phase]?.label || g.phase}
-                          </span>
-                        </td>
-                        <td className="py-2 px-2 text-right">{g.unitPower} W</td>
-                        <td className="py-2 px-2 text-right font-extrabold">{g.totalPower} W</td>
-                        <td className="py-2 px-2">{g.summaryStatus}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div
+                className={`p-3.5 rounded-xl border space-y-2.5 ${
+                  darkMode
+                    ? 'bg-slate-800/70 border-slate-700'
+                    : 'bg-sky-50/70 border-sky-200'
+                }`}
+              >
+                <div className="text-xs font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                  Guardar Proyecto Actual en la Nube
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nombre del centro o proyecto..."
+                    value={blueprintNameInput}
+                    onChange={(e) => setBlueprintNameInput(e.target.value)}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-700 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  />
+                  <button
+                    onClick={() =>
+                      handleSaveToCloud(
+                        blueprintNameInput || currentBlueprintId,
+                        blueprintNameInput || companyInfo.centerName
+                      )
+                    }
+                    disabled={isSavingCloud || !fbUser}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <CloudUpload className="w-4 h-4" />
+                    <span>{isSavingCloud ? 'Guardando...' : 'Guardar en Nube'}</span>
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
-                  2. Cubicación de Canalizaciones y Tramos de Cable por Fase
-                </h4>
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400">
-                      <th className="py-2 px-2">TAG Tramo</th>
-                      <th className="py-2 px-2">Fase Eléctrica</th>
-                      <th className="py-2 px-2">Conductor / Canalización</th>
-                      <th className="py-2 px-2 text-right">Tramo Pasillo</th>
-                      <th className="py-2 px-2 text-right">Bajada / Holgura</th>
-                      <th className="py-2 px-2 text-right">Total Cable</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {conduits.map((c) => {
-                      const m = calculateConduitMetrics(c);
-                      const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Proyectos Disponibles ({filteredBlueprints.length} de {savedBlueprints.length})
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Filtrar por centro, cliente o proyecto..."
+                    value={cloudSearchQuery}
+                    onChange={(e) => setCloudSearchQuery(e.target.value)}
+                    className={`sm:w-64 px-3 py-1.5 rounded-xl text-xs border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                {filteredBlueprints.length === 0 ? (
+                  <div className="p-6 text-center rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-400">
+                    {savedBlueprints.length === 0
+                      ? 'Aún no hay proyectos guardados en la nube. Haz clic en "Guardar en Nube" para almacenar tu primer proyecto.'
+                      : 'No se encontraron proyectos que coincidan con tu búsqueda.'}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredBlueprints.map((bp) => {
+                      const isCurrent = bp.id === currentBlueprintId;
                       return (
-                        <tr key={c.id} className="border-b border-slate-100 dark:border-slate-800">
-                          <td className="py-2 px-2 font-extrabold">{c.tag}</td>
-                          <td className="py-2 px-2 font-bold" style={{ color: pCfg.color }}>
-                            {pCfg.label}
-                          </td>
-                          <td className="py-2 px-2">{c.cableSpec || '-'}</td>
-                          <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
-                          <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
-                          <td className="py-2 px-2 text-right font-extrabold">{m.totalMeters} m</td>
-                        </tr>
+                        <div
+                          key={bp.id}
+                          className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                            isCurrent
+                              ? 'border-sky-500 bg-sky-500/10'
+                              : darkMode
+                              ? 'border-slate-800 bg-slate-800/40'
+                              : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-extrabold truncate">
+                                {bp.centerName || bp.title || bp.id}
+                              </span>
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-600 text-white">
+                                  Activo
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 truncate">
+                              {bp.projectName || 'Sin título'} · Cliente:{' '}
+                              {bp.clientName || 'No indicado'}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {bp.totalCages || 0} jaulas · {bp.totalObjects || 0} equipos · Actualizado:{' '}
+                              {bp.updatedAt ? new Date(bp.updatedAt).toLocaleString() : 'Reciente'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => handleLoadFromCloud(bp)}
+                              className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold"
+                            >
+                              Abrir Proyecto
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFromCloud(bp.id, bp.title || bp.id)}
+                              className="p-2 rounded-xl bg-rose-500/15 text-rose-600 hover:bg-rose-500/25"
+                              title="Eliminar de la nube"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
-                    <tr className="bg-slate-100/70 dark:bg-slate-800/70 font-extrabold">
-                      <td colSpan={5} className="py-2 px-2 text-right">
-                        TOTAL GENERAL DE CABLE UTILIZADO:
-                      </td>
-                      <td className="py-2 px-2 text-right text-sky-600 dark:text-sky-400">
-                        {totalCableMeters} m
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          MODAL: VISTA PREVIA DE LÁMINA TÉCNICA (SIN CUADRÍCULA)
-      ==================================================================== */}
-      {showPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl bg-white text-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-            <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between">
-              <span className="text-sm font-extrabold">
-                Vista Previa de Lámina Técnica (Sin Cuadrícula · Igual a PDF)
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleExportPDF}
-                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-extrabold flex items-center gap-1"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir / Guardar PDF</span>
-                </button>
-                <button
-                  onClick={() => setShowPreviewModal(false)}
-                  className="p-1.5 rounded-xl hover:bg-white/20"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="p-6 overflow-auto bg-slate-100 flex-1 space-y-3">
-              <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm space-y-3">
-                {companyInfo.logoDataUrl && (
-                  <div className="flex items-center">
-                    <img
-                      src={companyInfo.logoDataUrl}
-                      alt="Logo"
-                      className="max-h-16 object-contain"
-                    />
                   </div>
                 )}
-
-                <div
-                  className="border border-slate-300 rounded-lg p-2 bg-white"
-                  dangerouslySetInnerHTML={{ __html: generateSvgStringForExport(true) || '' }}
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 border border-slate-900 text-xs">
-                  <div className="p-2.5 border-b sm:border-b-0 sm:border-r border-slate-900">
-                    <div className="text-[10px] font-extrabold uppercase text-slate-500">
-                      Proyecto
-                    </div>
-                    <div className="font-extrabold">{companyInfo.projectName}</div>
-                    <div className="text-[11px] text-slate-600">
-                      {companyInfo.projectDescription}
-                    </div>
-                  </div>
-                  <div className="p-2.5 border-b sm:border-b-0 sm:border-r border-slate-900">
-                    <div className="text-[10px] font-extrabold uppercase text-slate-500">
-                      Cliente & Centro
-                    </div>
-                    <div className="font-bold">Cliente: {companyInfo.clientName}</div>
-                    <div className="font-bold">Centro: {companyInfo.centerName}</div>
-                  </div>
-                  <div className="p-2.5">
-                    <div className="text-[10px] font-extrabold uppercase text-slate-500">
-                      Coordenadas & Cableado
-                    </div>
-                    <a
-                      href={mapsHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-bold text-sky-700 underline block"
-                    >
-                      {companyInfo.coordinates || 'Sin coordenadas'}
-                    </a>
-                    <div className="font-extrabold text-slate-800 mt-1">
-                      Cableado Total: {totalCableMeters} m
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-end pt-3 border-t border-slate-200">
-                  <div className="text-sm font-extrabold text-slate-900">
-                    {companyInfo.companyName}
-                  </div>
-                  <div className="text-center text-xs border-t border-slate-400 pt-1 px-6">
-                    {companyInfo.signatureDataUrl && (
-                      <img
-                        src={companyInfo.signatureDataUrl}
-                        alt="Firma"
-                        className="max-h-12 mx-auto mb-1"
-                      />
-                    )}
-                    <div className="font-extrabold">{companyInfo.responsibleName}</div>
-                    <div className="text-slate-600">{companyInfo.responsibleRole}</div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* NOTIFICACIÓN FLOTANTE (TOAST) */}
+      {/* Notificación flotante */}
       {toast && (
-        <div
-          className={`fixed bottom-24 right-4 z-50 px-4 py-2.5 rounded-xl shadow-lg text-xs font-extrabold text-white flex items-center gap-2 ${
-            toast.type === 'success'
-              ? 'bg-emerald-600'
-              : toast.type === 'warn'
-              ? 'bg-amber-600'
-              : 'bg-slate-900'
-          }`}
-        >
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="fixed bottom-16 right-4 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xl border border-slate-700 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toast.message}</span>
         </div>
       )}
