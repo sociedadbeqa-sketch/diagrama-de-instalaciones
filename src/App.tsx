@@ -3075,15 +3075,6 @@ export default function App() {
       const svgString = serializer.serializeToString(clonedSvg);
       const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
 
-      // Diccionario local de fases (sin depender de PHASE_CONFIG externo)
-      const localPhaseLabels = {
-        fotoperiodo: 'Fotoperiodo LED',
-        fuerza_aux: 'Fuerza 220V Auxiliar',
-        control: 'Fuerza y Control',
-        monitoreo: 'Sensores / Cámaras',
-        alimentacion: 'Alimentación',
-      };
-
       const safeObjects = Array.isArray(objects) ? objects : [];
       const safeConduits = Array.isArray(conduits) ? conduits : [];
       const safeCages = Array.isArray(cages) ? cages : [];
@@ -3102,36 +3093,34 @@ export default function App() {
               0
             );
 
-      // Checklist automático de sistemas instalados en el plano
-      const installedSystems = [];
-      const hasPhotoperiodLamps = safeObjects.some(
-        (o) =>
-          o.phase === 'fotoperiodo' ||
-          o.icon === 'led_lamp' ||
-          /fotoperiodo/i.test(`${o.label || ''} ${o.spec || ''}`)
-      );
+      // Checklist automático de sistemas instalados según los objetos insertados en el plano
+      const installedSystemsSet = new Set();
 
-      if (hasPhotoperiodLamps) {
-        installedSystems.push('Fotoperiodo LED');
-      }
-      if (
-        safeObjects.some((o) => o.phase === 'fuerza_aux') ||
-        safeConduits.some((c) => ['L1', 'L2', 'L3', 'TRIFASICO'].includes(c.phase))
-      ) {
-        installedSystems.push('Fuerza / Iluminación');
-      }
-      if (
-        safeObjects.some((o) => o.phase === 'control') ||
-        safeConduits.some((c) => c.phase === 'CONTROL')
-      ) {
-        installedSystems.push('Control / Tableros');
-      }
-      if (safeObjects.some((o) => o.phase === 'monitoreo')) {
-        installedSystems.push('Monitoreo / Cámaras');
-      }
-      if (safeObjects.some((o) => o.phase === 'alimentacion')) {
-        installedSystems.push('Alimentación');
-      }
+      safeObjects.forEach((o) => {
+        const rawPhase = String(o.phase || '').trim();
+        if (!rawPhase) return;
+
+        if (rawPhase === 'luces_perimetrales') {
+          installedSystemsSet.add('Luces Perimetrales');
+        } else if (rawPhase === 'fotoperiodo') {
+          installedSystemsSet.add('Fotoperiodo LED');
+        } else if (rawPhase === 'fuerza_aux') {
+          installedSystemsSet.add('Fuerza 220V Auxiliar');
+        } else if (rawPhase === 'control') {
+          installedSystemsSet.add('Control / Tableros');
+        } else if (rawPhase === 'monitoreo') {
+          installedSystemsSet.add('Monitoreo / Cámaras');
+        } else if (rawPhase === 'alimentacion') {
+          installedSystemsSet.add('Alimentación');
+        } else {
+          const prettyName = rawPhase
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+          installedSystemsSet.add(prettyName);
+        }
+      });
+
+      const installedSystems = Array.from(installedSystemsSet);
 
       const checklistItemsHtml =
         installedSystems.length > 0
@@ -3145,6 +3134,18 @@ export default function App() {
               .join(' ')
           : '<span style="font-size:10.5px;color:#64748b;font-weight:600;">Sin sistemas registrados</span>';
 
+      // Fases dibujadas en canalizaciones (solo si existen líneas de fase dibujadas)
+      const hasDrawnPhaseLines = safeConduits.length > 0;
+      const drawnPhasesSummary = Array.from(
+        new Set(
+          safeConduits.map((c) => {
+            const info =
+              typeof CONDUIT_PHASE_CONFIG !== 'undefined' && CONDUIT_PHASE_CONFIG[c.phase];
+            return info ? info.label : c.phase;
+          })
+        )
+      ).join(', ');
+
       const rowsHtml = safeSummary
         .map((g) => {
           const rawTags = Array.isArray(g.tags)
@@ -3152,11 +3153,27 @@ export default function App() {
             : String(g.tagsLabel || '').trim();
           const hasValidTags = rawTags !== '' && rawTags !== '-' && rawTags.toLowerCase() !== 'sin tag';
           const displayTags = hasValidTags ? rawTags : 'SIN INFORMACION';
-          const phaseText =
-            (typeof PHASES !== 'undefined' && PHASES[g.phase]?.label) ||
-            localPhaseLabels[g.phase] ||
-            g.phase ||
-            '-';
+
+          // La columna Circuito / Fase solo muestra la fase si hay líneas de fase dibujadas
+          let phaseDisplay = 'SIN INFORMACION';
+          if (hasDrawnPhaseLines) {
+            const matchingConduits = safeConduits.filter(
+              (c) => String(c.phase || '').toLowerCase() === String(g.phase || '').toLowerCase()
+            );
+            if (matchingConduits.length > 0) {
+              phaseDisplay = Array.from(
+                new Set(
+                  matchingConduits.map(
+                    (c) =>
+                      (typeof CONDUIT_PHASE_CONFIG !== 'undefined' && CONDUIT_PHASE_CONFIG[c.phase]?.label) ||
+                      c.phase
+                  )
+                )
+              ).join(', ');
+            } else {
+              phaseDisplay = drawnPhasesSummary || 'SIN INFORMACION';
+            }
+          }
 
           return `
           <tr>
@@ -3164,7 +3181,7 @@ export default function App() {
             <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
             <td>${g.modulesLabel || '-'}</td>
             <td>${g.spec || '-'}</td>
-            <td>${phaseText}</td>
+            <td style="${!hasDrawnPhaseLines ? 'color:#64748b;font-style:italic;' : 'font-weight:600;'}">${phaseDisplay}</td>
             <td style="text-align:right;">${g.unitPower || 0} W</td>
             <td style="text-align:right; font-weight:700;">${g.totalPower || 0} W</td>
             <td>${g.summaryStatus || '-'}</td>
