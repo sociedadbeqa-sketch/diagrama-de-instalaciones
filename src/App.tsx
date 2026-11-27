@@ -15,6 +15,7 @@ import {
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { buildPdfWithLayersBytes } from './utils/pdfLayerExporter';
 
 // ============================================================================
 // CONFIGURACIÓN DE FIREBASE (PROYECTO INDEPENDIENTE: diagrama-centro-engorda)
@@ -882,6 +883,9 @@ export default function App() {
   const [conduitType, setConduitType] = useState('Ducto HDPE 32mm PN10');
   const [conduitCableSpec, setConduitCableSpec] = useState('Cable Submarino H07RN-F 3G4 mm²');
   const [conduitDropMeters, setConduitDropMeters] = useState(6);
+  const [conduitTargetModule, setConduitTargetModule] = useState('auto');
+  const [conduitOrthoMode, setConduitOrthoMode] = useState(true);
+  const [conduitBranchAnchor, setConduitBranchAnchor] = useState(null);
   const [drawingPoints, setDrawingPoints] = useState([]);
   const [cursorSvgPos, setCursorSvgPos] = useState(null);
 
@@ -1452,37 +1456,137 @@ export default function App() {
     };
   };
 
-  const cableSummaryByPhase = useMemo(() => {
-    const summary = {};
-    Object.keys(CONDUIT_PHASE_CONFIG).forEach((k) => {
-      summary[k] = {
-        phase: k,
-        label: CONDUIT_PHASE_CONFIG[k].label,
-        color: CONDUIT_PHASE_CONFIG[k].color,
-        count: 0,
-        horizontalMeters: 0,
-        dropMeters: 0,
+  const detectConduitModuleIdFromPoints = (pts, cagesList = cages, modsList = modules) => {
+    if (!pts || pts.length === 0) return modsList?.[0]?.id || 'MOD-200';
+    const scores = new Map();
+    const addSample = (pt, weight) => {
+      const modId =
+        cagesList && cagesList.length > 0
+          ? getDirectCageModuleMatch(pt.x, pt.y, cagesList, modsList).moduleId
+          : detectModuleIdFromBounds(pt.x, pt.y, modsList);
+      scores.set(modId, (scores.get(modId) || 0) + weight);
+    };
+
+    if (pts.length === 1) {
+      addSample(pts[0], 1);
+    } else {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        addSample({ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, Math.max(10, segLen));
+        addSample(p1, 5);
+      }
+      addSample(pts[pts.length - 1], 5);
+    }
+
+    let bestModId = modsList?.[0]?.id || 'MOD-200';
+    let bestScore = -1;
+    scores.forEach((score, modId) => {
+      if (score > bestScore) {
+        bestScore = score;
+        bestModId = modId;
+      }
+    });
+    return bestModId;
+  };
+
+  const resolveConduitModuleId = (conduit, cagesList = cages, modsList = modules) => {
+    if (conduit?.manualModule && conduit?.moduleId) return conduit.moduleId;
+    if (Array.isArray(conduit?.points) && conduit.points.length >= 1) {
+      return detectConduitModuleIdFromPoints(conduit.points, cagesList, modsList);
+    }
+    return conduit?.moduleId || modsList?.[0]?.id || 'MOD-200';
+  };
+
+  const conduitModuleMap = useMemo(() => {
+    const map = new Map();
+    conduits.forEach((c) => {
+      map.set(c.id, resolveConduitModuleId(c, cages, modules));
+    });
+    return map;
+  }, [conduits, cages, modules, moduleBoundsMap]);
+
+  const getConduitCurrentModuleId = (conduit) => {
+    if (!conduit) return modules[0]?.id || 'MOD-200';
+    return conduitModuleMap.get(conduit.id) || resolveConduitModuleId(conduit, cages, modules);
+  };
+
+  const cableSummaryByModule = useMemo(() => {
+    const orderedModIds = [];
+    modules.forEach((m) => {
+      if (m?.id && !orderedModIds.includes(m.id)) orderedModIds.push(m.id);
+    });
+    conduits.forEach((c) => {
+      const mId = getConduitCurrentModuleId(c);
+      if (mId && !orderedModIds.includes(mId)) orderedModIds.push(mId);
+    });
+    if (orderedModIds.length === 0) orderedModIds.push('MOD-200');
+
+    const moduleMap = new Map();
+    orderedModIds.forEach((mId) => {
+      const modObj = modules.find((m) => m.id === mId);
+      const phasesObj = {};
+      Object.keys(CONDUIT_PHASE_CONFIG).forEach((k) => {
+        phasesObj[k] = {
+          moduleId: mId,
+          phase: k,
+          label: CONDUIT_PHASE_CONFIG[k].label,
+          short: CONDUIT_PHASE_CONFIG[k].short,
+          color: CONDUIT_PHASE_CONFIG[k].color,
+          count: 0,
+          horizontalMeters: 0,
+          dropMeters: 0,
+          totalMeters: 0,
+        };
+      });
+      moduleMap.set(mId, {
+        moduleId: mId,
+        moduleName: modObj?.name || mId,
         totalMeters: 0,
-      };
+        phasesObj,
+      });
     });
 
     conduits.forEach((conduit) => {
+      const mId = getConduitCurrentModuleId(conduit);
+      const bucket = moduleMap.get(mId);
+      if (!bucket) return;
       const key = CONDUIT_PHASE_CONFIG[conduit.phase] ? conduit.phase : 'fase_r';
       const m = calculateConduitMetrics(conduit);
-      summary[key].count += 1;
-      summary[key].horizontalMeters = Number((summary[key].horizontalMeters + m.horizontalMeters).toFixed(1));
-      summary[key].dropMeters = Number((summary[key].dropMeters + m.dropMeters).toFixed(1));
-      summary[key].totalMeters = Number((summary[key].totalMeters + m.totalMeters).toFixed(1));
+      const pEntry = bucket.phasesObj[key];
+      pEntry.count += 1;
+      pEntry.horizontalMeters = Number((pEntry.horizontalMeters + m.horizontalMeters).toFixed(1));
+      pEntry.dropMeters = Number((pEntry.dropMeters + m.dropMeters).toFixed(1));
+      pEntry.totalMeters = Number((pEntry.totalMeters + m.totalMeters).toFixed(1));
+      bucket.totalMeters = Number((bucket.totalMeters + m.totalMeters).toFixed(1));
     });
 
-    return Object.values(summary);
-  }, [conduits, cages]);
+    return Array.from(moduleMap.values()).map((bucket) => ({
+      moduleId: bucket.moduleId,
+      moduleName: bucket.moduleName,
+      totalMeters: bucket.totalMeters,
+      phases: Object.values(bucket.phasesObj),
+    }));
+  }, [conduits, cages, modules, conduitModuleMap]);
+
+  const cableSummaryByPhase = useMemo(() => {
+    const flat = [];
+    cableSummaryByModule.forEach((modGroup) => {
+      modGroup.phases.forEach((p) => {
+        if (p.phase === 'fase_r' || p.phase === 'fase_s' || p.phase === 'fase_t' || p.count > 0) {
+          flat.push(p);
+        }
+      });
+    });
+    return flat;
+  }, [cableSummaryByModule]);
 
   const totalCableMeters = useMemo(() => {
     return Number(
-      cableSummaryByPhase.reduce((acc, item) => acc + item.totalMeters, 0).toFixed(1)
+      cableSummaryByModule.reduce((acc, item) => acc + item.totalMeters, 0).toFixed(1)
     );
-  }, [cableSummaryByPhase]);
+  }, [cableSummaryByModule]);
 
   // ============================================================================
   // CONEXIÓN AUTOMÁTICA A FIREBASE AUTH Y CLOUD FIRESTORE
@@ -1563,11 +1667,19 @@ export default function App() {
         ...o,
         moduleId: resolvedModMap.get(o.id) || getDirectCageModuleMatch(o.x, o.y, cagesToUse, modulesToUse).moduleId,
       }));
+      const rawConduits = overrideData?.conduits || conduits;
+      const conduitsToUse = rawConduits.map((c) => ({
+        ...c,
+        moduleId:
+          c.manualModule && c.moduleId
+            ? c.moduleId
+            : resolveConduitModuleId(c, cagesToUse, modulesToUse),
+      }));
       if (!overrideData) {
         setCages(cagesToUse);
         setObjects(objectsToUse);
+        setConduits(conduitsToUse);
       }
-      const conduitsToUse = overrideData?.conduits || conduits;
       const annotationsToUse = overrideData?.annotations || annotations;
       const catalogToUse = overrideData?.symbolCatalog || symbolCatalog;
       const phasesToUse = overrideData?.phaseConfigs || phaseConfigs;
@@ -1996,6 +2108,51 @@ export default function App() {
     }
   };
 
+  const startConduitFromNode = (conduit, nodeIndex) => {
+    const pts = conduit?.points || [];
+    if (pts.length === 0) return;
+    const clampedIdx = Math.max(0, Math.min(pts.length - 1, nodeIndex));
+    const anchorPt = pts[clampedIdx];
+
+    let prevPt = null;
+    if (clampedIdx === pts.length - 1 && pts.length >= 2) {
+      prevPt = pts[pts.length - 2];
+    } else if (clampedIdx === 0 && pts.length >= 2) {
+      prevPt = pts[1];
+    } else if (clampedIdx > 0) {
+      prevPt = pts[clampedIdx - 1];
+    }
+
+    const parentDir = prevPt
+      ? { dx: anchorPt.x - prevPt.x, dy: anchorPt.y - prevPt.y }
+      : null;
+
+    const modId = getConduitCurrentModuleId(conduit);
+    const phaseKey = CONDUIT_PHASE_CONFIG[conduit.phase] ? conduit.phase : 'fase_r';
+    const typeVal = String(conduit.conduitType || conduit.conduitSpec || '').trim() || 'Ducto HDPE 32mm PN10';
+    const cableVal = String(conduit.cableSpec || '').trim() || 'Cable Submarino H07RN-F 3G4 mm²';
+
+    setConduitPhase(phaseKey);
+    setConduitType(typeVal);
+    setConduitCableSpec(cableVal);
+    setConduitTargetModule(modId);
+    setConduitOrthoMode(true);
+    setConduitBranchAnchor({
+      sourceConduitId: conduit.id,
+      parentDir,
+      moduleId: modId,
+    });
+    setDrawingPoints([{ x: anchorPt.x, y: anchorPt.y }]);
+    setCursorSvgPos({ x: anchorPt.x, y: anchorPt.y });
+    setActiveTool('draw_conduit');
+    setSelectedId(conduit.id);
+    setSelectedKind('conduit');
+    notify(
+      `Trazando tramo perpendicular desde nodo (${modId} · ${CONDUIT_PHASE_CONFIG[phaseKey]?.label || phaseKey}). Haz clic y doble clic o Enter para finalizar.`,
+      'info'
+    );
+  };
+
   // ============================================================================
   // FINALIZAR TRAZO DE CANALIZACIÓN
   // ============================================================================
@@ -2004,6 +2161,7 @@ export default function App() {
     if (pts.length < 2) {
       setDrawingPoints([]);
       setCursorSvgPos(null);
+      setConduitBranchAnchor(null);
       setActiveTool('select');
       return;
     }
@@ -2013,10 +2171,19 @@ export default function App() {
     const phaseCfg = CONDUIT_PHASE_CONFIG[conduitPhase] || CONDUIT_PHASE_CONFIG.fase_r;
     const nextNum = conduits.length + 1;
     const resolvedConduitType = String(conduitType || '').trim() || 'Ducto HDPE 32mm PN10';
+    const useManualMod = Boolean(conduitTargetModule && conduitTargetModule !== 'auto');
+    const resolvedModId = useManualMod
+      ? conduitTargetModule
+      : conduitBranchAnchor?.moduleId || detectConduitModuleIdFromPoints(pts, cages, modules);
+    const modDigits = String(resolvedModId).replace(/[^0-9]/g, '') || resolvedModId;
+
     const newConduit = {
       id: `CAN-${Date.now()}`,
-      tag: `CAN-${phaseCfg.short.replace(/[^A-Z0-9]/g, '')}-${String(nextNum).padStart(2, '0')}`,
+      tag: `CAN-${modDigits}-${phaseCfg.short.replace(/[^A-Z0-9]/g, '')}-${String(nextNum).padStart(2, '0')}`,
       phase: conduitPhase,
+      moduleId: resolvedModId,
+      manualModule: useManualMod,
+      parentConduitId: conduitBranchAnchor?.sourceConduitId || null,
       cableSpec: conduitCableSpec || 'Cable Submarino H07RN-F 3G4 mm²',
       conduitType: resolvedConduitType,
       conduitSpec: resolvedConduitType,
@@ -2032,14 +2199,16 @@ export default function App() {
       conduitType: resolvedConduitType,
       cableSpec: conduitCableSpec,
       dropMeters: conduitDropMeters,
+      targetModule: conduitTargetModule,
     });
     setDrawingPoints([]);
     setCursorSvgPos(null);
+    setConduitBranchAnchor(null);
     setActiveTool('select');
     setSelectedId(newConduit.id);
     setSelectedKind('conduit');
     notify(
-      `Canalización "${newConduit.tag}" (${phaseCfg.label}) creada: ${metrics.totalMeters} m · Presiona Enter para trazar otro tramo`,
+      `Canalización "${newConduit.tag}" (${resolvedModId} · ${phaseCfg.label}) creada: ${metrics.totalMeters} m · Nodo final listo para derivar a 90°`,
       'success'
     );
   };
@@ -2246,6 +2415,8 @@ export default function App() {
       if (lastAction.conduitType) setConduitType(lastAction.conduitType);
       if (lastAction.cableSpec) setConduitCableSpec(lastAction.cableSpec);
       if (lastAction.dropMeters !== undefined) setConduitDropMeters(lastAction.dropMeters);
+      if (lastAction.targetModule) setConduitTargetModule(lastAction.targetModule);
+      setConduitBranchAnchor(null);
       setDrawingPoints([]);
       setCursorSvgPos(null);
       setActiveTool('draw_conduit');
@@ -2460,6 +2631,7 @@ export default function App() {
         if (activeTool === 'draw_conduit') {
           setDrawingPoints([]);
           setCursorSvgPos(null);
+          setConduitBranchAnchor(null);
           setActiveTool('select');
           notify('Trazo de canalización cancelado', 'info');
         } else if (activeTool !== 'select') {
@@ -2506,6 +2678,8 @@ export default function App() {
     conduitType,
     conduitCableSpec,
     conduitDropMeters,
+    conduitTargetModule,
+    conduitOrthoMode,
     newCageSizeMeters,
   ]);
 
@@ -2554,6 +2728,95 @@ export default function App() {
     });
 
     return { x: Math.round(snappedX), y: Math.round(snappedY) };
+  };
+
+  const snapSingleAxisToWalkway = (val, axisList) => {
+    if (!snapToWalkway || !axisList || axisList.length === 0) return Math.round(val);
+    let bestVal = val;
+    let minD = 22;
+    axisList.forEach((wVal) => {
+      const d = Math.abs(val - wVal);
+      if (d < minD) {
+        minD = d;
+        bestVal = wVal;
+      }
+    });
+    return Math.round(bestVal);
+  };
+
+  const findNearestConduitNode = (rawX, rawY, threshold = 16) => {
+    let nearest = null;
+    let minD = threshold;
+    conduits.forEach((c) => {
+      const pts = c.points || [];
+      pts.forEach((pt, idx) => {
+        const d = Math.hypot(rawX - pt.x, rawY - pt.y);
+        if (d < minD) {
+          minD = d;
+          nearest = { x: pt.x, y: pt.y, conduit: c, nodeIndex: idx };
+        }
+      });
+    });
+    return nearest;
+  };
+
+  const getConduitDrawPoint = (
+    rawX,
+    rawY,
+    currentPts = drawingPoints,
+    branchAnchor = conduitBranchAnchor
+  ) => {
+    if (!currentPts || currentPts.length === 0) {
+      const nodeHit = findNearestConduitNode(rawX, rawY, 16);
+      if (nodeHit) return { x: nodeHit.x, y: nodeHit.y };
+      return applySnap(rawX, rawY);
+    }
+
+    const anchorPt = currentPts[currentPts.length - 1];
+    if (!conduitOrthoMode) {
+      const nodeHit = findNearestConduitNode(rawX, rawY, 14);
+      if (nodeHit) return { x: nodeHit.x, y: nodeHit.y };
+      return applySnap(rawX, rawY);
+    }
+
+    if (currentPts.length === 1 && branchAnchor?.parentDir) {
+      const { dx, dy } = branchAnchor.parentDir;
+      const len = Math.hypot(dx, dy);
+      if (len > 1) {
+        if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dy) <= 4) {
+          return {
+            x: anchorPt.x,
+            y: snapSingleAxisToWalkway(rawY, walkwayLines.ys),
+          };
+        }
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) <= 4) {
+          return {
+            x: snapSingleAxisToWalkway(rawX, walkwayLines.xs),
+            y: anchorPt.y,
+          };
+        }
+        const perpX = -dy / len;
+        const perpY = dx / len;
+        const proj = (rawX - anchorPt.x) * perpX + (rawY - anchorPt.y) * perpY;
+        return {
+          x: Math.round(anchorPt.x + proj * perpX),
+          y: Math.round(anchorPt.y + proj * perpY),
+        };
+      }
+    }
+
+    const absDx = Math.abs(rawX - anchorPt.x);
+    const absDy = Math.abs(rawY - anchorPt.y);
+    if (absDx >= absDy) {
+      return {
+        x: snapSingleAxisToWalkway(rawX, walkwayLines.xs),
+        y: anchorPt.y,
+      };
+    }
+    return {
+      x: anchorPt.x,
+      y: snapSingleAxisToWalkway(rawY, walkwayLines.ys),
+    };
   };
 
   const clientToSvgCoords = (clientX, clientY) => {
@@ -2747,9 +3010,16 @@ export default function App() {
     }
 
     if (activeTool === 'draw_conduit') {
-      const snapped = applySnap(coords.x, coords.y);
-      setDrawingPoints((prev) => [...prev, snapped]);
-      setCursorSvgPos(snapped);
+      if (drawingPoints.length === 0) {
+        const nodeHit = findNearestConduitNode(coords.x, coords.y, 16);
+        if (nodeHit) {
+          startConduitFromNode(nodeHit.conduit, nodeHit.nodeIndex);
+          return;
+        }
+      }
+      const nextPt = getConduitDrawPoint(coords.x, coords.y, drawingPoints, conduitBranchAnchor);
+      setDrawingPoints((prev) => [...prev, nextPt]);
+      setCursorSvgPos(nextPt);
       return;
     }
 
@@ -2773,8 +3043,8 @@ export default function App() {
     const coords = clientToSvgCoords(e.clientX, e.clientY);
 
     if (activeTool === 'draw_conduit') {
-      const snapped = applySnap(coords.x, coords.y);
-      setCursorSvgPos(snapped);
+      const nextPt = getConduitDrawPoint(coords.x, coords.y, drawingPoints, conduitBranchAnchor);
+      setCursorSvgPos(nextPt);
       return;
     }
 
@@ -2898,9 +3168,16 @@ export default function App() {
       }
 
       if (activeTool === 'draw_conduit') {
-        const snapped = applySnap(coords.x, coords.y);
-        setDrawingPoints((prev) => [...prev, snapped]);
-        setCursorSvgPos(snapped);
+        if (drawingPoints.length === 0) {
+          const nodeHit = findNearestConduitNode(coords.x, coords.y, 18);
+          if (nodeHit) {
+            startConduitFromNode(nodeHit.conduit, nodeHit.nodeIndex);
+            return;
+          }
+        }
+        const nextPt = getConduitDrawPoint(coords.x, coords.y, drawingPoints, conduitBranchAnchor);
+        setDrawingPoints((prev) => [...prev, nextPt]);
+        setCursorSvgPos(nextPt);
         return;
       }
 
@@ -3029,6 +3306,16 @@ export default function App() {
         if (c.id !== selectedConduit.id) return c;
         if (field === 'conduitType') {
           return { ...c, conduitType: value, conduitSpec: value };
+        }
+        if (field === 'moduleId') {
+          if (value === 'auto') {
+            return {
+              ...c,
+              manualModule: false,
+              moduleId: detectConduitModuleIdFromPoints(c.points, cages, modules),
+            };
+          }
+          return { ...c, manualModule: true, moduleId: value };
         }
         return { ...c, [field]: value };
       })
@@ -3282,7 +3569,7 @@ export default function App() {
         'Marca',
         'TAGs Agrupados',
         'Características Técnicas',
-        'Circuito / Fase',
+        'Sistema',
         'Pot. Unit. (W)',
         'Pot. Total (W)',
         'Estado',
@@ -3311,8 +3598,9 @@ export default function App() {
     if (conduits.length > 0) {
       rows.push(
         [],
-        ['2. CUBICACIÓN DE CABLEADO POR FASE ELÉCTRICA'],
+        ['2. CUBICACIÓN DE CABLEADO POR FASE Y MÓDULO'],
         [
+          'Módulo',
           'TAG Tramo',
           'Tipo de Canalización',
           'Fase',
@@ -3325,7 +3613,9 @@ export default function App() {
           const m = calculateConduitMetrics(c);
           const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
           const typeLabel = c.conduitType || c.conduitSpec || 'Ducto HDPE 32mm PN10';
+          const modId = getConduitCurrentModuleId(c);
           return [
+            modId,
             c.tag,
             typeLabel,
             pCfg.label,
@@ -3334,7 +3624,18 @@ export default function App() {
             m.dropMeters,
             m.totalMeters,
           ];
-        })
+        }),
+        [],
+        ['RESUMEN TOTAL POR MÓDULO Y FASE'],
+        ['Módulo', 'Fase', 'Tramos', 'Tramo Pasillo (m)', 'Bajada/Holgura (m)', 'Total Fase (m)'],
+        ...cableSummaryByPhase.map((item) => [
+          item.moduleId,
+          item.label,
+          item.count,
+          item.horizontalMeters,
+          item.dropMeters,
+          item.totalMeters,
+        ])
       );
     }
 
@@ -3355,7 +3656,7 @@ export default function App() {
         'Componente Genérico',
         'Marca',
         'Características Técnicas',
-        'Circuito / Fase',
+        'Sistema',
         'Potencia (W)',
         'Estado',
         'Módulo',
@@ -3408,6 +3709,13 @@ export default function App() {
         modLookupMap?.get(o.id) || getDirectCageModuleMatch(o.x, o.y).moduleId;
       const key = `${genericName}__${brand}__${specKey}__${noteKey}__${currentModId}__${o.phase}__${Number(o.power) || 0}`;
 
+      const rawPhase = String(o.phase || '').trim();
+      const systemLabel =
+        phaseConfigs[rawPhase]?.label ||
+        (rawPhase
+          ? rawPhase.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+          : '');
+
       if (!map.has(key)) {
         map.set(key, {
           key,
@@ -3416,6 +3724,7 @@ export default function App() {
           spec: specKey,
           notesLabel: noteText,
           phase: o.phase,
+          systemLabel,
           unitPower: Number(o.power) || 0,
           totalPower: 0,
           count: 0,
@@ -3477,33 +3786,83 @@ export default function App() {
 
   const summarizedEquipment = useMemo(
     () => buildEquipmentSummary(objects, objectModuleMap),
-    [objects, objectModuleMap]
+    [objects, objectModuleMap, phaseConfigs]
   );
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     try {
       const svgEl = svgRef.current;
       if (!svgEl) return;
 
-      const clonedSvg = svgEl.cloneNode(true);
-      const gridRect = clonedSvg.querySelector('rect[fill="url(#techGrid)"]');
-      if (gridRect) gridRect.remove();
-
-      const innerG = clonedSvg.querySelector('g');
-      if (innerG) innerG.setAttribute('transform', 'translate(0, 0) scale(1)');
-      clonedSvg.setAttribute('viewBox', '0 0 1850 560');
-
-      const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(clonedSvg);
-      const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        notify('Activa las ventanas emergentes (pop-ups) en tu navegador para abrir la vista previa PDF', 'warn');
+        return;
+      }
 
       const safeObjects = Array.isArray(objects) ? objects : [];
       const safeConduits = Array.isArray(conduits) ? conduits : [];
       const safeCages = Array.isArray(cages) ? cages : [];
-      const freshModuleMap = resolveAllObjectModuleCodes(safeObjects, safeCages, modules);
-      const safeSummary = buildEquipmentSummary(safeObjects, freshModuleMap);
+      const safeAnnotations = Array.isArray(annotations) ? annotations : [];
+      const safeModules = Array.isArray(modules) ? modules : [];
 
-      // Cálculo autocontenido de potencia total y metros canalizados
+      let minX = 40;
+      let minY = 65;
+      let maxX = 1860;
+      let maxY = 535;
+      const activeBounds = Object.values(moduleBoundsMap || {}).filter((b) => b && b.hasCages);
+      if (activeBounds.length > 0) {
+        minX = Math.min(...activeBounds.map((b) => b.boxX)) - 60;
+        minY = Math.min(...activeBounds.map((b) => b.boxY - 90)) - 20;
+        maxX = Math.max(...activeBounds.map((b) => b.boxX + b.totalW)) + 60;
+        maxY = Math.max(...activeBounds.map((b) => b.boxY + b.totalH)) + 60;
+      }
+      if (safeAnnotations.length > 0) {
+        minX = Math.min(minX, ...safeAnnotations.map((a) => a.x - (a.width || 100) - 30));
+        minY = Math.min(minY, ...safeAnnotations.map((a) => a.y - (a.height || 60) - 30));
+        maxX = Math.max(maxX, ...safeAnnotations.map((a) => a.x + (a.width || 100) + 30));
+        maxY = Math.max(maxY, ...safeAnnotations.map((a) => a.y + (a.height || 60) + 30));
+      }
+      if (safeObjects.length > 0) {
+        minX = Math.min(minX, ...safeObjects.map((o) => Number(o.x || 0) - 65));
+        minY = Math.min(minY, ...safeObjects.map((o) => Number(o.y || 0) - 55));
+        maxX = Math.max(maxX, ...safeObjects.map((o) => Number(o.x || 0) + 65));
+        maxY = Math.max(maxY, ...safeObjects.map((o) => Number(o.y || 0) + 65));
+      }
+      safeConduits.forEach((c) => {
+        (c.points || []).forEach((pt) => {
+          minX = Math.min(minX, Number(pt.x || 0) - 70);
+          minY = Math.min(minY, Number(pt.y || 0) - 45);
+          maxX = Math.max(maxX, Number(pt.x || 0) + 70);
+          maxY = Math.max(maxY, Number(pt.y || 0) + 45);
+        });
+      });
+      const exportWidth = Math.max(800, Math.round(maxX - minX));
+      const exportHeight = Math.max(380, Math.round(maxY - minY));
+
+      const clonedSvg = svgEl.cloneNode(true);
+      const gridRect = clonedSvg.querySelector('#sea-grid-bg');
+      if (gridRect) gridRect.remove();
+      const innerG = clonedSvg.querySelector('#plan-viewport') || clonedSvg.querySelector('g');
+      if (innerG) innerG.setAttribute('transform', 'translate(0, 0) scale(1)');
+      clonedSvg.setAttribute('viewBox', `${minX} ${minY} ${exportWidth} ${exportHeight}`);
+      clonedSvg.removeAttribute('width');
+      clonedSvg.removeAttribute('height');
+
+      const svgString = new XMLSerializer().serializeToString(clonedSvg);
+      const mapsLink = buildGoogleMapsLink(companyInfo.coordinates, companyInfo.googleMapsUrl);
+      const freshModuleMap = resolveAllObjectModuleCodes(safeObjects, safeCages, safeModules);
+      const safeSummary = buildEquipmentSummary(safeObjects, freshModuleMap);
+      const fileName = `${slugifyCenterFileName('plano_centro')}.pdf`;
+
+      const escapePdfHtml = (val) =>
+        String(val ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
       const computedTotalWatts = safeObjects.reduce(
         (acc, o) => acc + (Number(o.power) || Number(o.watts) || 0),
         0
@@ -3514,33 +3873,22 @@ export default function App() {
           .toFixed(1)
       );
 
-      // Checklist automático de sistemas instalados según los objetos insertados en el plano
       const installedSystemsSet = new Set();
-
       safeObjects.forEach((o) => {
         const rawPhase = String(o.phase || '').trim();
         if (!rawPhase) return;
-
-        if (rawPhase === 'luces_perimetrales') {
-          installedSystemsSet.add('Luces Perimetrales');
-        } else if (rawPhase === 'fotoperiodo') {
-          installedSystemsSet.add('Fotoperiodo LED');
-        } else if (rawPhase === 'fuerza_aux') {
-          installedSystemsSet.add('Fuerza 220V Auxiliar');
-        } else if (rawPhase === 'control') {
-          installedSystemsSet.add('Control / Tableros');
-        } else if (rawPhase === 'monitoreo') {
-          installedSystemsSet.add('Monitoreo / Cámaras');
-        } else if (rawPhase === 'alimentacion') {
-          installedSystemsSet.add('Alimentación');
-        } else {
-          const prettyName = rawPhase
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, (l) => l.toUpperCase());
-          installedSystemsSet.add(prettyName);
+        if (rawPhase === 'luces_perimetrales') installedSystemsSet.add('Luces Perimetrales');
+        else if (rawPhase === 'fotoperiodo') installedSystemsSet.add('Fotoperiodo LED');
+        else if (rawPhase === 'fuerza_aux') installedSystemsSet.add('Fuerza 220V Auxiliar');
+        else if (rawPhase === 'control') installedSystemsSet.add('Control / Tableros');
+        else if (rawPhase === 'monitoreo') installedSystemsSet.add('Monitoreo / Cámaras');
+        else if (rawPhase === 'alimentacion') installedSystemsSet.add('Alimentación');
+        else {
+          installedSystemsSet.add(
+            rawPhase.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+          );
         }
       });
-
       const installedSystems = Array.from(installedSystemsSet);
 
       const checklistItemsHtml =
@@ -3549,31 +3897,11 @@ export default function App() {
               .map(
                 (sys) => `
                 <span style="display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #10b981;color:#065f46;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;">
-                  <span style="font-weight:900;color:#059669;">✓</span> ${sys}
+                  <span style="font-weight:900;color:#059669;">✓</span> ${escapePdfHtml(sys)}
                 </span>`
               )
               .join(' ')
           : '<span style="font-size:10.5px;color:#64748b;font-weight:600;">Sin sistemas registrados</span>';
-
-      // Fases dibujadas en canalizaciones (solo si existen líneas de fase dibujadas)
-      const hasDrawnPhaseLines = safeConduits.length > 0;
-      const drawnPhasesSummary = Array.from(
-        new Set(
-          safeConduits.map((c) => {
-            const info =
-              typeof CONDUIT_PHASE_CONFIG !== 'undefined' && CONDUIT_PHASE_CONFIG[c.phase];
-            return info ? info.label : c.phase;
-          })
-        )
-      ).join(', ');
-
-      const escapePdfHtml = (val) =>
-        String(val ?? '')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
 
       const rowsHtml = safeSummary
         .map((g) => {
@@ -3591,26 +3919,16 @@ export default function App() {
               : ''
           }`;
 
-          // La columna Circuito / Fase solo muestra la fase si hay líneas de fase dibujadas
-          let phaseDisplay = 'SIN INFORMACION';
-          if (hasDrawnPhaseLines) {
-            const matchingConduits = safeConduits.filter(
-              (c) => String(c.phase || '').toLowerCase() === String(g.phase || '').toLowerCase()
-            );
-            if (matchingConduits.length > 0) {
-              phaseDisplay = Array.from(
-                new Set(
-                  matchingConduits.map(
-                    (c) =>
-                      (typeof CONDUIT_PHASE_CONFIG !== 'undefined' && CONDUIT_PHASE_CONFIG[c.phase]?.label) ||
-                      c.phase
-                  )
-                )
-              ).join(', ');
-            } else {
-              phaseDisplay = drawnPhasesSummary || 'SIN INFORMACION';
-            }
-          }
+          const rawSystem = String(g.phase || '').trim();
+          const systemLabel = String(
+            g.systemLabel ||
+              phaseConfigs[rawSystem]?.label ||
+              (rawSystem
+                ? rawSystem.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+                : '')
+          ).trim();
+          const hasValidSystem = systemLabel !== '' && systemLabel !== '-';
+          const systemDisplay = hasValidSystem ? systemLabel : 'SIN INFORMACION';
 
           const locationText = String(g.locationsLabel || '').trim();
           const hasValidLocation = locationText !== '' && locationText !== '-';
@@ -3654,7 +3972,7 @@ export default function App() {
             <td>${escapePdfHtml(g.modulesLabel || '-')}</td>
             <td style="${!hasValidLocation ? 'color:#64748b;font-style:italic;' : ''}">${escapePdfHtml(displayLocation)}</td>
             <td>${specHtml}</td>
-            <td style="${!hasDrawnPhaseLines ? 'color:#64748b;font-style:italic;' : 'font-weight:600;'}">${escapePdfHtml(phaseDisplay)}</td>
+            <td style="${!hasValidSystem ? 'color:#64748b;font-style:italic;' : 'font-weight:600;'}">${escapePdfHtml(systemDisplay)}</td>
             <td style="text-align:right;">${g.unitPower || 0} W</td>
             <td style="text-align:right; font-weight:700;">${g.totalPower || 0} W</td>
             <td>${escapePdfHtml(g.summaryStatus || '-')}</td>
@@ -3663,17 +3981,23 @@ export default function App() {
         .join('');
 
       const conduitPhaseGroupsMap = new Map();
+      const moduleOrderMap = new Map(safeModules.map((m, idx) => [m.id, idx]));
+      const phaseOrderMap = new Map(Object.keys(CONDUIT_PHASE_CONFIG).map((k, idx) => [k, idx]));
+
       safeConduits.forEach((c) => {
+        const conduitModId = resolveConduitModuleId(c, safeCages, safeModules);
         const phaseKey = CONDUIT_PHASE_CONFIG[c.phase] ? c.phase : 'fase_r';
         const phaseInfo = CONDUIT_PHASE_CONFIG[phaseKey] || { label: c.phase || phaseKey };
         const conduitTypeLabel =
           String(c.conduitType || c.conduitSpec || '').trim() || 'Ducto HDPE 32mm PN10';
         const cableSpecLabel = String(c.cableSpec || '').trim() || '-';
-        const groupKey = `${phaseKey}__${conduitTypeLabel.toLowerCase()}__${cableSpecLabel.toLowerCase()}`;
+        const groupKey = `${conduitModId}__${phaseKey}__${conduitTypeLabel.toLowerCase()}__${cableSpecLabel.toLowerCase()}`;
         const metrics = calculateConduitMetrics(c);
 
         if (!conduitPhaseGroupsMap.has(groupKey)) {
           conduitPhaseGroupsMap.set(groupKey, {
+            moduleId: conduitModId,
+            phaseKey,
             phaseLabel: phaseInfo.label,
             conduitTypeLabel,
             cableSpecLabel,
@@ -3688,9 +4012,20 @@ export default function App() {
         grp.totalMeters = Number((grp.totalMeters + (Number(metrics?.totalMeters) || 0)).toFixed(1));
       });
 
-      const conduitRowsHtml = Array.from(conduitPhaseGroupsMap.values())
+      const sortedConduitGroups = Array.from(conduitPhaseGroupsMap.values()).sort((a, b) => {
+        const modOrderA = moduleOrderMap.has(a.moduleId) ? moduleOrderMap.get(a.moduleId) : 999;
+        const modOrderB = moduleOrderMap.has(b.moduleId) ? moduleOrderMap.get(b.moduleId) : 999;
+        if (modOrderA !== modOrderB) return modOrderA - modOrderB;
+        if (a.moduleId !== b.moduleId) return a.moduleId.localeCompare(b.moduleId);
+        const pOrderA = phaseOrderMap.has(a.phaseKey) ? phaseOrderMap.get(a.phaseKey) : 999;
+        const pOrderB = phaseOrderMap.has(b.phaseKey) ? phaseOrderMap.get(b.phaseKey) : 999;
+        return pOrderA - pOrderB;
+      });
+
+      const conduitRowsHtml = sortedConduitGroups
         .map((grp) => `
           <tr>
+            <td style="font-weight:700;">${escapePdfHtml(grp.moduleId)}</td>
             <td style="font-weight:700;">${escapePdfHtml(grp.conduitTypeLabel)}</td>
             <td>${escapePdfHtml(grp.phaseLabel)}</td>
             <td>${escapePdfHtml(grp.cableSpecLabel)}</td>
@@ -3699,18 +4034,136 @@ export default function App() {
           </tr>`)
         .join('');
 
+      const conductorTotalsMap = new Map();
+      safeConduits.forEach((c) => {
+        const conduitModId = resolveConduitModuleId(c, safeCages, safeModules);
+        const cableName = String(c.cableSpec || '').trim().replace(/\s+/g, ' ') || 'Sin Especificar';
+        const cableKey = cableName.toLowerCase();
+        const metrics = calculateConduitMetrics(c);
+
+        if (!conductorTotalsMap.has(cableKey)) {
+          conductorTotalsMap.set(cableKey, {
+            cableName,
+            modules: new Set(),
+            horizontalMeters: 0,
+            dropMeters: 0,
+            totalMeters: 0,
+          });
+        }
+        const entry = conductorTotalsMap.get(cableKey);
+        if (conduitModId) entry.modules.add(conduitModId);
+        entry.horizontalMeters = Number(
+          (entry.horizontalMeters + (Number(metrics?.horizontalMeters) || 0)).toFixed(1)
+        );
+        entry.dropMeters = Number(
+          (entry.dropMeters + (Number(metrics?.dropMeters) || 0)).toFixed(1)
+        );
+        entry.totalMeters = Number(
+          (entry.totalMeters + (Number(metrics?.totalMeters) || 0)).toFixed(1)
+        );
+      });
+
+      const conductorTotalsList = Array.from(conductorTotalsMap.values());
+      const projectCableHorizontalTotal = Number(
+        conductorTotalsList.reduce((acc, item) => acc + item.horizontalMeters, 0).toFixed(1)
+      );
+      const projectCableDropTotal = Number(
+        conductorTotalsList.reduce((acc, item) => acc + item.dropMeters, 0).toFixed(1)
+      );
+      const projectCableGrandTotal = Number(
+        conductorTotalsList.reduce((acc, item) => acc + item.totalMeters, 0).toFixed(1)
+      );
+
+      const conductorTotalsRowsHtml = conductorTotalsList
+        .map((item) => {
+          const modsLabel = Array.from(item.modules)
+            .sort((a, b) => {
+              const orderA = moduleOrderMap.has(a) ? moduleOrderMap.get(a) : 999;
+              const orderB = moduleOrderMap.has(b) ? moduleOrderMap.get(b) : 999;
+              if (orderA !== orderB) return orderA - orderB;
+              return String(a).localeCompare(String(b));
+            })
+            .join(', ');
+          return `
+          <tr>
+            <td style="font-weight:700;">${escapePdfHtml(item.cableName)}</td>
+            <td>${escapePdfHtml(modsLabel || '-')}</td>
+            <td style="text-align:right;">${item.horizontalMeters} m</td>
+            <td style="text-align:right;">${item.dropMeters} m</td>
+            <td style="text-align:right; font-weight:800;">${item.totalMeters} m</td>
+          </tr>`;
+        })
+        .join('');
+
       const htmlDoc = `
         <!DOCTYPE html>
         <html lang="es">
         <head>
           <meta charset="UTF-8" />
-          <title>${companyInfo.centerName || 'Plano Técnico'}</title>
+          <title>${escapePdfHtml(companyInfo.centerName || 'Vista Previa PDF')}</title>
           <style>
             @page { margin: 8mm; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 12px 16px; }
+            * { box-sizing: border-box; }
+            body {
+              font-family: 'Segoe UI', Arial, sans-serif;
+              color: #0f172a;
+              margin: 0;
+              background: #e2e8f0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .preview-toolbar {
+              position: sticky;
+              top: 0;
+              z-index: 50;
+              background: #0f172a;
+              color: #ffffff;
+              padding: 10px 18px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              box-shadow: 0 2px 10px rgba(15, 23, 42, 0.25);
+            }
+            .toolbar-info { display: flex; flex-direction: column; gap: 2px; }
+            .toolbar-title { font-size: 13px; font-weight: 800; }
+            .toolbar-sub { font-size: 11px; color: #94a3b8; }
+            .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+            .btn-action {
+              border: none;
+              border-radius: 8px;
+              padding: 8px 14px;
+              font-size: 12px;
+              font-weight: 800;
+              cursor: pointer;
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              text-decoration: none;
+            }
+            .btn-export-pdf { background: #0284c7; color: #ffffff; }
+            .btn-export-pdf:hover:not(.is-loading) { background: #0369a1; }
+            .btn-export-pdf.is-loading { opacity: 0.72; cursor: wait; }
+            .btn-print { background: #334155; color: #ffffff; }
+            .btn-print:hover { background: #475569; }
+            .sheet-wrap {
+              max-width: 1120px;
+              margin: 14px auto;
+              background: #ffffff;
+              padding: 14px 18px;
+              border-radius: 8px;
+              box-shadow: 0 4px 20px rgba(15, 23, 42, 0.12);
+            }
             .logo-bar { margin-bottom: 8px; }
             .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
-            .plan-box { border: 1.5px solid #94a3b8; border-radius: 8px; padding: 6px; background: #f8fafc; margin-bottom: 10px; }
+            .plan-box {
+              border: 1.5px solid #94a3b8;
+              border-radius: 8px;
+              padding: 6px;
+              background: ${darkMode ? '#020617' : '#f8fafc'};
+              margin-bottom: 10px;
+            }
             .plan-box svg { width: 100%; height: auto; max-height: 360px; display: block; }
             .title-block { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10.5px; }
             .title-block td { border: 1.5px solid #0f172a; padding: 5px 8px; }
@@ -3724,98 +4177,227 @@ export default function App() {
             table.inv { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 12px; }
             table.inv th, table.inv td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
             table.inv th { background: #0f172a; color: #ffffff; font-weight: 700; }
+            table.inv tfoot td { background: #f1f5f9; font-weight: 800; border-top: 2px solid #0f172a; }
+            .section-subtitle { font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 10px 0 4px 0; letter-spacing: 0.3px; }
             .footer-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 16px; border-top: 1.5px solid #cbd5e1; padding-top: 10px; }
             .company-footer { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
             .sign-box { width: 250px; text-align: center; border-top: 1px solid #334155; padding-top: 5px; font-size: 10.5px; }
             .sign-img { max-height: 46px; margin: 0 auto 4px auto; display: block; }
+            @media print {
+              body { background: #ffffff; margin: 0; }
+              .preview-toolbar { display: none !important; }
+              .sheet-wrap { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; }
+            }
           </style>
         </head>
         <body>
-          ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
-
-          <div class="plan-box">${svgString}</div>
-
-          <table class="title-block">
-            <tr>
-              <td style="width:36%;"><span class="tb-label">Proyecto</span><span class="tb-val">${companyInfo.projectName || '-'}</span></td>
-              <td style="width:32%;"><span class="tb-label">Cliente / Mandante</span><span class="tb-val">${companyInfo.clientName || '-'}</span></td>
-              <td style="width:32%;"><span class="tb-label">Centro / Pontón</span><span class="tb-val">${companyInfo.centerName || '-'}</span></td>
-            </tr>
-            <tr>
-              <td colspan="2"><span class="tb-label">Descripción del Alcance</span><span>${companyInfo.projectDescription || '-'}</span></td>
-              <td><span class="tb-label">Coordenadas Geográficas</span><a href="${mapsLink}" target="_blank" style="color:#0284c7;font-weight:700;">${companyInfo.coordinates || 'Sin coordenadas'}</a></td>
-            </tr>
-          </table>
-
-          <div class="kpis">
-            <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${safeCages.length} (${safeCages[0]?.dimensions || '30m x 30m'})</div></div>
-            <div class="kpi">
-              <div class="kpi-label">Checklist Sistemas Instalados</div>
-              <div class="checklist-wrap">${checklistItemsHtml}</div>
+          <div class="preview-toolbar">
+            <div class="toolbar-info">
+              <span class="toolbar-title">Vista Previa Lámina Técnica · ${escapePdfHtml(companyInfo.centerName || companyInfo.projectName || 'Plano')}</span>
+              <span class="toolbar-sub" id="pdf-layers-status">Preparando archivo PDF automático con capas activas...</span>
             </div>
-            <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(computedTotalWatts / 1000).toFixed(2)} kW</div></div>
-            <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${computedGrandTotalMeters} m</div></div>
+            <div class="toolbar-actions">
+              <a href="#preparando" id="btn-export-layered-pdf" class="btn-action btn-export-pdf is-loading" aria-disabled="true">
+                Preparando PDF...
+              </a>
+              <button type="button" class="btn-action btn-print" onclick="window.print()">
+                Imprimir
+              </button>
+            </div>
           </div>
 
-          <table class="inv">
-            <thead>
+          <div class="sheet-wrap">
+            ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
+
+            <div class="plan-box">${svgString}</div>
+
+            <table class="title-block">
               <tr>
-                <th style="text-align:center;">Cant.</th>
-                <th>Marca</th>
-                <th>TAGs Agrupados</th>
-                <th>Módulo</th>
-                <th>Ubicación</th>
-                <th>Especificación Técnica</th>
-                <th>Circuito / Fase</th>
-                <th style="text-align:right;">Pot. Unit.</th>
-                <th style="text-align:right;">Pot. Total</th>
-                <th>Estado</th>
+                <td style="width:36%;"><span class="tb-label">Proyecto</span><span class="tb-val">${escapePdfHtml(companyInfo.projectName || '-')}</span></td>
+                <td style="width:32%;"><span class="tb-label">Cliente / Mandante</span><span class="tb-val">${escapePdfHtml(companyInfo.clientName || '-')}</span></td>
+                <td style="width:32%;"><span class="tb-label">Centro / Pontón</span><span class="tb-val">${escapePdfHtml(companyInfo.centerName || '-')}</span></td>
               </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
+              <tr>
+                <td colspan="2"><span class="tb-label">Descripción del Alcance</span><span>${escapePdfHtml(companyInfo.projectDescription || '-')}</span></td>
+                <td><span class="tb-label">Coordenadas Geográficas</span><a href="${escapePdfHtml(mapsLink)}" target="_blank" style="color:#0284c7;font-weight:700;">${escapePdfHtml(companyInfo.coordinates || 'Sin coordenadas')}</a></td>
+              </tr>
+            </table>
 
-          ${
-            safeConduits.length > 0
-              ? `<table class="inv">
-                  <thead>
-                    <tr>
-                      <th>Tipo de Canalización</th>
-                      <th>Fase / Circuito</th>
-                      <th>Conductor / Cable</th>
-                      <th style="text-align:center;">Holgura</th>
-                      <th style="text-align:right;">Longitud Calculada</th>
-                    </tr>
-                  </thead>
-                  <tbody>${conduitRowsHtml}</tbody>
-                </table>`
-              : ''
-          }
+            <div class="kpis">
+              <div class="kpi"><div class="kpi-label">Jaulas Totales</div><div class="kpi-val">${safeCages.length} (${escapePdfHtml(safeCages[0]?.dimensions || '30m x 30m')})</div></div>
+              <div class="kpi">
+                <div class="kpi-label">Checklist Sistemas Instalados</div>
+                <div class="checklist-wrap">${checklistItemsHtml}</div>
+              </div>
+              <div class="kpi"><div class="kpi-label">Potencia Total</div><div class="kpi-val">${(computedTotalWatts / 1000).toFixed(2)} kW</div></div>
+              <div class="kpi"><div class="kpi-label">Cable Canalizado</div><div class="kpi-val">${computedGrandTotalMeters} m</div></div>
+            </div>
 
-          <div class="footer-bottom">
-            <div class="company-footer">${companyInfo.companyName || 'SERVICIOS BEQA SPA'}</div>
-            <div class="sign-box">
-              ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : ''}
-              <strong>${companyInfo.responsibleName || 'Responsable Técnico'}</strong><br/>
-              <span>${companyInfo.responsibleRole || ''}</span>
+            ${
+              safeSummary.length > 0
+                ? `<table class="inv">
+                    <thead>
+                      <tr>
+                        <th style="text-align:center;">Cant.</th>
+                        <th>Marca</th>
+                        <th>TAGs Agrupados</th>
+                        <th>Módulo</th>
+                        <th>Ubicación</th>
+                        <th>Especificación Técnica</th>
+                        <th>Sistema</th>
+                        <th style="text-align:right;">Pot. Unit.</th>
+                        <th style="text-align:right;">Pot. Total</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                  </table>`
+                : ''
+            }
+
+            ${
+              safeConduits.length > 0
+                ? `<table class="inv">
+                    <thead>
+                      <tr>
+                        <th>Módulo</th>
+                        <th>Tipo de Canalización</th>
+                        <th>Fase / Circuito</th>
+                        <th>Conductor / Cable</th>
+                        <th style="text-align:center;">Holgura</th>
+                        <th style="text-align:right;">Longitud Calculada</th>
+                      </tr>
+                    </thead>
+                    <tbody>${conduitRowsHtml}</tbody>
+                  </table>
+                  <div class="section-subtitle">Total de Cable Eléctrico Utilizado en el Proyecto (Todos los Módulos)</div>
+                  <table class="inv">
+                    <thead>
+                      <tr>
+                        <th>Conductor / Cable</th>
+                        <th>Módulos</th>
+                        <th style="text-align:right;">Tramo Pasillo</th>
+                        <th style="text-align:right;">Holgura</th>
+                        <th style="text-align:right;">Total Cable Utilizado</th>
+                      </tr>
+                    </thead>
+                    <tbody>${conductorTotalsRowsHtml}</tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="2">TOTAL CABLE ELÉCTRICO DEL PROYECTO</td>
+                        <td style="text-align:right;">${projectCableHorizontalTotal} m</td>
+                        <td style="text-align:right;">${projectCableDropTotal} m</td>
+                        <td style="text-align:right;">${projectCableGrandTotal} m</td>
+                      </tr>
+                    </tfoot>
+                  </table>`
+                : ''
+            }
+
+            <div class="footer-bottom">
+              <div class="company-footer">${escapePdfHtml(companyInfo.companyName || 'SERVICIOS BEQA SPA')}</div>
+              <div class="sign-box">
+                ${companyInfo.signatureDataUrl ? `<img src="${companyInfo.signatureDataUrl}" class="sign-img" />` : ''}
+                <strong>${escapePdfHtml(companyInfo.responsibleName || 'Responsable Técnico')}</strong><br/>
+                <span>${escapePdfHtml(companyInfo.responsibleRole || '')}</span>
+              </div>
             </div>
           </div>
-
-          <script>
-            window.onload = function() { setTimeout(function() { window.print(); }, 350); };
-          </script>
         </body>
         </html>
       `;
 
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        notify('Activa las ventanas emergentes (pop-ups) en tu navegador para exportar PDF', 'warn');
-        return;
-      }
       printWindow.document.open();
       printWindow.document.write(htmlDoc);
       printWindow.document.close();
+
+      let isPdfReady = false;
+      let pendingAutoDownload = false;
+      const downloadLink = printWindow.document.getElementById('btn-export-layered-pdf');
+      const statusEl = printWindow.document.getElementById('pdf-layers-status');
+
+      if (downloadLink) {
+        downloadLink.onclick = (ev) => {
+          if (!isPdfReady) {
+            ev.preventDefault();
+            pendingAutoDownload = true;
+            if (statusEl) {
+              statusEl.textContent =
+                'Generando archivo PDF con capas, la descarga comenzará automáticamente al terminar...';
+            }
+            return false;
+          }
+          if (statusEl) {
+            statusEl.textContent = `Descargando ${fileName} (capas activas incluidas)...`;
+          }
+          return true;
+        };
+      }
+
+      // Generar el PDF real con capas OCG (sin plano base en capas) y habilitar descarga nativa directa
+      let pdfBytes;
+      try {
+        pdfBytes = await buildPdfWithLayersBytes({
+          svgElement: svgEl,
+          darkMode,
+          fileName,
+          companyInfo,
+          mapsLink,
+          cages: safeCages,
+          objects: safeObjects,
+          conduits: safeConduits,
+          annotations: safeAnnotations,
+          modules: safeModules,
+          moduleBoundsMap,
+          summarizedEquipment: safeSummary,
+          phaseConfigs,
+          conduitPhaseConfig: CONDUIT_PHASE_CONFIG,
+          typeGenericLabels: TYPE_GENERIC_LABELS,
+          calculateConduitMetrics,
+          resolveConduitModuleId,
+        });
+      } catch (pdfErr) {
+        if (!printWindow.closed) {
+          if (statusEl) {
+            statusEl.textContent = `Error al generar PDF: ${pdfErr?.message || 'Intenta nuevamente'}`;
+          }
+          if (downloadLink) {
+            downloadLink.textContent = 'Error al preparar PDF';
+          }
+        }
+        throw pdfErr;
+      }
+
+      if (!printWindow.closed) {
+        const WinUint8 = (printWindow as any).Uint8Array || Uint8Array;
+        const WinBlob = (printWindow as any).Blob || Blob;
+        const WinURL = (printWindow as any).URL || URL;
+        const pdfBlob = new WinBlob([new WinUint8(pdfBytes)], { type: 'application/pdf' });
+        const blobUrl = WinURL.createObjectURL(pdfBlob);
+
+        isPdfReady = true;
+        if (statusEl) {
+          statusEl.textContent =
+            'PDF con capas listo (equipos y cableados R/S/T activables; plano base y tablas fijos).';
+        }
+        if (downloadLink) {
+          downloadLink.setAttribute('href', blobUrl);
+          downloadLink.setAttribute('download', fileName);
+          downloadLink.removeAttribute('aria-disabled');
+          downloadLink.classList.remove('is-loading');
+          downloadLink.textContent = 'Exportar PDF (con Capas)';
+          if (pendingAutoDownload) {
+            downloadLink.click();
+          }
+        }
+        printWindow.addEventListener('pagehide', () => {
+          try {
+            WinURL.revokeObjectURL(blobUrl);
+          } catch {
+            // ignore
+          }
+        });
+      }
     } catch (err) {
       console.error('Error al generar PDF:', err);
       notify(`Error al generar PDF: ${err?.message || 'Revisa la consola'}`, 'warn');
@@ -4303,7 +4885,7 @@ export default function App() {
         />
 
         {showLabels && (
-          <g transform="translate(0, 26)">
+          <g data-pdf-label="true" transform="translate(0, 26)">
             <rect
               x="-34"
               y="-8"
@@ -4795,12 +5377,14 @@ export default function App() {
                       if (activeTool === 'draw_conduit') {
                         setDrawingPoints([]);
                         setCursorSvgPos(null);
+                        setConduitBranchAnchor(null);
                         setActiveTool('select');
                       } else {
                         setDrawingPoints([]);
+                        setConduitBranchAnchor(null);
                         setActiveTool('draw_conduit');
                         notify(
-                          `Haz clic en el plano para trazar canalización (${CONDUIT_PHASE_CONFIG[conduitPhase]?.label}). Doble clic o Enter para finalizar.`,
+                          `Haz clic en el plano o en el nodo final de un tramo para trazar canalización (${CONDUIT_PHASE_CONFIG[conduitPhase]?.label}). Doble clic o Enter para finalizar.`,
                           'info'
                         );
                       }
@@ -4813,6 +5397,28 @@ export default function App() {
                   >
                     {activeTool === 'draw_conduit' ? 'Cancelar' : 'Dibujar'}
                   </button>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    Módulo del Tramo
+                  </label>
+                  <select
+                    value={conduitTargetModule}
+                    onChange={(e) => setConduitTargetModule(e.target.value)}
+                    className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-700 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  >
+                    <option value="auto">Automático (según ubicación en plano)</option>
+                    {modules.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id} — {m.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -4884,6 +5490,16 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={conduitOrthoMode}
+                    onChange={(e) => setConduitOrthoMode(e.target.checked)}
+                    className="rounded accent-sky-600"
+                  />
+                  <span>Trazo perpendicular / ortogonal (90°)</span>
+                </label>
               </div>
 
               <div
@@ -5451,10 +6067,26 @@ export default function App() {
             )}
 
             {activeTool === 'draw_conduit' && (
-              <div className="px-3 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-extrabold shadow-md flex items-center gap-2">
+              <div className="px-3 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-extrabold shadow-md flex flex-wrap items-center gap-2">
                 <span>
-                  Trazando {CONDUIT_PHASE_CONFIG[conduitPhase]?.label} ({drawingPoints.length} ptos)
+                  Trazando {CONDUIT_PHASE_CONFIG[conduitPhase]?.label}
+                  {conduitBranchAnchor?.moduleId || conduitTargetModule !== 'auto'
+                    ? ` · ${conduitBranchAnchor?.moduleId || conduitTargetModule}`
+                    : ''}{' '}
+                  ({drawingPoints.length} ptos)
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setConduitOrthoMode((v) => !v)}
+                  className={`px-2 py-0.5 rounded-md font-extrabold ${
+                    conduitOrthoMode
+                      ? 'bg-sky-400 text-slate-950'
+                      : 'bg-white/20 text-white hover:bg-white/30'
+                  }`}
+                  title="Alternar bloqueo perpendicular/ortogonal (90°)"
+                >
+                  {conduitOrthoMode ? '90° Ortogonal ON' : 'Ángulo Libre'}
+                </button>
                 {drawingPoints.length >= 2 && (
                   <button
                     onClick={() => finishDrawingConduit()}
@@ -5467,6 +6099,7 @@ export default function App() {
                   onClick={() => {
                     setDrawingPoints([]);
                     setCursorSvgPos(null);
+                    setConduitBranchAnchor(null);
                     setActiveTool('select');
                   }}
                   className="px-1.5 py-0.5 bg-white/20 rounded-md hover:bg-white/30"
@@ -5620,7 +6253,7 @@ export default function App() {
 
               {/* Línea Troncal Submarina Dinámica entre Módulos */}
               {trunkCoords && (
-                <g>
+                <g data-pdf-layer="trunk">
                   <line
                     x1={trunkCoords.x1}
                     y1={trunkCoords.y1}
@@ -5750,8 +6383,11 @@ export default function App() {
                 if (pts.length < 2) return null;
                 const isSel = selectedKind === 'conduit' && selectedId === conduit.id;
                 const pCfg = CONDUIT_PHASE_CONFIG[conduit.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                const modId = getConduitCurrentModuleId(conduit);
                 const metrics = calculateConduitMetrics(conduit);
                 const pointsStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
+                const startPt = pts[0];
+                const endPt = pts[pts.length - 1];
 
                 let labelPt = pts[0];
                 let maxSegLen = -1;
@@ -5769,6 +6405,8 @@ export default function App() {
                 return (
                   <g
                     key={conduit.id}
+                    data-pdf-layer="conduit"
+                    data-conduit-phase={conduit.phase || 'fase_r'}
                     onClick={(e) => {
                       if (activeTool !== 'select') return;
                       e.stopPropagation();
@@ -5810,23 +6448,89 @@ export default function App() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    {pts.map((pt, idx) => (
+                    {pts.slice(1, -1).map((pt, idx) => (
                       <circle
-                        key={idx}
+                        key={`mid-${idx}`}
                         cx={pt.x}
                         cy={pt.y}
-                        r={isSel ? '4.5' : '3'}
+                        r={isSel ? '4' : '3'}
                         fill={pCfg.color}
                         stroke="#ffffff"
                         strokeWidth="1.2"
                       />
                     ))}
+
+                    {/* Nodo de inicio */}
+                    <g
+                      transform={`translate(${startPt.x}, ${startPt.y})`}
+                      onMouseDown={(e) => {
+                        if (e.button !== 0) return;
+                        if (
+                          activeTool === 'select' ||
+                          (activeTool === 'draw_conduit' && drawingPoints.length === 0)
+                        ) {
+                          e.stopPropagation();
+                          startConduitFromNode(conduit, 0);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-crosshair"
+                    >
+                      <title>{`Nodo inicial (${modId} · ${pCfg.label}) — Clic para derivar tramo perpendicular`}</title>
+                      <circle
+                        r={isSel ? '5.5' : '4.2'}
+                        fill="#ffffff"
+                        stroke={pCfg.color}
+                        strokeWidth="1.8"
+                      />
+                      <circle r="1.7" fill={pCfg.color} />
+                    </g>
+
+                    {/* Nodo terminal para derivar nuevo tramo perpendicular */}
+                    <g
+                      transform={`translate(${endPt.x}, ${endPt.y})`}
+                      onMouseDown={(e) => {
+                        if (e.button !== 0) return;
+                        if (
+                          activeTool === 'select' ||
+                          (activeTool === 'draw_conduit' && drawingPoints.length === 0)
+                        ) {
+                          e.stopPropagation();
+                          startConduitFromNode(conduit, pts.length - 1);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-crosshair"
+                    >
+                      <title>{`Nodo final (${modId} · ${pCfg.label}) — Clic para trazar nuevo tramo perpendicular`}</title>
+                      <circle
+                        r={isSel ? '10' : '8.5'}
+                        fill={pCfg.color}
+                        fillOpacity="0.16"
+                        stroke={pCfg.color}
+                        strokeWidth="1.1"
+                        strokeDasharray="2.5 2"
+                      />
+                      <circle
+                        r={isSel ? '6.2' : '5.5'}
+                        fill="#ffffff"
+                        stroke={pCfg.color}
+                        strokeWidth="2.1"
+                      />
+                      <path
+                        d="M -2.4,0 L 2.4,0 M 0,-2.4 L 0,2.4"
+                        stroke={pCfg.color}
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </g>
+
                     {showLabels && (
-                      <g transform={`translate(${labelPt.x}, ${labelPt.y - 12})`}>
+                      <g data-pdf-label="true" transform={`translate(${labelPt.x}, ${labelPt.y - 12})`}>
                         <rect
-                          x="-44"
+                          x="-56"
                           y="-9"
-                          width="88"
+                          width="112"
                           height="16"
                           rx="5"
                           fill={darkMode ? 'rgba(15,23,42,0.94)' : 'rgba(255,255,255,0.96)'}
@@ -5836,11 +6540,11 @@ export default function App() {
                         <text
                           textAnchor="middle"
                           y="2"
-                          fontSize="8.5"
+                          fontSize="8.2"
                           fontWeight="800"
                           fill={pCfg.color}
                         >
-                          {pCfg.short} · {metrics.totalMeters}m
+                          {modId} · {pCfg.short} · {metrics.totalMeters}m
                         </text>
                       </g>
                     )}
@@ -5921,6 +6625,7 @@ export default function App() {
                 return (
                   <g
                     key={ann.id}
+                    data-pdf-layer="annotation"
                     transform={`translate(${ann.x}, ${ann.y})`}
                     onMouseDown={(e) => {
                       if (activeTool !== 'select' || e.button !== 0) return;
@@ -5952,6 +6657,9 @@ export default function App() {
                 return (
                   <g
                     key={obj.id}
+                    data-pdf-layer="object"
+                    data-obj-type={obj.type}
+                    data-obj-brand={String(obj.brand || '').trim() || 'Sin Marca'}
                     transform={`translate(${obj.x}, ${obj.y})`}
                     onMouseDown={(e) => {
                       if (activeTool !== 'select' || e.button !== 0) return;
@@ -6704,29 +7412,66 @@ export default function App() {
 
                 {(() => {
                   const m = calculateConduitMetrics(selectedConduit);
+                  const resolvedModId = getConduitCurrentModuleId(selectedConduit);
                   return (
-                    <div
-                      className={`p-3 rounded-xl border grid grid-cols-3 gap-2 text-center ${
-                        darkMode
-                          ? 'bg-slate-800/80 border-slate-700'
-                          : 'bg-sky-50 border-sky-200'
-                      }`}
-                    >
-                      <div>
-                        <div className="text-[10px] font-bold text-slate-400">Pasillo</div>
-                        <div className="text-xs font-extrabold">{m.horizontalMeters} m</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-bold text-slate-400">Bajada/Holg.</div>
-                        <div className="text-xs font-extrabold">{m.dropMeters} m</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-bold text-sky-600">Total Cable</div>
-                        <div className="text-sm font-extrabold text-sky-600 dark:text-sky-400">
-                          {m.totalMeters} m
+                    <>
+                      <div
+                        className={`p-3 rounded-xl border grid grid-cols-3 gap-2 text-center ${
+                          darkMode
+                            ? 'bg-slate-800/80 border-slate-700'
+                            : 'bg-sky-50 border-sky-200'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400">Pasillo</div>
+                          <div className="text-xs font-extrabold">{m.horizontalMeters} m</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400">Bajada/Holg.</div>
+                          <div className="text-xs font-extrabold">{m.dropMeters} m</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-sky-600">Total Cable</div>
+                          <div className="text-sm font-extrabold text-sky-600 dark:text-sky-400">
+                            {m.totalMeters} m
+                          </div>
                         </div>
                       </div>
-                    </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          startConduitFromNode(
+                            selectedConduit,
+                            Math.max(0, (selectedConduit.points?.length || 1) - 1)
+                          )
+                        }
+                        className="w-full py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Trazar Tramo Perpendicular desde Nodo Final</span>
+                      </button>
+
+                      <div>
+                        <label className="block text-xs font-bold mb-1">Módulo Asignado</label>
+                        <select
+                          value={selectedConduit.manualModule ? selectedConduit.moduleId : 'auto'}
+                          onChange={(e) => updateSelectedConduit('moduleId', e.target.value)}
+                          className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                            darkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-white border-slate-200 text-slate-900'
+                          }`}
+                        >
+                          <option value="auto">Automático ({resolvedModId})</option>
+                          {modules.map((mod) => (
+                            <option key={mod.id} value={mod.id}>
+                              {mod.id} — {mod.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
                   );
                 })()}
 
@@ -7033,40 +7778,69 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                      Cubicación de Cable por Fase
+                      Cubicación de Cable por Módulo y Fase
                     </span>
                     <span className="text-xs font-extrabold text-sky-600 dark:text-sky-400">
                       Total: {totalCableMeters} m
                     </span>
                   </div>
 
-                  <div className="space-y-1.5">
-                    {cableSummaryByPhase.map((item) => (
+                  <div className="space-y-2.5">
+                    {cableSummaryByModule.map((modGroup) => (
                       <div
-                        key={item.phase}
-                        className={`p-2 rounded-xl border flex items-center justify-between text-xs ${
+                        key={modGroup.moduleId}
+                        className={`p-2 rounded-xl border space-y-1.5 ${
                           darkMode
-                            ? 'bg-slate-800/60 border-slate-700'
-                            : 'bg-slate-50 border-slate-200'
+                            ? 'bg-slate-800/40 border-slate-700/80'
+                            : 'bg-slate-50/90 border-slate-200'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full shrink-0"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <div>
-                            <div className="font-bold">{item.label}</div>
-                            <div className="text-[10px] text-slate-400">
-                              {item.count} tramo(s) · Pasillo {item.horizontalMeters}m + Bajada{' '}
-                              {item.dropMeters}m
-                            </div>
-                          </div>
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                            {modGroup.moduleId}
+                          </span>
+                          <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
+                            {modGroup.totalMeters} m
+                          </span>
                         </div>
-                        <span className="font-extrabold">{item.totalMeters} m</span>
+                        <div className="space-y-1">
+                          {modGroup.phases
+                            .filter(
+                              (item) =>
+                                item.phase === 'fase_r' ||
+                                item.phase === 'fase_s' ||
+                                item.phase === 'fase_t' ||
+                                item.count > 0
+                            )
+                            .map((item) => (
+                              <div
+                                key={`${modGroup.moduleId}-${item.phase}`}
+                                className={`p-1.5 rounded-lg border flex items-center justify-between text-xs ${
+                                  darkMode
+                                    ? 'bg-slate-900/70 border-slate-700'
+                                    : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: item.color }}
+                                  />
+                                  <div>
+                                    <div className="font-bold text-[11px]">{item.label}</div>
+                                    <div className="text-[10px] text-slate-400">
+                                      {item.count} tramo(s) · Pasillo {item.horizontalMeters}m + Bajada{' '}
+                                      {item.dropMeters}m
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="font-extrabold text-[11px]">{item.totalMeters} m</span>
+                              </div>
+                            ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -7903,7 +8677,7 @@ export default function App() {
                   className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir / PDF</span>
+                  <span>Imprimir / Guardar PDF</span>
                 </button>
                 <button
                   onClick={() => setShowPreviewModal(false)}
@@ -8097,7 +8871,7 @@ export default function App() {
                       <th className="py-2 px-2">Marca</th>
                       <th className="py-2 px-2">TAGs Agrupados</th>
                       <th className="py-2 px-2">Características Técnicas</th>
-                      <th className="py-2 px-2">Circuito / Fase</th>
+                      <th className="py-2 px-2">Sistema</th>
                       <th className="py-2 px-2 text-right">Pot. Unit.</th>
                       <th className="py-2 px-2 text-right">Pot. Total</th>
                       <th className="py-2 px-2">Estado</th>
@@ -8194,54 +8968,105 @@ export default function App() {
               </div>
 
               {conduits.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2">
-                    2. Cubicación de Cableado por Fase Eléctrica
-                  </h4>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
-                        <th className="py-2 px-2">TAG Tramo</th>
-                        <th className="py-2 px-2">Tipo de Canalización</th>
-                        <th className="py-2 px-2">Fase</th>
-                        <th className="py-2 px-2">Conductor</th>
-                        <th className="py-2 px-2 text-right">Tramo Pasillo</th>
-                        <th className="py-2 px-2 text-right">Bajada/Holgura</th>
-                        <th className="py-2 px-2 text-right">Total Cable</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {conduits.map((c) => {
-                        const m = calculateConduitMetrics(c);
-                        const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
-                        return (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2">
+                      2. Resumen de Cableado por Módulo y Fase Eléctrica (R / S / T)
+                    </h4>
+                    <table className="w-full text-left border-collapse text-xs mb-4">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                          <th className="py-2 px-2">Módulo</th>
+                          <th className="py-2 px-2">Fase / Circuito</th>
+                          <th className="py-2 px-2 text-center">Tramos</th>
+                          <th className="py-2 px-2 text-right">Tramo Pasillo</th>
+                          <th className="py-2 px-2 text-right">Bajada/Holgura</th>
+                          <th className="py-2 px-2 text-right">Total Fase</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cableSummaryByPhase.map((item) => (
                           <tr
-                            key={c.id}
+                            key={`sum-${item.moduleId}-${item.phase}`}
                             className="border-b border-slate-100 dark:border-slate-800/70"
                           >
-                            <td className="py-2 px-2 font-extrabold">{c.tag}</td>
-                            <td className="py-2 px-2 font-semibold">
-                              {c.conduitType || c.conduitSpec || 'Ducto HDPE 32mm PN10'}
+                            <td className="py-2 px-2 font-extrabold text-sky-600 dark:text-sky-400">
+                              {item.moduleId}
                             </td>
                             <td className="py-2 px-2">
                               <span
                                 className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                                style={{ backgroundColor: pCfg.color }}
+                                style={{ backgroundColor: item.color }}
                               >
-                                {pCfg.label}
+                                {item.label}
                               </span>
                             </td>
-                            <td className="py-2 px-2">{c.cableSpec}</td>
-                            <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
-                            <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
+                            <td className="py-2 px-2 text-center font-bold">{item.count}</td>
+                            <td className="py-2 px-2 text-right">{item.horizontalMeters} m</td>
+                            <td className="py-2 px-2 text-right">{item.dropMeters} m</td>
                             <td className="py-2 px-2 text-right font-extrabold">
-                              {m.totalMeters} m
+                              {item.totalMeters} m
                             </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                      Detalle de Tramos Trazados
+                    </h4>
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                          <th className="py-2 px-2">Módulo</th>
+                          <th className="py-2 px-2">TAG Tramo</th>
+                          <th className="py-2 px-2">Tipo de Canalización</th>
+                          <th className="py-2 px-2">Fase</th>
+                          <th className="py-2 px-2">Conductor</th>
+                          <th className="py-2 px-2 text-right">Tramo Pasillo</th>
+                          <th className="py-2 px-2 text-right">Bajada/Holgura</th>
+                          <th className="py-2 px-2 text-right">Total Cable</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {conduits.map((c) => {
+                          const m = calculateConduitMetrics(c);
+                          const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+                          const modId = getConduitCurrentModuleId(c);
+                          return (
+                            <tr
+                              key={c.id}
+                              className="border-b border-slate-100 dark:border-slate-800/70"
+                            >
+                              <td className="py-2 px-2 font-extrabold text-sky-600 dark:text-sky-400">
+                                {modId}
+                              </td>
+                              <td className="py-2 px-2 font-extrabold">{c.tag}</td>
+                              <td className="py-2 px-2 font-semibold">
+                                {c.conduitType || c.conduitSpec || 'Ducto HDPE 32mm PN10'}
+                              </td>
+                              <td className="py-2 px-2">
+                                <span
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+                                  style={{ backgroundColor: pCfg.color }}
+                                >
+                                  {pCfg.label}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2">{c.cableSpec}</td>
+                              <td className="py-2 px-2 text-right">{m.horizontalMeters} m</td>
+                              <td className="py-2 px-2 text-right">{m.dropMeters} m</td>
+                              <td className="py-2 px-2 text-right font-extrabold">
+                                {m.totalMeters} m
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
