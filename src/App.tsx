@@ -1825,6 +1825,75 @@ export default function App() {
     [annotations, selectedId, selectedKind]
   );
 
+  const activeConduitPhaseSummary = useMemo(() => {
+    const phaseKey = CONDUIT_PHASE_CONFIG[conduitPhase] ? conduitPhase : 'fase_r';
+    const phaseCfg = CONDUIT_PHASE_CONFIG[phaseKey] || CONDUIT_PHASE_CONFIG.fase_r;
+
+    let moduleId = '';
+    if (conduitTargetModule && conduitTargetModule !== 'auto') {
+      moduleId = conduitTargetModule;
+    } else if (activeTool === 'draw_conduit' && drawingPoints.length > 0) {
+      moduleId =
+        conduitBranchAnchor?.moduleId ||
+        detectConduitModuleIdFromPoints(drawingPoints, cages, modules);
+    } else if (selectedConduit) {
+      moduleId = getConduitCurrentModuleId(selectedConduit);
+    } else if (selectedObject) {
+      moduleId = getObjectCurrentModuleId(selectedObject);
+    } else if (selectedCage?.moduleId) {
+      moduleId = selectedCage.moduleId;
+    } else if (selectedModule?.id) {
+      moduleId = selectedModule.id;
+    } else {
+      const latestPhaseConduit = [...conduits]
+        .reverse()
+        .find((c) => (CONDUIT_PHASE_CONFIG[c.phase] ? c.phase : 'fase_r') === phaseKey);
+      if (latestPhaseConduit) {
+        moduleId = getConduitCurrentModuleId(latestPhaseConduit);
+      } else {
+        moduleId = cableSummaryByModule[0]?.moduleId || modules[0]?.id || 'MOD-100';
+      }
+    }
+
+    const modBucket = cableSummaryByModule.find((m) => m.moduleId === moduleId);
+    const phaseBucket = modBucket?.phases?.find((p) => p.phase === phaseKey);
+    let totalMeters = Number(phaseBucket?.totalMeters || 0);
+
+    if (activeTool === 'draw_conduit' && drawingPoints.length >= 2) {
+      const liveMetrics = calculateConduitMetrics({
+        points: drawingPoints,
+        dropMeters: Number(conduitDropMeters) || 0,
+      });
+      totalMeters = Number((totalMeters + (Number(liveMetrics?.totalMeters) || 0)).toFixed(1));
+    }
+
+    const shortCode = String(phaseCfg.short || phaseKey).split(' ')[0] || 'R';
+    return {
+      moduleId,
+      phaseKey,
+      phaseLabel: phaseCfg.label || phaseKey,
+      shortCode,
+      totalMeters: Number(totalMeters.toFixed(1)),
+    };
+  }, [
+    conduitPhase,
+    conduitTargetModule,
+    activeTool,
+    drawingPoints,
+    conduitBranchAnchor,
+    cages,
+    modules,
+    selectedConduit,
+    selectedObject,
+    selectedCage,
+    selectedModule,
+    conduits,
+    cableSummaryByModule,
+    conduitDropMeters,
+    conduitModuleMap,
+    objectModuleMap,
+  ]);
+
   const filteredBlueprints = useMemo(() => {
     const q = cloudSearchQuery.trim().toLowerCase();
     if (!q) return savedBlueprints;
@@ -5484,9 +5553,20 @@ export default function App() {
                     />
                   </div>
                   <div className="flex flex-col justify-end">
-                    <div className="px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 text-[10px] font-extrabold flex items-center justify-between">
+                    <span
+                      className="block text-[10px] font-bold text-slate-500 mb-0.5 truncate"
+                      title={`Total ${activeConduitPhaseSummary.phaseLabel} en ${activeConduitPhaseSummary.moduleId}`}
+                    >
+                      {activeConduitPhaseSummary.moduleId} · Fase {activeConduitPhaseSummary.shortCode}
+                    </span>
+                    <div
+                      className="px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 text-[10px] font-extrabold flex items-center justify-between gap-1"
+                      title={`Total ${activeConduitPhaseSummary.phaseLabel} en ${activeConduitPhaseSummary.moduleId}`}
+                    >
                       <span>Total:</span>
-                      <span className="text-sky-600 dark:text-sky-400">{totalCableMeters} m</span>
+                      <span className="text-sky-600 dark:text-sky-400 shrink-0">
+                        {activeConduitPhaseSummary.totalMeters} m
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -7510,7 +7590,7 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold mb-1">
-                    Bajada Sumergible / Holgura de Conexionado (metros)
+                    Holgura de Conexionado (metros)
                   </label>
                   <input
                     type="number"
