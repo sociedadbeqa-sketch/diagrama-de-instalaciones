@@ -543,6 +543,7 @@ const INITIAL_CONDUITS = [
     tag: 'CAN-200-R',
     phase: 'fase_r',
     cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
+    conduitType: 'Ducto HDPE 32mm PN10',
     conduitSpec: 'Ducto HDPE 32mm PN10',
     dropMeters: 6,
     points: [
@@ -555,6 +556,7 @@ const INITIAL_CONDUITS = [
     tag: 'CAN-200-S',
     phase: 'fase_s',
     cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
+    conduitType: 'Ducto HDPE 32mm PN10',
     conduitSpec: 'Ducto HDPE 32mm PN10',
     dropMeters: 6,
     points: [
@@ -569,6 +571,7 @@ const INITIAL_CONDUITS = [
     tag: 'CAN-200-T',
     phase: 'fase_t',
     cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
+    conduitType: 'Ducto HDPE 32mm PN10',
     conduitSpec: 'Ducto HDPE 32mm PN10',
     dropMeters: 6,
     points: [
@@ -638,6 +641,16 @@ const CONDUIT_PHASE_CONFIG = {
     dashArray: '7 4',
   },
 };
+
+const CONDUIT_TYPE_OPTIONS = [
+  'Ducto HDPE 32mm PN10',
+  'Ducto HDPE 25mm PN10',
+  'Conduit PVC',
+  'Conduit EMT Galvanizado',
+  'Tubería Flexible Corrugada',
+  'Bandeja Portaconductores',
+  'Tendido Submarino Directo',
+];
 
 const STATUS_CONFIG = {
   operativo: { label: 'Operativo', color: '#10b981', dot: 'bg-emerald-500' },
@@ -866,6 +879,7 @@ export default function App() {
 
   // Estado de dibujo de canalización por fase
   const [conduitPhase, setConduitPhase] = useState('fase_r');
+  const [conduitType, setConduitType] = useState('Ducto HDPE 32mm PN10');
   const [conduitCableSpec, setConduitCableSpec] = useState('Cable Submarino H07RN-F 3G4 mm²');
   const [conduitDropMeters, setConduitDropMeters] = useState(6);
   const [drawingPoints, setDrawingPoints] = useState([]);
@@ -1998,12 +2012,14 @@ export default function App() {
 
     const phaseCfg = CONDUIT_PHASE_CONFIG[conduitPhase] || CONDUIT_PHASE_CONFIG.fase_r;
     const nextNum = conduits.length + 1;
+    const resolvedConduitType = String(conduitType || '').trim() || 'Ducto HDPE 32mm PN10';
     const newConduit = {
       id: `CAN-${Date.now()}`,
       tag: `CAN-${phaseCfg.short.replace(/[^A-Z0-9]/g, '')}-${String(nextNum).padStart(2, '0')}`,
       phase: conduitPhase,
       cableSpec: conduitCableSpec || 'Cable Submarino H07RN-F 3G4 mm²',
-      conduitSpec: 'Ducto HDPE 32mm PN10',
+      conduitType: resolvedConduitType,
+      conduitSpec: resolvedConduitType,
       dropMeters: Number(conduitDropMeters) || 0,
       points: pts,
     };
@@ -2013,6 +2029,7 @@ export default function App() {
     setLastAction({
       kind: 'draw_conduit',
       phase: conduitPhase,
+      conduitType: resolvedConduitType,
       cableSpec: conduitCableSpec,
       dropMeters: conduitDropMeters,
     });
@@ -2226,6 +2243,7 @@ export default function App() {
     if (lastAction.kind === 'draw_conduit') {
       const targetPhase = lastAction.phase || conduitPhase;
       setConduitPhase(targetPhase);
+      if (lastAction.conduitType) setConduitType(lastAction.conduitType);
       if (lastAction.cableSpec) setConduitCableSpec(lastAction.cableSpec);
       if (lastAction.dropMeters !== undefined) setConduitDropMeters(lastAction.dropMeters);
       setDrawingPoints([]);
@@ -2485,6 +2503,7 @@ export default function App() {
     drawingPoints,
     lastAction,
     conduitPhase,
+    conduitType,
     conduitCableSpec,
     conduitDropMeters,
     newCageSizeMeters,
@@ -3006,7 +3025,13 @@ export default function App() {
     if (!selectedConduit) return;
     pushHistory();
     setConduits((prev) =>
-      prev.map((c) => (c.id === selectedConduit.id ? { ...c, [field]: value } : c))
+      prev.map((c) => {
+        if (c.id !== selectedConduit.id) return c;
+        if (field === 'conduitType') {
+          return { ...c, conduitType: value, conduitSpec: value };
+        }
+        return { ...c, [field]: value };
+      })
     );
   };
 
@@ -3289,6 +3314,7 @@ export default function App() {
         ['2. CUBICACIÓN DE CABLEADO POR FASE ELÉCTRICA'],
         [
           'TAG Tramo',
+          'Tipo de Canalización',
           'Fase',
           'Conductor',
           'Tramo Pasillo (m)',
@@ -3298,8 +3324,10 @@ export default function App() {
         ...conduits.map((c) => {
           const m = calculateConduitMetrics(c);
           const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+          const typeLabel = c.conduitType || c.conduitSpec || 'Ducto HDPE 32mm PN10';
           return [
             c.tag,
+            typeLabel,
             pCfg.label,
             c.cableSpec,
             m.horizontalMeters,
@@ -3392,6 +3420,7 @@ export default function App() {
           totalPower: 0,
           count: 0,
           tags: [],
+          tableroItems: [],
           modules: new Set(),
           locations: new Map(),
           statuses: [],
@@ -3401,6 +3430,22 @@ export default function App() {
       entry.count += 1;
       entry.totalPower += Number(o.power) || 0;
       entry.tags.push(o.tag);
+      if (o.type === 'tablero') {
+        const phaseColor = phaseConfigs[o.phase]?.color || '#0284c7';
+        const effectiveColor =
+          o.customColor && String(o.customColor).trim()
+            ? String(o.customColor).trim()
+            : phaseColor;
+        const statusColor = STATUS_CONFIG[o.status]?.color || '#10b981';
+        entry.tableroItems.push({
+          tag: String(o.tag || '').trim(),
+          effectiveColor,
+          statusColor,
+          rotation: Number(o.rotation) || 0,
+          flipX: Boolean(o.flipX),
+          flipY: Boolean(o.flipY),
+        });
+      }
       if (currentModId) entry.modules.add(currentModId);
       const locText = String(o.locationLabel || '').trim().replace(/\s+/g, ' ');
       if (locText) {
@@ -3463,13 +3508,11 @@ export default function App() {
         (acc, o) => acc + (Number(o.power) || Number(o.watts) || 0),
         0
       );
-      const computedGrandTotalMeters =
-        typeof totalCableMetersByPhase !== 'undefined' && totalCableMetersByPhase?.grandTotal !== undefined
-          ? totalCableMetersByPhase.grandTotal
-          : safeConduits.reduce(
-              (acc, c) => acc + (typeof computeConduitMeters === 'function' ? Number(computeConduitMeters(c)) || 0 : 0),
-              0
-            );
+      const computedGrandTotalMeters = Number(
+        safeConduits
+          .reduce((acc, c) => acc + (Number(calculateConduitMetrics(c)?.totalMeters) || 0), 0)
+          .toFixed(1)
+      );
 
       // Checklist automático de sistemas instalados según los objetos insertados en el plano
       const installedSystemsSet = new Set();
@@ -3573,11 +3616,41 @@ export default function App() {
           const hasValidLocation = locationText !== '' && locationText !== '-';
           const displayLocation = hasValidLocation ? locationText : 'SIN INFORMACION';
 
+          const tableroItems = Array.isArray(g.tableroItems) ? g.tableroItems : [];
+          const tagsCellHtml =
+            tableroItems.length > 0
+              ? `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+                  ${tableroItems
+                    .map((tb) => {
+                      const tbTag = tb.tag && tb.tag !== '-' && tb.tag.toLowerCase() !== 'sin tag' ? tb.tag : 'SIN INFORMACION';
+                      const tbTagMuted = tbTag === 'SIN INFORMACION';
+                      const sx = tb.flipX ? -1 : 1;
+                      const sy = tb.flipY ? -1 : 1;
+                      const rot = Number(tb.rotation) || 0;
+                      const col = escapePdfHtml(tb.effectiveColor || '#ef4444');
+                      const sCol = escapePdfHtml(tb.statusColor || '#10b981');
+                      const svgIcon = `<svg viewBox="-21 -21 42 42" width="22" height="22" style="flex-shrink:0;display:block;" aria-hidden="true">
+                        <g transform="scale(${sx}, ${sy}) rotate(${rot})">
+                          <circle r="17" fill="#ffffff" stroke="${col}" stroke-width="2.6" />
+                          <rect x="-7" y="-8" width="14" height="16" rx="2" fill="${col}" />
+                          <polygon points="1,-5 -3,1 0,1 -1,5 4,-1 1,-1" fill="#ffffff" />
+                        </g>
+                        <circle cx="13" cy="-13" r="4.8" fill="${sCol}" stroke="#ffffff" stroke-width="1.6" />
+                      </svg>`;
+                      return `<span style="display:inline-flex;align-items:center;gap:5px;">
+                        ${svgIcon}
+                        <span style="font-weight:700;${tbTagMuted ? 'color:#64748b;font-style:italic;' : ''}">${escapePdfHtml(tbTag)}</span>
+                      </span>`;
+                    })
+                    .join('')}
+                </div>`
+              : escapePdfHtml(displayTags);
+
           return `
           <tr>
             <td style="text-align:center; font-weight:800;">${g.count}</td>
             <td style="font-weight:700; color:#3730a3;">${escapePdfHtml(brandLabel)}</td>
-            <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${escapePdfHtml(displayTags)}</td>
+            <td style="font-weight:700; ${tableroItems.length === 0 && !hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${tagsCellHtml}</td>
             <td>${escapePdfHtml(g.modulesLabel || '-')}</td>
             <td style="${!hasValidLocation ? 'color:#64748b;font-style:italic;' : ''}">${escapePdfHtml(displayLocation)}</td>
             <td>${specHtml}</td>
@@ -3589,22 +3662,41 @@ export default function App() {
         })
         .join('');
 
-      const conduitRowsHtml = safeConduits
-        .map((c) => {
-          const phaseInfo =
-            (typeof CONDUIT_PHASE_CONFIG !== 'undefined' && CONDUIT_PHASE_CONFIG[c.phase]) || {
-              label: c.phase,
-            };
-          const meters = typeof computeConduitMeters === 'function' ? computeConduitMeters(c) : 0;
-          return `
+      const conduitPhaseGroupsMap = new Map();
+      safeConduits.forEach((c) => {
+        const phaseKey = CONDUIT_PHASE_CONFIG[c.phase] ? c.phase : 'fase_r';
+        const phaseInfo = CONDUIT_PHASE_CONFIG[phaseKey] || { label: c.phase || phaseKey };
+        const conduitTypeLabel =
+          String(c.conduitType || c.conduitSpec || '').trim() || 'Ducto HDPE 32mm PN10';
+        const cableSpecLabel = String(c.cableSpec || '').trim() || '-';
+        const groupKey = `${phaseKey}__${conduitTypeLabel.toLowerCase()}__${cableSpecLabel.toLowerCase()}`;
+        const metrics = calculateConduitMetrics(c);
+
+        if (!conduitPhaseGroupsMap.has(groupKey)) {
+          conduitPhaseGroupsMap.set(groupKey, {
+            phaseLabel: phaseInfo.label,
+            conduitTypeLabel,
+            cableSpecLabel,
+            horizontalMeters: 0,
+            dropMeters: 0,
+            totalMeters: 0,
+          });
+        }
+        const grp = conduitPhaseGroupsMap.get(groupKey);
+        grp.horizontalMeters = Number((grp.horizontalMeters + (Number(metrics?.horizontalMeters) || 0)).toFixed(1));
+        grp.dropMeters = Number((grp.dropMeters + (Number(metrics?.dropMeters) || 0)).toFixed(1));
+        grp.totalMeters = Number((grp.totalMeters + (Number(metrics?.totalMeters) || 0)).toFixed(1));
+      });
+
+      const conduitRowsHtml = Array.from(conduitPhaseGroupsMap.values())
+        .map((grp) => `
           <tr>
-            <td style="font-weight:700;">${c.tag}</td>
-            <td>${phaseInfo.label}</td>
-            <td>${c.cableSpec || '-'}</td>
-            <td style="text-align:center;">+${c.slackPercent || 0}%</td>
-            <td style="text-align:right; font-weight:800;">${meters} m</td>
-          </tr>`;
-        })
+            <td style="font-weight:700;">${escapePdfHtml(grp.conduitTypeLabel)}</td>
+            <td>${escapePdfHtml(grp.phaseLabel)}</td>
+            <td>${escapePdfHtml(grp.cableSpecLabel)}</td>
+            <td style="text-align:center;">${grp.dropMeters} m</td>
+            <td style="text-align:right; font-weight:800;">${grp.totalMeters} m</td>
+          </tr>`)
         .join('');
 
       const htmlDoc = `
@@ -3688,7 +3780,7 @@ export default function App() {
               ? `<table class="inv">
                   <thead>
                     <tr>
-                      <th>Tramo Canalización</th>
+                      <th>Tipo de Canalización</th>
                       <th>Fase / Circuito</th>
                       <th>Conductor / Cable</th>
                       <th style="text-align:center;">Holgura</th>
@@ -4742,6 +4834,29 @@ export default function App() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    Tipo de Canalización
+                  </label>
+                  <input
+                    type="text"
+                    list="conduit-type-options"
+                    value={conduitType}
+                    onChange={(e) => setConduitType(e.target.value)}
+                    placeholder="Ej. Ducto HDPE 32mm PN10"
+                    className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-700 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'
+                    }`}
+                  />
+                  <datalist id="conduit-type-options">
+                    {CONDUIT_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -6667,6 +6782,22 @@ export default function App() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold mb-1">Tipo de Canalización</label>
+                  <input
+                    type="text"
+                    list="conduit-type-options"
+                    value={selectedConduit.conduitType ?? selectedConduit.conduitSpec ?? ''}
+                    onChange={(e) => updateSelectedConduit('conduitType', e.target.value)}
+                    placeholder="Ej. Ducto HDPE 32mm PN10, Conduit PVC, Bandeja..."
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold mb-1">Tipo de Conductor / Cable</label>
                   <input
                     type="text"
@@ -7985,8 +8116,57 @@ export default function App() {
                         <td className="py-2.5 px-2 font-bold text-indigo-600 dark:text-indigo-400">
                           {g.brand}
                         </td>
-                        <td className="py-2.5 px-2 text-[11px] text-slate-500 max-w-[180px] truncate">
-                          {g.tagsLabel}
+                        <td className="py-2.5 px-2 text-[11px] text-slate-500 max-w-[200px]">
+                          {g.tableroItems?.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {g.tableroItems.map((tb, idx) => (
+                                <span
+                                  key={`${g.key}-tb-${idx}`}
+                                  className="inline-flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100"
+                                >
+                                  <svg
+                                    viewBox="-21 -21 42 42"
+                                    className="w-5 h-5 shrink-0"
+                                    aria-hidden="true"
+                                  >
+                                    <g
+                                      transform={`scale(${tb.flipX ? -1 : 1}, ${tb.flipY ? -1 : 1}) rotate(${tb.rotation || 0})`}
+                                    >
+                                      <circle
+                                        r="17"
+                                        fill={darkMode ? '#0f172a' : '#ffffff'}
+                                        stroke={tb.effectiveColor}
+                                        strokeWidth="2.6"
+                                      />
+                                      <rect
+                                        x="-7"
+                                        y="-8"
+                                        width="14"
+                                        height="16"
+                                        rx="2"
+                                        fill={tb.effectiveColor}
+                                      />
+                                      <polygon
+                                        points="1,-5 -3,1 0,1 -1,5 4,-1 1,-1"
+                                        fill="#ffffff"
+                                      />
+                                    </g>
+                                    <circle
+                                      cx="13"
+                                      cy="-13"
+                                      r="4.8"
+                                      fill={tb.statusColor}
+                                      stroke={darkMode ? '#0f172a' : '#ffffff'}
+                                      strokeWidth="1.6"
+                                    />
+                                  </svg>
+                                  <span>{tb.tag || 'SIN INFORMACION'}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="block truncate">{g.tagsLabel}</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-2">
                           <div>{g.spec || '-'}</div>
@@ -8022,6 +8202,7 @@ export default function App() {
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
                         <th className="py-2 px-2">TAG Tramo</th>
+                        <th className="py-2 px-2">Tipo de Canalización</th>
                         <th className="py-2 px-2">Fase</th>
                         <th className="py-2 px-2">Conductor</th>
                         <th className="py-2 px-2 text-right">Tramo Pasillo</th>
@@ -8039,6 +8220,9 @@ export default function App() {
                             className="border-b border-slate-100 dark:border-slate-800/70"
                           >
                             <td className="py-2 px-2 font-extrabold">{c.tag}</td>
+                            <td className="py-2 px-2 font-semibold">
+                              {c.conduitType || c.conduitSpec || 'Ducto HDPE 32mm PN10'}
+                            </td>
                             <td className="py-2 px-2">
                               <span
                                 className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
