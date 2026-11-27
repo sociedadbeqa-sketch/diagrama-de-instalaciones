@@ -9,7 +9,8 @@ import {
   MonitorPlay, X, Cloud, FolderOpen, CloudUpload, MapPin, ExternalLink, FolderPlus,
   Route, Square, Scissors, ClipboardPaste, Undo2, Redo2, Lock, Unlock,
   FlipHorizontal2, FlipVertical2, AlignCenterHorizontal, Palette,
-  Type, Circle, Triangle, ArrowRight, Diamond, Minus, PlusCircle
+  Type, Circle, Triangle, ArrowRight, Diamond, Minus, PlusCircle,
+  Download, FileSpreadsheet
 } from 'lucide-react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -698,12 +699,6 @@ const getModuleHeaderDimensions = (mod) => {
 
 export default function App() {
   useEffect(() => {
-    if (!document.getElementById('tailwind-cdn-injected')) {
-      const script = document.createElement('script');
-      script.id = 'tailwind-cdn-injected';
-      script.src = 'https://cdn.tailwindcss.com';
-      document.head.appendChild(script);
-    }
     if (!document.getElementById('inter-font-injected')) {
       const link = document.createElement('link');
       link.id = 'inter-font-injected';
@@ -1131,12 +1126,36 @@ export default function App() {
   };
 
   // ============================================================================
+  // RESOLUCIÓN PRECISA DE MÓDULO SEGÚN NUMERACIÓN DE JAULAS Y FOCOS CERCANOS
+  // ============================================================================
+  const resolveCageModuleCode = (cage, modsList = modules) => {
+    const labelStr = String(cage?.label ?? '').trim();
+    const raw = labelStr !== '' ? labelStr : String(cage?.number ?? '').trim();
+    const numMatch = raw.match(/\d+/);
+    if (numMatch) {
+      const num = parseInt(numMatch[0], 10);
+      if (num >= 100) {
+        const series = Math.floor(num / 100) * 100;
+        const seriesStr = String(series);
+        const matched =
+          (modsList || []).find((m) => String(m.id || '').includes(seriesStr)) ||
+          (modsList || []).find(
+            (m) => Math.floor((Number(m.startNumber) || 0) / 100) * 100 === series
+          );
+        return matched ? matched.id : `MOD-${series}`;
+      }
+    }
+    if (cage?.moduleId) return cage.moduleId;
+    return modsList?.[0]?.id || 'MOD-200';
+  };
+
+  // ============================================================================
   // LÍMITES DINÁMICOS DE MÓDULOS (ZONA GRIS AUTOAJUSTABLE A LAS JAULAS ACTIVAS)
   // ============================================================================
   const moduleBoundsMap = useMemo(() => {
     const map = {};
     modules.forEach((mod) => {
-      const modCages = cages.filter((c) => c.moduleId === mod.id);
+      const modCages = cages.filter((c) => resolveCageModuleCode(c, modules) === mod.id);
       const walkway = STANDARD_WALKWAY_WIDTH;
 
       if (modCages.length === 0) {
@@ -1179,22 +1198,192 @@ export default function App() {
     return map;
   }, [modules, cages]);
 
-  const detectModuleId = (x) => {
-    if (modules.length === 0) return 'MOD-200';
-    if (modules.length === 1) return modules[0].id;
+  const detectModuleIdFromBounds = (x, y, modsList = modules, boundsMap = moduleBoundsMap) => {
+    if (!modsList || modsList.length === 0) return 'MOD-200';
+    if (modsList.length === 1) return modsList[0].id;
 
-    let bestModId = modules[0].id;
-    let bestDist = Infinity;
-    modules.forEach((mod) => {
-      const b = moduleBoundsMap[mod.id];
-      const centerX = b && b.hasCages ? b.boxX + b.totalW / 2 : mod.originX + 200;
-      const d = Math.abs(x - centerX);
-      if (d < bestDist) {
-        bestDist = d;
-        bestModId = mod.id;
+    let bestModId = modsList[0].id;
+    let bestBoxDist = Infinity;
+    let bestCenterDist = Infinity;
+    const hasY = typeof y === 'number' && !Number.isNaN(y);
+
+    modsList.forEach((mod) => {
+      const b = boundsMap?.[mod.id];
+      if (b && b.hasCages) {
+        const dx = Math.max(b.boxX - x, 0, x - (b.boxX + b.totalW));
+        const dy = hasY ? Math.max(b.boxY - y, 0, y - (b.boxY + b.totalH)) : 0;
+        const boxDist = Math.hypot(dx, dy);
+        const centerX = b.boxX + b.totalW / 2;
+        const centerY = b.boxY + b.totalH / 2;
+        const centerDist = hasY ? Math.hypot(x - centerX, y - centerY) : Math.abs(x - centerX);
+
+        if (
+          boxDist < bestBoxDist - 0.001 ||
+          (Math.abs(boxDist - bestBoxDist) <= 0.001 && centerDist < bestCenterDist)
+        ) {
+          bestBoxDist = boxDist;
+          bestCenterDist = centerDist;
+          bestModId = mod.id;
+        }
+      } else {
+        const centerX = mod.originX + 200;
+        const centerY = mod.originY + 120;
+        const centerDist = hasY ? Math.hypot(x - centerX, y - centerY) : Math.abs(x - centerX);
+        if (bestBoxDist === Infinity && centerDist < bestCenterDist) {
+          bestCenterDist = centerDist;
+          bestModId = mod.id;
+        }
       }
     });
     return bestModId;
+  };
+
+  const getDirectCageModuleMatch = (x, y, cagesList = cages, modsList = modules) => {
+    if (!cagesList || cagesList.length === 0) {
+      return {
+        moduleId: detectModuleIdFromBounds(x, y, modsList),
+        boxDist: Infinity,
+        anchorRadius: 72,
+        ambiguous: false,
+      };
+    }
+
+    const hasY = typeof y === 'number' && !Number.isNaN(y);
+    const rankedByModule = new Map();
+
+    cagesList.forEach((c) => {
+      const size = Number(c.size) || BASE_CAGE_PX;
+      const dx = Math.max(c.x - x, 0, x - (c.x + size));
+      const dy = hasY ? Math.max(c.y - y, 0, y - (c.y + size)) : 0;
+      const boxDist = Math.hypot(dx, dy);
+      const cx = c.x + size / 2;
+      const cy = c.y + size / 2;
+      const centerDist = hasY ? Math.hypot(x - cx, y - cy) : Math.abs(x - cx);
+      const code = resolveCageModuleCode(c, modsList);
+      const prev = rankedByModule.get(code);
+      if (
+        !prev ||
+        boxDist < prev.boxDist - 0.001 ||
+        (Math.abs(boxDist - prev.boxDist) <= 0.001 && centerDist < prev.centerDist)
+      ) {
+        rankedByModule.set(code, {
+          moduleId: code,
+          boxDist,
+          centerDist,
+          anchorRadius: Math.max(48, Math.round(size * 0.55)),
+        });
+      }
+    });
+
+    const sorted = Array.from(rankedByModule.values()).sort((a, b) => {
+      if (Math.abs(a.boxDist - b.boxDist) > 0.001) return a.boxDist - b.boxDist;
+      return a.centerDist - b.centerDist;
+    });
+
+    const best = sorted[0];
+    const second = sorted[1];
+    const ambiguous = Boolean(second && Math.abs(second.boxDist - best.boxDist) <= 16);
+    return {
+      moduleId: best.moduleId,
+      boxDist: best.boxDist,
+      anchorRadius: best.anchorRadius,
+      ambiguous,
+    };
+  };
+
+  const resolveAllObjectModuleCodes = (objsList, cagesList, modsList) => {
+    const directMap = new Map();
+    objsList.forEach((o) => {
+      directMap.set(o.id, getDirectCageModuleMatch(o.x, o.y, cagesList, modsList));
+    });
+
+    const finalMap = new Map();
+    objsList.forEach((o) => {
+      const direct = directMap.get(o.id);
+      if (!direct) return;
+
+      // Si el objeto está alejado de las jaulas o en zona ambigua entre módulos,
+      // tomar como referencia los demás focos cercanos (radio 130px) anclados a jaulas.
+      if (direct.boxDist > direct.anchorRadius || direct.ambiguous) {
+        const scores = new Map();
+        objsList.forEach((other) => {
+          if (other.id === o.id) return;
+          const otherDirect = directMap.get(other.id);
+          if (!otherDirect || otherDirect.ambiguous) return;
+          if (
+            otherDirect.boxDist > otherDirect.anchorRadius &&
+            otherDirect.boxDist >= direct.boxDist
+          ) {
+            return;
+          }
+
+          const dist = Math.hypot((o.x || 0) - (other.x || 0), (o.y || 0) - (other.y || 0));
+          if (dist > 130) return;
+
+          const weight = (otherDirect.boxDist <= otherDirect.anchorRadius ? 3 : 1) / (dist + 16);
+          scores.set(otherDirect.moduleId, (scores.get(otherDirect.moduleId) || 0) + weight);
+        });
+
+        if (scores.size > 0) {
+          let bestNeighborMod = direct.moduleId;
+          let bestScore = -1;
+          scores.forEach((score, modCode) => {
+            if (score > bestScore) {
+              bestScore = score;
+              bestNeighborMod = modCode;
+            }
+          });
+          finalMap.set(o.id, bestNeighborMod);
+          return;
+        }
+      }
+
+      finalMap.set(o.id, direct.moduleId);
+    });
+
+    return finalMap;
+  };
+
+  const objectModuleMap = useMemo(
+    () => resolveAllObjectModuleCodes(objects, cages, modules),
+    [objects, cages, modules, moduleBoundsMap]
+  );
+
+  const getObjectCurrentModuleId = (obj) => {
+    if (!obj) return modules[0]?.id || 'MOD-200';
+    return objectModuleMap.get(obj.id) || getDirectCageModuleMatch(obj.x, obj.y).moduleId;
+  };
+
+  const detectModuleId = (x, y) => {
+    if (cages && cages.length > 0) {
+      const direct = getDirectCageModuleMatch(x, y, cages, modules);
+      if (direct.boxDist <= direct.anchorRadius && !direct.ambiguous) {
+        return direct.moduleId;
+      }
+      const scores = new Map();
+      objects.forEach((other) => {
+        const otherDirect = getDirectCageModuleMatch(other.x, other.y, cages, modules);
+        if (otherDirect.ambiguous || otherDirect.boxDist > otherDirect.anchorRadius) return;
+        const dist = Math.hypot((x || 0) - (other.x || 0), ((y ?? other.y) || 0) - (other.y || 0));
+        if (dist <= 130) {
+          const w = 1 / (dist + 16);
+          scores.set(otherDirect.moduleId, (scores.get(otherDirect.moduleId) || 0) + w);
+        }
+      });
+      if (scores.size > 0) {
+        let bestMod = direct.moduleId;
+        let bestW = -1;
+        scores.forEach((w, code) => {
+          if (w > bestW) {
+            bestW = w;
+            bestMod = code;
+          }
+        });
+        return bestMod;
+      }
+      return direct.moduleId;
+    }
+    return detectModuleIdFromBounds(x, y, modules, moduleBoundsMap);
   };
 
   // ============================================================================
@@ -1348,9 +1537,22 @@ export default function App() {
     setIsSavingCloud(true);
     try {
       const infoToUse = overrideData?.companyInfo || companyInfo;
-      const objectsToUse = overrideData?.objects || objects;
-      const cagesToUse = overrideData?.cages || cages;
+      const rawObjects = overrideData?.objects || objects;
+      const rawCages = overrideData?.cages || cages;
       const modulesToUse = overrideData?.modules || modules;
+      const cagesToUse = rawCages.map((c) => ({
+        ...c,
+        moduleId: resolveCageModuleCode(c, modulesToUse),
+      }));
+      const resolvedModMap = resolveAllObjectModuleCodes(rawObjects, cagesToUse, modulesToUse);
+      const objectsToUse = rawObjects.map((o) => ({
+        ...o,
+        moduleId: resolvedModMap.get(o.id) || getDirectCageModuleMatch(o.x, o.y, cagesToUse, modulesToUse).moduleId,
+      }));
+      if (!overrideData) {
+        setCages(cagesToUse);
+        setObjects(objectsToUse);
+      }
       const conduitsToUse = overrideData?.conduits || conduits;
       const annotationsToUse = overrideData?.annotations || annotations;
       const catalogToUse = overrideData?.symbolCatalog || symbolCatalog;
@@ -1891,7 +2093,7 @@ export default function App() {
     pushHistory();
     const newX = Math.round(sourceObj.x + offsetX);
     const newY = Math.round(sourceObj.y + offsetY);
-    const modId = detectModuleId(newX);
+    const modId = detectModuleId(newX, newY);
     const count = objects.filter((o) => o.type === sourceObj.type).length + 1;
 
     const baseTag = sourceObj.tag.replace(/-\d+$/, '');
@@ -2100,9 +2302,12 @@ export default function App() {
           e.preventDefault();
           if (!e.repeat) pushHistory();
           setObjects((prev) =>
-            prev.map((o) =>
-              o.id === selectedObject.id ? { ...o, x: o.x + dx, y: o.y + dy } : o
-            )
+            prev.map((o) => {
+              if (o.id !== selectedObject.id) return o;
+              const nextX = o.x + dx;
+              const nextY = o.y + dy;
+              return { ...o, x: nextX, y: nextY, moduleId: detectModuleId(nextX, nextY) };
+            })
           );
           return;
         }
@@ -2344,7 +2549,7 @@ export default function App() {
   const placeSymbolAtCoords = (rawX, rawY) => {
     pushHistory();
     const snapped = applySnap(rawX, rawY);
-    const modId = detectModuleId(snapped.x);
+    const modId = detectModuleId(snapped.x, snapped.y);
     const modShort = modId === 'MOD-200' ? '200' : '100';
     const prefixMap = {
       luminaria: 'FOT',
@@ -2459,7 +2664,7 @@ export default function App() {
     const nextNum =
       cages.reduce((maxN, c) => Math.max(maxN, Number(c.number) || 0), 100) + 1;
     const customLabel = newCageLabelInput.trim() || String(nextNum);
-    const modId = detectModuleId(rawX);
+    const modId = detectModuleId(rawX, rawY);
     const targetMod = modules.find((m) => m.id === modId) || modules[0];
 
     const step = visualPx + STANDARD_WALKWAY_WIDTH;
@@ -2556,7 +2761,7 @@ export default function App() {
 
     if (draggingObjId) {
       const snapped = applySnap(coords.x, coords.y);
-      const modId = detectModuleId(snapped.x);
+      const modId = detectModuleId(snapped.x, snapped.y);
       setObjects((prev) =>
         prev.map((obj) =>
           obj.id === draggingObjId
@@ -2708,7 +2913,7 @@ export default function App() {
         e.preventDefault();
         const coords = clientToSvgCoords(touch.clientX, touch.clientY);
         const snapped = applySnap(coords.x, coords.y);
-        const modId = detectModuleId(snapped.x);
+        const modId = detectModuleId(snapped.x, snapped.y);
         setObjects((prev) =>
           prev.map((obj) =>
             obj.id === draggingObjId
@@ -3006,9 +3211,162 @@ export default function App() {
     img.src = url;
   };
 
-  const summarizedEquipment = useMemo(() => {
+  const escapeCsvCell = (value) => {
+    const str = value === null || value === undefined ? '' : String(value);
+    if (/[",\n\r;]/.test(str)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const downloadCsvFile = (filename, rows) => {
+    const csvContent =
+      '\uFEFF' + rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleExportInventorySummaryCSV = () => {
+    if (summarizedEquipment.length === 0 && conduits.length === 0) {
+      notify('No hay equipos ni canalizaciones para exportar', 'warn');
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const totalWatts = summarizedEquipment.reduce((sum, g) => sum + (Number(g.totalPower) || 0), 0);
+    const rows = [
+      ['REPORTE DE INVENTARIO GENERAL DE EQUIPOS Y CABLEADO'],
+      ['Proyecto', companyInfo.projectName || 'Sin nombre'],
+      ['Centro / Pontón', companyInfo.centerName || 'Sin especificar'],
+      ['Cliente', companyInfo.clientName || 'Sin especificar'],
+      ['Fecha de exportación', today],
+      ['Total Equipos (unidades)', objects.length],
+      ['Potencia Instalada Total (W)', totalWatts],
+      ['Total Cableado (m)', totalCableMeters],
+      [],
+      ['1. RESUMEN DE EQUIPOS INSTALADOS (AGRUPADOS POR COMPONENTE GENÉRICO Y MARCA)'],
+      [
+        'Cant.',
+        'Componente Genérico',
+        'Marca',
+        'TAGs Agrupados',
+        'Características Técnicas',
+        'Circuito / Fase',
+        'Pot. Unit. (W)',
+        'Pot. Total (W)',
+        'Estado',
+        'Módulos',
+        'Ubicación',
+      ],
+      ...summarizedEquipment.map((g) => [
+        g.count,
+        g.genericName,
+        g.brand,
+        g.tagsLabel,
+        g.notesLabel
+          ? g.spec
+            ? `${g.spec} | Notas de mantención: ${g.notesLabel}`
+            : `Notas de mantención: ${g.notesLabel}`
+          : g.spec,
+        phaseConfigs[g.phase]?.label || g.phase,
+        g.unitPower,
+        g.totalPower,
+        g.summaryStatus,
+        g.modulesLabel || '-',
+        g.locationsLabel || '-',
+      ]),
+    ];
+
+    if (conduits.length > 0) {
+      rows.push(
+        [],
+        ['2. CUBICACIÓN DE CABLEADO POR FASE ELÉCTRICA'],
+        [
+          'TAG Tramo',
+          'Fase',
+          'Conductor',
+          'Tramo Pasillo (m)',
+          'Bajada/Holgura (m)',
+          'Total Cable (m)',
+        ],
+        ...conduits.map((c) => {
+          const m = calculateConduitMetrics(c);
+          const pCfg = CONDUIT_PHASE_CONFIG[c.phase] || CONDUIT_PHASE_CONFIG.fase_r;
+          return [
+            c.tag,
+            pCfg.label,
+            c.cableSpec,
+            m.horizontalMeters,
+            m.dropMeters,
+            m.totalMeters,
+          ];
+        })
+      );
+    }
+
+    const filename = `${slugifyCenterFileName('centro_engorda')}_inventario_resumen_${today}.csv`;
+    downloadCsvFile(filename, rows);
+    notify(`Inventario exportado a "${filename}"`, 'success');
+  };
+
+  const handleExportMaintenanceCSV = () => {
+    if (objects.length === 0) {
+      notify('No hay equipos registrados para exportar', 'warn');
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = [
+      [
+        'TAG',
+        'Componente Genérico',
+        'Marca',
+        'Características Técnicas',
+        'Circuito / Fase',
+        'Potencia (W)',
+        'Estado',
+        'Módulo',
+        'Ubicación',
+        'Última Inspección',
+        'Observaciones',
+      ],
+      ...objects.map((o) => {
+        const genericName = (
+          o.genericName ||
+          TYPE_GENERIC_LABELS[o.type] ||
+          'Componente Eléctrico'
+        ).trim();
+        const statusLabel = STATUS_CONFIG[o.status]?.label || o.status || 'Operativo';
+        const currentModuleId = getObjectCurrentModuleId(o);
+        return [
+          o.tag || '',
+          genericName,
+          o.brand || 'Sin Marca',
+          o.spec || '',
+          phaseConfigs[o.phase]?.label || o.phase || '',
+          Number(o.power) || 0,
+          statusLabel,
+          currentModuleId,
+          o.locationLabel || '',
+          o.lastInspection || '',
+          o.description || '',
+        ];
+      }),
+    ];
+
+    const filename = `${slugifyCenterFileName('centro_engorda')}_reporte_mantencion_${today}.csv`;
+    downloadCsvFile(filename, rows);
+    notify(`Reporte de mantención exportado a "${filename}"`, 'success');
+  };
+
+  const buildEquipmentSummary = (objsList, modLookupMap) => {
     const map = new Map();
-    objects.forEach((o) => {
+    (objsList || []).forEach((o) => {
       const genericName = (
         o.genericName ||
         TYPE_GENERIC_LABELS[o.type] ||
@@ -3016,7 +3374,11 @@ export default function App() {
       ).trim();
       const brand = (o.brand || 'Sin Marca').trim();
       const specKey = (o.spec || '').trim();
-      const key = `${genericName}__${brand}__${specKey}__${o.phase}__${Number(o.power) || 0}`;
+      const noteText = String(o.description || '').trim().replace(/\s+/g, ' ');
+      const noteKey = noteText.toLowerCase();
+      const currentModId =
+        modLookupMap?.get(o.id) || getDirectCageModuleMatch(o.x, o.y).moduleId;
+      const key = `${genericName}__${brand}__${specKey}__${noteKey}__${currentModId}__${o.phase}__${Number(o.power) || 0}`;
 
       if (!map.has(key)) {
         map.set(key, {
@@ -3024,12 +3386,14 @@ export default function App() {
           genericName,
           brand,
           spec: specKey,
+          notesLabel: noteText,
           phase: o.phase,
           unitPower: Number(o.power) || 0,
           totalPower: 0,
           count: 0,
           tags: [],
           modules: new Set(),
+          locations: new Map(),
           statuses: [],
         });
       }
@@ -3037,7 +3401,14 @@ export default function App() {
       entry.count += 1;
       entry.totalPower += Number(o.power) || 0;
       entry.tags.push(o.tag);
-      if (o.moduleId) entry.modules.add(o.moduleId);
+      if (currentModId) entry.modules.add(currentModId);
+      const locText = String(o.locationLabel || '').trim().replace(/\s+/g, ' ');
+      if (locText) {
+        const locKey = locText.toLowerCase();
+        if (!entry.locations.has(locKey)) {
+          entry.locations.set(locKey, locText);
+        }
+      }
       entry.statuses.push(o.status);
     });
 
@@ -3051,12 +3422,18 @@ export default function App() {
         : 'Operativo';
       return {
         ...entry,
-        modulesLabel: Array.from(entry.modules).join(', '),
+        modulesLabel: Array.from(entry.modules).sort().join(', '),
+        locationsLabel: Array.from(entry.locations.values()).join(', '),
         tagsLabel: entry.tags.join(', '),
         summaryStatus,
       };
     });
-  }, [objects]);
+  };
+
+  const summarizedEquipment = useMemo(
+    () => buildEquipmentSummary(objects, objectModuleMap),
+    [objects, objectModuleMap]
+  );
 
   const handleExportPDF = () => {
     try {
@@ -3078,7 +3455,8 @@ export default function App() {
       const safeObjects = Array.isArray(objects) ? objects : [];
       const safeConduits = Array.isArray(conduits) ? conduits : [];
       const safeCages = Array.isArray(cages) ? cages : [];
-      const safeSummary = Array.isArray(summarizedEquipment) ? summarizedEquipment : [];
+      const freshModuleMap = resolveAllObjectModuleCodes(safeObjects, safeCages, modules);
+      const safeSummary = buildEquipmentSummary(safeObjects, freshModuleMap);
 
       // Cálculo autocontenido de potencia total y metros canalizados
       const computedTotalWatts = safeObjects.reduce(
@@ -3146,6 +3524,14 @@ export default function App() {
         )
       ).join(', ');
 
+      const escapePdfHtml = (val) =>
+        String(val ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
       const rowsHtml = safeSummary
         .map((g) => {
           const rawTags = Array.isArray(g.tags)
@@ -3153,6 +3539,14 @@ export default function App() {
             : String(g.tagsLabel || '').trim();
           const hasValidTags = rawTags !== '' && rawTags !== '-' && rawTags.toLowerCase() !== 'sin tag';
           const displayTags = hasValidTags ? rawTags : 'SIN INFORMACION';
+          const brandLabel = String(g.brand || '').trim() || 'Sin Marca';
+          const specText = String(g.spec || '').trim();
+          const notesText = String(g.notesLabel || '').trim();
+          const specHtml = `${specText ? escapePdfHtml(specText) : '-'}${
+            notesText
+              ? `<div style="font-size:9.5px;color:#475569;margin-top:2px;line-height:1.3;"><strong>Notas de mantención:</strong> ${escapePdfHtml(notesText)}</div>`
+              : ''
+          }`;
 
           // La columna Circuito / Fase solo muestra la fase si hay líneas de fase dibujadas
           let phaseDisplay = 'SIN INFORMACION';
@@ -3175,16 +3569,22 @@ export default function App() {
             }
           }
 
+          const locationText = String(g.locationsLabel || '').trim();
+          const hasValidLocation = locationText !== '' && locationText !== '-';
+          const displayLocation = hasValidLocation ? locationText : 'SIN INFORMACION';
+
           return `
           <tr>
             <td style="text-align:center; font-weight:800;">${g.count}</td>
-            <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${displayTags}</td>
-            <td>${g.modulesLabel || '-'}</td>
-            <td>${g.spec || '-'}</td>
-            <td style="${!hasDrawnPhaseLines ? 'color:#64748b;font-style:italic;' : 'font-weight:600;'}">${phaseDisplay}</td>
+            <td style="font-weight:700; color:#3730a3;">${escapePdfHtml(brandLabel)}</td>
+            <td style="font-weight:700; ${!hasValidTags ? 'color:#64748b;font-style:italic;' : ''}">${escapePdfHtml(displayTags)}</td>
+            <td>${escapePdfHtml(g.modulesLabel || '-')}</td>
+            <td style="${!hasValidLocation ? 'color:#64748b;font-style:italic;' : ''}">${escapePdfHtml(displayLocation)}</td>
+            <td>${specHtml}</td>
+            <td style="${!hasDrawnPhaseLines ? 'color:#64748b;font-style:italic;' : 'font-weight:600;'}">${escapePdfHtml(phaseDisplay)}</td>
             <td style="text-align:right;">${g.unitPower || 0} W</td>
             <td style="text-align:right; font-weight:700;">${g.totalPower || 0} W</td>
-            <td>${g.summaryStatus || '-'}</td>
+            <td>${escapePdfHtml(g.summaryStatus || '-')}</td>
           </tr>`;
         })
         .join('');
@@ -3269,8 +3669,10 @@ export default function App() {
             <thead>
               <tr>
                 <th style="text-align:center;">Cant.</th>
+                <th>Marca</th>
                 <th>TAGs Agrupados</th>
                 <th>Módulo</th>
+                <th>Ubicación</th>
                 <th>Especificación Técnica</th>
                 <th>Circuito / Fase</th>
                 <th style="text-align:right;">Pot. Unit.</th>
@@ -3332,7 +3734,7 @@ export default function App() {
     return objects.filter((obj) => {
       if (filterPhase !== 'all' && obj.phase !== filterPhase) return false;
       if (filterStatus !== 'all' && obj.status !== filterStatus) return false;
-      if (filterModule !== 'all' && obj.moduleId !== filterModule) return false;
+      if (filterModule !== 'all' && getObjectCurrentModuleId(obj) !== filterModule) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTag = obj.tag.toLowerCase().includes(q);
@@ -3343,7 +3745,7 @@ export default function App() {
       }
       return true;
     });
-  }, [objects, filterPhase, filterStatus, filterModule, searchQuery]);
+  }, [objects, filterPhase, filterStatus, filterModule, searchQuery, objectModuleMap]);
 
   const metrics = useMemo(() => {
     const totalPower = objects.reduce((sum, o) => sum + (Number(o.power) || 0), 0);
@@ -5785,7 +6187,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-extrabold uppercase text-sky-500">
-                      Equipo / Luminaria Seleccionada
+                      Equipo / Luminaria Seleccionada · {getObjectCurrentModuleId(selectedObject)}
                     </span>
                     <h2 className="text-lg font-extrabold">{selectedObject.tag}</h2>
                   </div>
@@ -7515,7 +7917,7 @@ export default function App() {
                 : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-extrabold">
                   Resumen General de Equipos por Componente y Marca ({objects.length} unidades) y
@@ -7525,12 +7927,30 @@ export default function App() {
                   Agrupación automática por tipo genérico, marca y potencia unitaria
                 </p>
               </div>
-              <button
-                onClick={() => setShowInventoryModal(false)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800"
-              >
-                Cerrar
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleExportInventorySummaryCSV}
+                  title="Descargar resumen agrupado de equipos y cableado en formato CSV"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Exportar Resumen CSV
+                </button>
+                <button
+                  onClick={handleExportMaintenanceCSV}
+                  title="Descargar listado individual por TAG con ubicación y última inspección para reportes de mantención"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white transition-colors"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Detalle Mantención CSV
+                </button>
+                <button
+                  onClick={() => setShowInventoryModal(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -7568,7 +7988,14 @@ export default function App() {
                         <td className="py-2.5 px-2 text-[11px] text-slate-500 max-w-[180px] truncate">
                           {g.tagsLabel}
                         </td>
-                        <td className="py-2.5 px-2">{g.spec}</td>
+                        <td className="py-2.5 px-2">
+                          <div>{g.spec || '-'}</div>
+                          {g.notesLabel && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              <span className="font-semibold">Notas de mantención:</span> {g.notesLabel}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-2.5 px-2">
                           <span
                             className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
