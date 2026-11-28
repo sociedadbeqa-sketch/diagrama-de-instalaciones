@@ -546,7 +546,7 @@ const INITIAL_CONDUITS = [
     cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
     conduitType: 'Ducto HDPE 32mm PN10',
     conduitSpec: 'Ducto HDPE 32mm PN10',
-    dropMeters: 6,
+    dropMeters: 3,
     points: [
       { x: 112, y: 280 },
       { x: 176, y: 280 },
@@ -559,7 +559,7 @@ const INITIAL_CONDUITS = [
     cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
     conduitType: 'Ducto HDPE 32mm PN10',
     conduitSpec: 'Ducto HDPE 32mm PN10',
-    dropMeters: 6,
+    dropMeters: 3,
     points: [
       { x: 112, y: 280 },
       { x: 112, y: 152 },
@@ -574,7 +574,7 @@ const INITIAL_CONDUITS = [
     cableSpec: 'Cable Submarino H07RN-F 3G4 mm²',
     conduitType: 'Ducto HDPE 32mm PN10',
     conduitSpec: 'Ducto HDPE 32mm PN10',
-    dropMeters: 6,
+    dropMeters: 3,
     points: [
       { x: 112, y: 280 },
       { x: 112, y: 408 },
@@ -882,8 +882,7 @@ export default function App() {
   const [conduitPhase, setConduitPhase] = useState('fase_r');
   const [conduitType, setConduitType] = useState('Ducto HDPE 32mm PN10');
   const [conduitCableSpec, setConduitCableSpec] = useState('Cable Submarino H07RN-F 3G4 mm²');
-  const [conduitDropMeters, setConduitDropMeters] = useState(6);
-  const [conduitTargetModule, setConduitTargetModule] = useState('auto');
+  const [conduitDropMeters, setConduitDropMeters] = useState(3);
   const [conduitOrthoMode, setConduitOrthoMode] = useState(true);
   const [conduitBranchAnchor, setConduitBranchAnchor] = useState(null);
   const [drawingPoints, setDrawingPoints] = useState([]);
@@ -1427,31 +1426,38 @@ export default function App() {
 
   const calculateConduitMetrics = (conduit) => {
     const pts = conduit?.points || [];
+    const perSegmentDrop = Number(conduit?.dropMeters) || 0;
     if (pts.length < 2) {
-      const drop = Number(conduit?.dropMeters) || 0;
       return {
         horizontalMeters: 0,
-        dropMeters: drop,
-        totalMeters: Number(drop.toFixed(1)),
+        dropMeters: 0,
+        perSegmentDropMeters: Number(perSegmentDrop.toFixed(1)),
+        segmentCount: 0,
+        totalMeters: 0,
       };
     }
 
     let horizontalMeters = 0;
+    let segmentCount = 0;
     for (let i = 0; i < pts.length - 1; i++) {
       const p1 = pts[i];
       const p2 = pts[i + 1];
       const segPx = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      if (segPx <= 1) continue;
+      segmentCount += 1;
       const midPt = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
       const metersPerPx = getScaleMetersPerPixelAtPoint(midPt);
       horizontalMeters += segPx * metersPerPx;
     }
 
-    const dropMeters = Number(conduit?.dropMeters) || 0;
+    const dropMeters = perSegmentDrop * segmentCount;
     const totalMeters = horizontalMeters + dropMeters;
 
     return {
       horizontalMeters: Number(horizontalMeters.toFixed(1)),
       dropMeters: Number(dropMeters.toFixed(1)),
+      perSegmentDropMeters: Number(perSegmentDrop.toFixed(1)),
+      segmentCount,
       totalMeters: Number(totalMeters.toFixed(1)),
     };
   };
@@ -1830,9 +1836,7 @@ export default function App() {
     const phaseCfg = CONDUIT_PHASE_CONFIG[phaseKey] || CONDUIT_PHASE_CONFIG.fase_r;
 
     let moduleId = '';
-    if (conduitTargetModule && conduitTargetModule !== 'auto') {
-      moduleId = conduitTargetModule;
-    } else if (activeTool === 'draw_conduit' && drawingPoints.length > 0) {
+    if (activeTool === 'draw_conduit' && drawingPoints.length > 0) {
       moduleId =
         conduitBranchAnchor?.moduleId ||
         detectConduitModuleIdFromPoints(drawingPoints, cages, modules);
@@ -1877,7 +1881,6 @@ export default function App() {
     };
   }, [
     conduitPhase,
-    conduitTargetModule,
     activeTool,
     drawingPoints,
     conduitBranchAnchor,
@@ -2204,7 +2207,6 @@ export default function App() {
     setConduitPhase(phaseKey);
     setConduitType(typeVal);
     setConduitCableSpec(cableVal);
-    setConduitTargetModule(modId);
     setConduitOrthoMode(true);
     setConduitBranchAnchor({
       sourceConduitId: conduit.id,
@@ -2226,7 +2228,16 @@ export default function App() {
   // FINALIZAR TRAZO DE CANALIZACIÓN
   // ============================================================================
   const finishDrawingConduit = (ptsOverride = null) => {
-    const pts = ptsOverride || drawingPoints;
+    const rawPts = ptsOverride || drawingPoints;
+    const pts = [];
+    for (const pt of rawPts) {
+      if (
+        pts.length === 0 ||
+        Math.hypot(pt.x - pts[pts.length - 1].x, pt.y - pts[pts.length - 1].y) > 1
+      ) {
+        pts.push(pt);
+      }
+    }
     if (pts.length < 2) {
       setDrawingPoints([]);
       setCursorSvgPos(null);
@@ -2240,10 +2251,8 @@ export default function App() {
     const phaseCfg = CONDUIT_PHASE_CONFIG[conduitPhase] || CONDUIT_PHASE_CONFIG.fase_r;
     const nextNum = conduits.length + 1;
     const resolvedConduitType = String(conduitType || '').trim() || 'Ducto HDPE 32mm PN10';
-    const useManualMod = Boolean(conduitTargetModule && conduitTargetModule !== 'auto');
-    const resolvedModId = useManualMod
-      ? conduitTargetModule
-      : conduitBranchAnchor?.moduleId || detectConduitModuleIdFromPoints(pts, cages, modules);
+    const resolvedModId =
+      conduitBranchAnchor?.moduleId || detectConduitModuleIdFromPoints(pts, cages, modules);
     const modDigits = String(resolvedModId).replace(/[^0-9]/g, '') || resolvedModId;
 
     const newConduit = {
@@ -2251,7 +2260,7 @@ export default function App() {
       tag: `CAN-${modDigits}-${phaseCfg.short.replace(/[^A-Z0-9]/g, '')}-${String(nextNum).padStart(2, '0')}`,
       phase: conduitPhase,
       moduleId: resolvedModId,
-      manualModule: useManualMod,
+      manualModule: false,
       parentConduitId: conduitBranchAnchor?.sourceConduitId || null,
       cableSpec: conduitCableSpec || 'Cable Submarino H07RN-F 3G4 mm²',
       conduitType: resolvedConduitType,
@@ -2268,7 +2277,6 @@ export default function App() {
       conduitType: resolvedConduitType,
       cableSpec: conduitCableSpec,
       dropMeters: conduitDropMeters,
-      targetModule: conduitTargetModule,
     });
     setDrawingPoints([]);
     setCursorSvgPos(null);
@@ -2484,7 +2492,6 @@ export default function App() {
       if (lastAction.conduitType) setConduitType(lastAction.conduitType);
       if (lastAction.cableSpec) setConduitCableSpec(lastAction.cableSpec);
       if (lastAction.dropMeters !== undefined) setConduitDropMeters(lastAction.dropMeters);
-      if (lastAction.targetModule) setConduitTargetModule(lastAction.targetModule);
       setConduitBranchAnchor(null);
       setDrawingPoints([]);
       setCursorSvgPos(null);
@@ -2747,7 +2754,6 @@ export default function App() {
     conduitType,
     conduitCableSpec,
     conduitDropMeters,
-    conduitTargetModule,
     conduitOrthoMode,
     newCageSizeMeters,
   ]);
@@ -3087,7 +3093,15 @@ export default function App() {
         }
       }
       const nextPt = getConduitDrawPoint(coords.x, coords.y, drawingPoints, conduitBranchAnchor);
-      setDrawingPoints((prev) => [...prev, nextPt]);
+      setDrawingPoints((prev) => {
+        if (
+          prev.length > 0 &&
+          Math.hypot(nextPt.x - prev[prev.length - 1].x, nextPt.y - prev[prev.length - 1].y) <= 1
+        ) {
+          return prev;
+        }
+        return [...prev, nextPt];
+      });
       setCursorSvgPos(nextPt);
       return;
     }
@@ -3245,7 +3259,15 @@ export default function App() {
           }
         }
         const nextPt = getConduitDrawPoint(coords.x, coords.y, drawingPoints, conduitBranchAnchor);
-        setDrawingPoints((prev) => [...prev, nextPt]);
+        setDrawingPoints((prev) => {
+          if (
+            prev.length > 0 &&
+            Math.hypot(nextPt.x - prev[prev.length - 1].x, nextPt.y - prev[prev.length - 1].y) <= 1
+          ) {
+            return prev;
+          }
+          return [...prev, nextPt];
+        });
         setCursorSvgPos(nextPt);
         return;
       }
@@ -4224,8 +4246,61 @@ export default function App() {
               border-radius: 8px;
               box-shadow: 0 4px 20px rgba(15, 23, 42, 0.12);
             }
-            .logo-bar { margin-bottom: 8px; }
+            .sheet-header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 14px;
+              padding: 10px 14px;
+              margin-bottom: 10px;
+              background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+              border: 1px solid #cbd5e1;
+              border-left: 5px solid #0284c7;
+              border-bottom: 2.5px solid #0f172a;
+              border-radius: 6px;
+            }
+            .header-logo-wrap { display: flex; align-items: center; flex-shrink: 0; }
             .logo { max-height: 46px; max-width: 170px; object-fit: contain; }
+            .beqa-badge {
+              display: inline-flex;
+              align-items: center;
+              gap: 9px;
+              background: #0f172a;
+              color: #ffffff;
+              padding: 7px 13px;
+              border-radius: 6px;
+              border: 1.5px solid #0284c7;
+            }
+            .beqa-icon {
+              width: 26px;
+              height: 26px;
+              border-radius: 4px;
+              background: #0284c7;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+            .beqa-wordmark { display: flex; flex-direction: column; line-height: 1.05; }
+            .beqa-brand { font-size: 16px; font-weight: 900; letter-spacing: 1px; color: #ffffff; }
+            .beqa-sub { font-size: 7.5px; font-weight: 800; letter-spacing: 0.9px; color: #38bdf8; text-transform: uppercase; }
+            .header-title-wrap { flex: 1; text-align: center; min-width: 0; }
+            .header-eyebrow { font-size: 9px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #0284c7; margin-bottom: 2px; }
+            .header-main-title { font-size: 20px; font-weight: 900; letter-spacing: 0.6px; color: #0f172a; text-transform: uppercase; line-height: 1.1; }
+            .header-subtitle { font-size: 10.5px; font-weight: 600; color: #475569; margin-top: 2px; }
+            .header-meta {
+              background: #ffffff;
+              border: 1px solid #cbd5e1;
+              border-radius: 5px;
+              padding: 6px 10px;
+              font-size: 9.5px;
+              line-height: 1.45;
+              min-width: 165px;
+              flex-shrink: 0;
+            }
+            .meta-row { display: flex; justify-content: space-between; gap: 10px; }
+            .meta-lbl { font-weight: 800; color: #64748b; text-transform: uppercase; font-size: 8.5px; }
+            .meta-val { font-weight: 800; color: #0f172a; }
             .plan-box {
               border: 1.5px solid #94a3b8;
               border-radius: 8px;
@@ -4276,7 +4351,34 @@ export default function App() {
           </div>
 
           <div class="sheet-wrap">
-            ${companyInfo.logoDataUrl ? `<div class="logo-bar"><img src="${companyInfo.logoDataUrl}" class="logo" /></div>` : ''}
+            <div class="sheet-header">
+              <div class="header-logo-wrap">
+                ${
+                  companyInfo.logoDataUrl
+                    ? `<img src="${companyInfo.logoDataUrl}" class="logo" alt="Logo BEQA" />`
+                    : `<div class="beqa-badge">
+                        <div class="beqa-icon">
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="#ffffff" stroke="none"></polygon>
+                          </svg>
+                        </div>
+                        <div class="beqa-wordmark">
+                          <span class="beqa-brand">BEQA</span>
+                          <span class="beqa-sub">Servicios SpA</span>
+                        </div>
+                      </div>`
+                }
+              </div>
+              <div class="header-title-wrap">
+                <div class="header-eyebrow">Lámina Técnica de Infraestructura Eléctrica</div>
+                <div class="header-main-title">Distribución de Equipos</div>
+                <div class="header-subtitle">${escapePdfHtml(companyInfo.centerName || companyInfo.companyName || 'SERVICIOS BEQA SPA')}</div>
+              </div>
+              <div class="header-meta">
+                <div class="meta-row"><span class="meta-lbl">Código</span><span class="meta-val">${escapePdfHtml(companyInfo.code || 'SIEP-2026-01')}</span></div>
+                <div class="meta-row"><span class="meta-lbl">Fecha</span><span class="meta-val">${escapePdfHtml(new Date().toLocaleDateString('es-CL'))}</span></div>
+              </div>
+            </div>
 
             <div class="plan-box">${svgString}</div>
 
@@ -5470,28 +5572,6 @@ export default function App() {
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                    Módulo del Tramo
-                  </label>
-                  <select
-                    value={conduitTargetModule}
-                    onChange={(e) => setConduitTargetModule(e.target.value)}
-                    className={`w-full px-2 py-1.5 rounded-lg text-xs font-bold border ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-700 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
-                  >
-                    <option value="auto">Automático (según ubicación en plano)</option>
-                    {modules.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id} — {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
                     Fase Eléctrica del Tramo
                   </label>
                   <select
@@ -5536,8 +5616,11 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      Bajada / Holgura (m)
+                    <label
+                      className="block text-[10px] font-bold text-slate-500 mb-0.5"
+                      title="Metros de holgura por cada tramo (clic a clic) de la polilínea"
+                    >
+                      Holgura / Tramo (m)
                     </label>
                     <input
                       type="number"
@@ -6150,9 +6233,7 @@ export default function App() {
               <div className="px-3 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-extrabold shadow-md flex flex-wrap items-center gap-2">
                 <span>
                   Trazando {CONDUIT_PHASE_CONFIG[conduitPhase]?.label}
-                  {conduitBranchAnchor?.moduleId || conduitTargetModule !== 'auto'
-                    ? ` · ${conduitBranchAnchor?.moduleId || conduitTargetModule}`
-                    : ''}{' '}
+                  {conduitBranchAnchor?.moduleId ? ` · ${conduitBranchAnchor.moduleId}` : ''}{' '}
                   ({drawingPoints.length} ptos)
                 </span>
                 <button
@@ -7507,7 +7588,9 @@ export default function App() {
                           <div className="text-xs font-extrabold">{m.horizontalMeters} m</div>
                         </div>
                         <div>
-                          <div className="text-[10px] font-bold text-slate-400">Bajada/Holg.</div>
+                          <div className="text-[10px] font-bold text-slate-400">
+                            Holgura ({m.segmentCount} tr.)
+                          </div>
                           <div className="text-xs font-extrabold">{m.dropMeters} m</div>
                         </div>
                         <div>
@@ -7590,7 +7673,7 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold mb-1">
-                    Holgura de Conexionado (metros)
+                    Holgura de Conexionado por Tramo (metros)
                   </label>
                   <input
                     type="number"
@@ -7604,6 +7687,15 @@ export default function App() {
                         : 'bg-slate-50 border-slate-200 text-slate-900'
                     }`}
                   />
+                  {(() => {
+                    const segInfo = calculateConduitMetrics(selectedConduit);
+                    return (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {segInfo.segmentCount} tramo(s) en polilínea × {segInfo.perSegmentDropMeters} m ={' '}
+                        <strong className="text-sky-500">{segInfo.dropMeters} m</strong> de holgura total
+                      </p>
+                    );
+                  })()}
                 </div>
 
                 <div>
